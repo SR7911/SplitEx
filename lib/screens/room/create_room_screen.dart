@@ -48,9 +48,11 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Create Room')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: _inviteCode != null ? _buildSuccess() : _buildForm(),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: _inviteCode != null ? _buildSuccess() : _buildForm(),
+        ),
       ),
     );
   }
@@ -95,7 +97,7 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.check_circle, size: 64, color: Colors.green),
+        const Icon(Icons.check_circle_rounded, size: 64, color: Colors.green),
         const SizedBox(height: 16),
         Text(
           'Room Created!',
@@ -128,7 +130,7 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
               ),
               const SizedBox(width: 12),
               IconButton(
-                icon: const Icon(Icons.copy),
+                icon: const Icon(Icons.copy_rounded),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _inviteCode!));
                   ScaffoldMessenger.of(context).showSnackBar(

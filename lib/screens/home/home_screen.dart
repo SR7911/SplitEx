@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:split_ex/config/theme.dart';
 import 'package:split_ex/models/activity_model.dart';
 import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/activity_provider.dart';
@@ -11,6 +12,7 @@ import 'package:split_ex/providers/dashboard_provider.dart';
 import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/notification_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/providers/theme_provider.dart';
 import 'package:split_ex/screens/expense/add_expense_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -208,6 +210,16 @@ class _AppDrawer extends ConsumerWidget {
             },
           ),
           const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Text(
+              'Appearance',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+          const _DrawerThemeTile(),
+          const _DrawerPaletteTile(),
+          const Divider(),
           ListTile(
             leading: Icon(Icons.group_add, color: Colors.grey[400]),
             title: Text('Create Room', style: TextStyle(color: Colors.grey[400])),
@@ -229,6 +241,133 @@ class _AppDrawer extends ConsumerWidget {
               await ref.read(authServiceProvider).signOut();
               ref.invalidate(currentRoomProvider);
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DrawerThemeTile extends ConsumerWidget {
+  const _DrawerThemeTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final label = switch (themeMode) {
+      AppThemeMode.light => 'Light',
+      AppThemeMode.dark => 'Dark',
+      AppThemeMode.deepDark => 'Deep Dark',
+      AppThemeMode.system => 'System',
+    };
+    final icon = switch (themeMode) {
+      AppThemeMode.light => Icons.light_mode,
+      AppThemeMode.dark => Icons.dark_mode,
+      AppThemeMode.deepDark => Icons.brightness_1,
+      AppThemeMode.system => Icons.brightness_auto,
+    };
+
+    return ListTile(
+      leading: Icon(icon),
+      title: const Text('Theme'),
+      subtitle: Text(label),
+      onTap: () => _showThemeDialog(context, ref),
+    );
+  }
+
+  void _showThemeDialog(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.read(themeModeProvider);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Choose Theme'),
+        children: AppThemeMode.values.map((mode) {
+          final modeLabel = switch (mode) {
+            AppThemeMode.light => 'Light',
+            AppThemeMode.dark => 'Dark',
+            AppThemeMode.deepDark => 'Deep Dark',
+            AppThemeMode.system => 'System',
+          };
+          final modeIcon = switch (mode) {
+            AppThemeMode.light => Icons.light_mode,
+            AppThemeMode.dark => Icons.dark_mode,
+            AppThemeMode.deepDark => Icons.brightness_1,
+            AppThemeMode.system => Icons.brightness_auto,
+          };
+
+          return RadioListTile<AppThemeMode>(
+            value: mode,
+            groupValue: themeMode,
+            title: Text(modeLabel),
+            secondary: Icon(modeIcon),
+            onChanged: (value) {
+              if (value == null) return;
+              ref.read(themeModeProvider.notifier).setMode(value);
+              Navigator.pop(ctx);
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _DrawerPaletteTile extends ConsumerWidget {
+  const _DrawerPaletteTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentPalette = ref.watch(appPaletteProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.palette_rounded, size: 22),
+              const SizedBox(width: 16),
+              Text(
+                'Color - ${AppTheme.paletteName(currentPalette)}',
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: AppPalette.values.map((palette) {
+              final isSelected = palette == currentPalette;
+              final color = AppTheme.paletteColor(palette);
+
+              return Tooltip(
+                message: AppTheme.paletteName(palette),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => ref.read(appPaletteProvider.notifier).setPalette(palette),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isSelected
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Colors.transparent,
+                        width: 2,
+                      ),
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        : null,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),
@@ -730,13 +869,13 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: () => context.push('/create-room'),
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_rounded),
               label: const Text('Create Room'),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => context.push('/join-room'),
-              icon: const Icon(Icons.person_add),
+              icon: const Icon(Icons.person_add_rounded),
               label: const Text('Join Room'),
             ),
           ],
@@ -791,7 +930,7 @@ class _NotificationBell extends ConsumerWidget {
       icon: Badge(
         isLabelVisible: count > 0,
         label: Text('$count', style: const TextStyle(fontSize: 10)),
-        child: const Icon(Icons.notifications_outlined),
+        child: const Icon(Icons.notifications_none_rounded),
       ),
       tooltip: 'Notifications',
       onPressed: () => context.push('/notifications'),

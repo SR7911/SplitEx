@@ -45,7 +45,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         createdAt: DateTime.now(),
       );
       await ref.read(userServiceProvider).createUserProfile(userModel);
-      if (mounted) context.go('/');
+      ref.invalidate(profileExistsProvider);
+      final hasProfile = await ref.read(profileExistsProvider.future);
+      if (mounted && hasProfile) context.go('/');
     } on Exception catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -364,7 +364,17 @@ class AppTheme {
       scaffoldBackgroundColor: bg,
       colorScheme: base.colorScheme.copyWith(surface: surface),
       cardTheme: base.cardTheme.copyWith(color: cardColor),
-      appBarTheme: base.appBarTheme.copyWith(backgroundColor: const Color(0xFF000000)),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: const Color(0xFF000000),
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(color: Colors.white),
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Color(0xFF000000),
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
+      ),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(fillColor: cardColor),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Color(0xFF0A0A0A),
