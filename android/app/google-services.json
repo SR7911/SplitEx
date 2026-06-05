@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "341719116383",
+    "project_id": "splitex-17485",
+    "storage_bucket": "splitex-17485.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:341719116383:android:c68694620ad55577ed09ea",
+        "android_client_info": {
+          "package_name": "com.splitex.in.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "341719116383-av1a7uo3abks6cimihkogo8eh1h9o139.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.splitex.in.app",
+            "certificate_hash": "ae2360a0f717ab6b885e76609fc416e4df941e51"
+          }
+        },
+        {
+          "client_id": "341719116383-ttlbrk7eno681vftds800fqspg7eucgl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.splitex.in.app",
+            "certificate_hash": "379dfec892f06ed09af4658b75670c4d240acef3"
+          }
+        },
+        {
+          "client_id": "341719116383-1ft1m93qu2340ohsiubjli9ehslirgaj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoeSa4pY3W1nly0TFgr46IqBO26Bp4Mds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "341719116383-1ft1m93qu2340ohsiubjli9ehslirgaj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
