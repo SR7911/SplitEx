@@ -28,7 +28,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => UpiIdDialog(userId: ref.read(currentUserIdProvider)),
+        builder: (_) => UpiIdDialog(userId: ref.read(currentUserIdProvider), allowSkip: true),
       );
     }
   }

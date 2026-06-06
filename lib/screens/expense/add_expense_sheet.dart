@@ -91,7 +91,8 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
           );
           return;
         }
-        splitAmong = [userId, _selectedMembers.first];
+        // For one-to-one split, the selected person owes the full amount to the payer.
+        splitAmong = [_selectedMembers.first];
         break;
     }
 
@@ -274,7 +275,9 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
               if (_splitType != SplitType.equal && room != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  _splitType == SplitType.oneToOne ? 'Select one person:' : 'Split with:',
+                  _splitType == SplitType.oneToOne
+                      ? 'Select one person who owes the full amount:'
+                      : 'Split with:',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 ..._buildMemberChips(room.memberIds),

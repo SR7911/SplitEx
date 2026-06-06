@@ -25,7 +25,8 @@ import 'package:split_ex/services/receipt_generator.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
-  const RoomDetailScreen({super.key, required this.roomId});
+  final int initialTabIndex;
+  const RoomDetailScreen({super.key, required this.roomId, this.initialTabIndex = 0});
 
   @override
   ConsumerState<RoomDetailScreen> createState() => _RoomDetailScreenState();
@@ -38,7 +39,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTabIndex);
     _tabController.addListener(() => setState(() {}));
     _selectedMonth = DateTime.now();
   }

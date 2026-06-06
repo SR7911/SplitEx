@@ -12,11 +12,12 @@ service cloud.firestore {
 
     // Rooms collection
     match /rooms/{roomId} {
-      allow read: if request.auth != null &&
-        request.auth.uid in resource.data.memberIds;
+      allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update: if request.auth != null &&
-        request.auth.uid in resource.data.memberIds;
+        (request.auth.uid in resource.data.memberIds ||
+         (request.auth.uid in request.resource.data.memberIds &&
+          !(request.auth.uid in resource.data.memberIds)));
       allow delete: if request.auth != null &&
         request.auth.uid == resource.data.adminId;
 
@@ -28,6 +29,19 @@ service cloud.firestore {
           request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
         allow update: if request.auth != null &&
           (request.auth.uid == resource.data.createdBy ||
+           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId);
+        allow delete: if request.auth != null &&
+          request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId;
+      }
+
+      // Bills subcollection - room members only
+      match /bills/{billId} {
+        allow read: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+        allow create: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+        allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.paidBy ||
            request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId);
         allow delete: if request.auth != null &&
           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId;

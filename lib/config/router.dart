@@ -22,18 +22,23 @@ import 'package:split_ex/screens/settings/settings_screen.dart';
 import 'package:split_ex/screens/settings/edit_profile_screen.dart';
 import 'package:split_ex/screens/settings/change_password_screen.dart';
 import 'package:split_ex/screens/settings/notification_preferences_screen.dart';
+import 'package:split_ex/screens/splash/splash_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final profileExists = ref.watch(profileExistsProvider);
 
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     redirect: (context, state) {
       final isLoggedIn = authState.valueOrNull != null;
+      final isSplash = state.matchedLocation == '/splash';
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
       final isProfileSetup = state.matchedLocation == '/profile-setup';
+
+      // Don't redirect if we are on splash, let it handle the first navigation
+      if (isSplash) return null;
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
       if (isLoggedIn && isAuthRoute) {
@@ -48,6 +53,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) => const HomeScreen(),
@@ -78,9 +87,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/room/:roomId',
-        builder: (context, state) => RoomDetailScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
+        builder: (context, state) {
+          final tabParam = state.uri.queryParameters['tab'];
+          var initialTabIndex = 0;
+          if (tabParam != null) {
+            switch (tabParam) {
+              case 'bills':
+              case '1':
+                initialTabIndex = 1;
+                break;
+              case 'settlements':
+              case '2':
+                initialTabIndex = 2;
+                break;
+            }
+          }
+          return RoomDetailScreen(
+            roomId: state.pathParameters['roomId']!,
+            initialTabIndex: initialTabIndex,
+          );
+        },
       ),
       GoRoute(
         path: '/room/:roomId/dashboard',

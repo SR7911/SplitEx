@@ -68,3 +68,13 @@ samples, guidance on mobile development, and a full API reference.
 - Email verification
 - Re-authentication for sensitive operations
 - Anonymous sign-in
+
+
+### Known issues
+- Image upload issue
+- Settlement issue - UPI apps showing error during payment(GPAY, Phonepay, Paytm)
+- 1 - 1 Expense should be like, a person paying for another person, i.e, one person owing the entered anount totally to paid person - Done
+- Clicking settle up in homepage, moving to expense tab of room page instead of settlement tab
+- Settlement tab showing same data even changing months
+- Pending settlements are showing in activity log and recent activity
+- Home page selecting other month, current month recent activity showing

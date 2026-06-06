@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/services/user_service.dart';
+import 'package:split_ex/screens/settlement/upi_id_dialog.dart';
 
 class JoinRoomScreen extends ConsumerStatefulWidget {
   const JoinRoomScreen({super.key});
@@ -26,10 +28,52 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
     setState(() => _isLoading = true);
     try {
       final userId = ref.read(currentUserIdProvider);
+
+      // Ensure user has a primary UPI ID before joining a room. If missing,
+      // prompt the user explaining that UPI is only used to receive money
+      // (not for fraud). This prompt is skippable earlier in onboarding but
+      // mandatory when joining a room.
+      final profile = await UserService().getUserProfile(userId);
+      if (profile == null || profile.upiId == null || profile.upiId!.isEmpty) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('UPI ID Required to Join'),
+            content: const Text(
+                'To join a room you must add your primary UPI ID so others can settle payments with you. This is only used to receive money and will not be used for fraud or marketing.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Set UPI')),
+            ],
+          ),
+        );
+
+        if (proceed != true) {
+          return;
+        }
+
+        // Force UPI dialog (no skip) and wait for user to save.
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => UpiIdDialog(userId: userId, allowSkip: false),
+        );
+
+        final updated = await UserService().getUserProfile(userId);
+        if (updated == null || updated.upiId == null || updated.upiId!.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('UPI ID is required to join a room')),
+            );
+          }
+          return;
+        }
+      }
+
       final room = await ref.read(roomServiceProvider).joinRoom(
-            _codeController.text.trim().toUpperCase(),
-            userId,
-          );
+        _codeController.text.trim().toUpperCase(),
+        userId,
+      );
       if (room == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -22,7 +22,11 @@ class UpiService {
     );
 
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      // await launchUrl(uri);
+      await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
       return true;
     }
     return false;

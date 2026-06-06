@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/config/theme.dart';
 import 'package:split_ex/models/activity_model.dart';
 import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/activity_provider.dart';
@@ -12,8 +11,9 @@ import 'package:split_ex/providers/dashboard_provider.dart';
 import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/notification_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
-import 'package:split_ex/providers/theme_provider.dart';
 import 'package:split_ex/screens/expense/add_expense_sheet.dart';
+import 'package:split_ex/services/user_service.dart';
+import 'package:split_ex/screens/settlement/upi_id_dialog.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -42,6 +42,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!next.isAfter(DateTime(now.year, now.month))) {
       setState(() => _selectedMonth = next);
     }
+  }
+
+  Future<bool> checkUpiExist() async {
+    // Ensure primary UPI is set before entering the room. Force entry
+    // of UPI (no skip) when missing — block further app actions until saved.
+    final userId = ref.read(currentUserIdProvider);
+    var profile = ref.read(userProfileProvider).valueOrNull;
+    if (profile == null) {
+      profile = await UserService().getUserProfile(userId);
+    }
+    if (profile == null || profile.upiId == null || profile.upiId!.isEmpty) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('UPI ID Required to Enter Room'),
+          content: const Text('To enter a room you must add your primary UPI ID so others can settle payments with you. This is only used to receive money and will not be used for fraud or marketing.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Set UPI')),
+          ],
+        ),
+      );
+
+      if (proceed != true) return false;
+
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => UpiIdDialog(userId: userId, allowSkip: false),
+      );
+
+      final updated = await UserService().getUserProfile(userId);
+      if (updated == null || updated.upiId == null || updated.upiId!.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('UPI ID is required to enter a room')));
+        }
+        return false;
+      }
+    }
+
+    return true;
   }
 
   bool get _isCurrentMonth =>
@@ -101,7 +142,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 memberCount: room.memberIds.length,
                 inviteCode: room.inviteCode,
                 isAdmin: room.isAdmin(userId),
-                onTap: () {
+                onTap: () async {
+                  final allowed = await checkUpiExist();
+                  if (!allowed) return;
+
                   ref.read(currentRoomProvider.notifier).state = room;
                   context.push('/room/${room.id}');
                 },
@@ -121,7 +165,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 16),
 
               // 6. Quick Actions
-              _QuickActions(roomId: room.id, selectedMonth: _selectedMonth),
+              _QuickActions(roomId: room.id, selectedMonth: _selectedMonth, checkUpiExist: checkUpiExist),
               const SizedBox(height: 16),
 
               // 7. Recent Activity
@@ -210,16 +254,6 @@ class _AppDrawer extends ConsumerWidget {
             },
           ),
           const Divider(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Text(
-              'Appearance',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-          ),
-          const _DrawerThemeTile(),
-          const _DrawerPaletteTile(),
-          const Divider(),
           ListTile(
             leading: Icon(Icons.group_add, color: Colors.grey[400]),
             title: Text('Create Room', style: TextStyle(color: Colors.grey[400])),
@@ -241,133 +275,6 @@ class _AppDrawer extends ConsumerWidget {
               await ref.read(authServiceProvider).signOut();
               ref.invalidate(currentRoomProvider);
             },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DrawerThemeTile extends ConsumerWidget {
-  const _DrawerThemeTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeModeProvider);
-    final label = switch (themeMode) {
-      AppThemeMode.light => 'Light',
-      AppThemeMode.dark => 'Dark',
-      AppThemeMode.deepDark => 'Deep Dark',
-      AppThemeMode.system => 'System',
-    };
-    final icon = switch (themeMode) {
-      AppThemeMode.light => Icons.light_mode,
-      AppThemeMode.dark => Icons.dark_mode,
-      AppThemeMode.deepDark => Icons.brightness_1,
-      AppThemeMode.system => Icons.brightness_auto,
-    };
-
-    return ListTile(
-      leading: Icon(icon),
-      title: const Text('Theme'),
-      subtitle: Text(label),
-      onTap: () => _showThemeDialog(context, ref),
-    );
-  }
-
-  void _showThemeDialog(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.read(themeModeProvider);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Choose Theme'),
-        children: AppThemeMode.values.map((mode) {
-          final modeLabel = switch (mode) {
-            AppThemeMode.light => 'Light',
-            AppThemeMode.dark => 'Dark',
-            AppThemeMode.deepDark => 'Deep Dark',
-            AppThemeMode.system => 'System',
-          };
-          final modeIcon = switch (mode) {
-            AppThemeMode.light => Icons.light_mode,
-            AppThemeMode.dark => Icons.dark_mode,
-            AppThemeMode.deepDark => Icons.brightness_1,
-            AppThemeMode.system => Icons.brightness_auto,
-          };
-
-          return RadioListTile<AppThemeMode>(
-            value: mode,
-            groupValue: themeMode,
-            title: Text(modeLabel),
-            secondary: Icon(modeIcon),
-            onChanged: (value) {
-              if (value == null) return;
-              ref.read(themeModeProvider.notifier).setMode(value);
-              Navigator.pop(ctx);
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
-class _DrawerPaletteTile extends ConsumerWidget {
-  const _DrawerPaletteTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentPalette = ref.watch(appPaletteProvider);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.palette_rounded, size: 22),
-              const SizedBox(width: 16),
-              Text(
-                'Color - ${AppTheme.paletteName(currentPalette)}',
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: AppPalette.values.map((palette) {
-              final isSelected = palette == currentPalette;
-              final color = AppTheme.paletteColor(palette);
-
-              return Tooltip(
-                message: AppTheme.paletteName(palette),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => ref.read(appPaletteProvider.notifier).setPalette(palette),
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.onSurface
-                            : Colors.transparent,
-                        width: 2,
-                      ),
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
-                  ),
-                ),
-              );
-            }).toList(),
           ),
         ],
       ),
@@ -551,7 +458,16 @@ class _RoomHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isAdmin) const Chip(label: Text('Admin')),
+              if (isAdmin)
+                Chip(
+                  label: Text(
+                    'Admin',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
               const Icon(Icons.chevron_right),
             ],
           ),
@@ -610,7 +526,8 @@ class _SpendingSummary extends StatelessWidget {
 class _QuickActions extends ConsumerWidget {
   final String roomId;
   final DateTime selectedMonth;
-  const _QuickActions({required this.roomId, required this.selectedMonth});
+  final Future<bool> Function()? checkUpiExist;
+  const _QuickActions({required this.roomId, required this.selectedMonth, this.checkUpiExist});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -618,7 +535,8 @@ class _QuickActions extends ConsumerWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            onPressed: () {
+            onPressed: () async {
+              if (checkUpiExist != null && !await checkUpiExist!()) return;
               final room = ref.read(userRoomsProvider).valueOrNull?.first;
               if (room != null) {
                 ref.read(currentRoomProvider.notifier).state = room;
@@ -632,7 +550,10 @@ class _QuickActions extends ConsumerWidget {
         const SizedBox(width: 10),
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: () => context.push('/room/$roomId'),
+            onPressed: () async {
+              if (checkUpiExist != null && !await checkUpiExist!()) return;
+              context.push('/room/$roomId?tab=settlements');
+            },
             icon: const Icon(Icons.handshake, size: 18),
             label: const Text('Settle Up'),
           ),

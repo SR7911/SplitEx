@@ -1,4 +1,6 @@
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -32,17 +34,27 @@ class UploadService {
       final fileName =
           '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
       final ref = _storage.ref('receipts/$roomId/$folder/$fileName');
-      await ref.putFile(file).timeout(const Duration(seconds: 30));
-      return await ref.getDownloadURL();
-    } catch (_) {
+      final snapshot = await ref.putFile(file);
+      if (snapshot.state == TaskState.success) {
+        return await ref.getDownloadURL();
+      }
+      return null;
+    } on FirebaseException catch (e, st) {
+      debugPrint('UploadReceipt FirebaseException: ${e.code} ${e.message}');
+      debugPrint('$st');
+      return null;
+    } catch (e, st) {
+      debugPrint('UploadReceipt failed: $e');
+      debugPrint('$st');
       return null;
     }
   }
 
   Future<bool> _hasNetwork() async {
     try {
-      final result = await InternetAddress.lookup('googleapis.com')
-          .timeout(const Duration(seconds: 3));
+      final result = await InternetAddress.lookup(
+        'googleapis.com',
+      ).timeout(const Duration(seconds: 3));
       return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
     } catch (_) {
       return false;

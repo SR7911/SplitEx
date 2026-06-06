@@ -7,6 +7,8 @@ import 'package:split_ex/providers/settlement_provider.dart';
 import 'package:split_ex/providers/activity_provider.dart';
 import 'package:split_ex/models/activity_model.dart';
 import 'package:split_ex/services/balance_service.dart';
+import 'package:split_ex/services/user_service.dart';
+import 'package:split_ex/screens/settlement/upi_id_dialog.dart';
 
 class SettlementScreen extends ConsumerWidget {
   final String roomId;
@@ -91,8 +93,39 @@ class SettlementScreen extends ConsumerWidget {
   }
 
   Future<void> _launchUpi(BuildContext context, WidgetRef ref, String payeeName) async {
+    // Look up payee's profile to get their UPI ID
+    final payeeProfile = await UserService().getUserProfile(debt.to);
+    final upiId = payeeProfile?.upiId;
+
+    if (upiId == null || upiId.isEmpty) {
+      // Payee hasn't set a UPI ID — inform the user and offer options
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('UPI ID Not Set'),
+          content: Text('${nameMap[debt.to] ?? debt.to} has not set a UPI ID.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                // Allow current user to mark as paid manually
+                _markAsPaid(context, ref);
+              },
+              child: const Text('Mark as Paid'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final launched = await ref.read(upiServiceProvider).launchPayment(
-          upiId: 'test@upi', // Will use real UPI ID from user profile in production
+          upiId: upiId,
           payeeName: payeeName,
           amount: debt.amount,
           note: 'SplitEx settlement',

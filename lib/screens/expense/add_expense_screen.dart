@@ -75,7 +75,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           );
           return;
         }
-        splitAmong = [userId, _selectedMembers.first];
+        // For one-to-one split, the selected person owes the full amount to the payer.
+        splitAmong = [_selectedMembers.first];
         break;
     }
 
@@ -243,7 +244,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 const SizedBox(height: 16),
                 Text(
                   _splitType == SplitType.oneToOne
-                      ? 'Select one person:'
+                      ? 'Select one person who owes the full amount:'
                       : 'Select members to split with:',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),

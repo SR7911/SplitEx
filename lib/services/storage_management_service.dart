@@ -52,7 +52,12 @@ class StorageStats {
   static const int maxFirestoreBytes = 1073741824;
   static const int maxStorageBytes = 5368709120;
 
-  int get totalDocs => totalExpenses + totalBills + totalActivities + totalSettlements + totalNotifications;
+  int get totalDocs =>
+      totalExpenses +
+      totalBills +
+      totalActivities +
+      totalSettlements +
+      totalNotifications;
 }
 
 class StorageManagementService {
@@ -112,9 +117,8 @@ class StorageManagementService {
     final activitiesSnap = await roomRef.collection('activities').get();
     final settlementsSnap = await roomRef.collection('settlements').get();
     final notificationsSnap = await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('notifications')
+        .where('targetUserId', isEqualTo: userId)
         .get();
 
     // Build month data
@@ -146,16 +150,18 @@ class StorageManagementService {
       addToMonth(month, 'notifications');
     }
 
-    final dataByMonth = monthMap.map((month, counts) => MapEntry(
-          month,
-          MonthData(
-            expenses: counts['expenses'] ?? 0,
-            bills: counts['bills'] ?? 0,
-            activities: counts['activities'] ?? 0,
-            settlements: counts['settlements'] ?? 0,
-            notifications: counts['notifications'] ?? 0,
-          ),
-        ));
+    final dataByMonth = monthMap.map(
+      (month, counts) => MapEntry(
+        month,
+        MonthData(
+          expenses: counts['expenses'] ?? 0,
+          bills: counts['bills'] ?? 0,
+          activities: counts['activities'] ?? 0,
+          settlements: counts['settlements'] ?? 0,
+          notifications: counts['notifications'] ?? 0,
+        ),
+      ),
+    );
 
     // Images
     int totalImages = 0;
@@ -169,7 +175,8 @@ class StorageManagementService {
       }
     } catch (_) {}
 
-    final totalDocs = expensesSnap.docs.length +
+    final totalDocs =
+        expensesSnap.docs.length +
         billsSnap.docs.length +
         activitiesSnap.docs.length +
         settlementsSnap.docs.length +
@@ -195,8 +202,12 @@ class StorageManagementService {
   }
 
   Future<int> clearExpensesByMonth(String roomId, String month) async {
-    final snap = await _firestore.collection('rooms').doc(roomId)
-        .collection('expenses').where('month', isEqualTo: month).get();
+    final snap = await _firestore
+        .collection('rooms')
+        .doc(roomId)
+        .collection('expenses')
+        .where('month', isEqualTo: month)
+        .get();
     final batch = _firestore.batch();
     for (final doc in snap.docs) batch.delete(doc.reference);
     await batch.commit();
@@ -205,8 +216,12 @@ class StorageManagementService {
   }
 
   Future<int> clearBillsByMonth(String roomId, String month) async {
-    final snap = await _firestore.collection('rooms').doc(roomId)
-        .collection('bills').where('month', isEqualTo: month).get();
+    final snap = await _firestore
+        .collection('rooms')
+        .doc(roomId)
+        .collection('bills')
+        .where('month', isEqualTo: month)
+        .get();
     final batch = _firestore.batch();
     for (final doc in snap.docs) batch.delete(doc.reference);
     await batch.commit();
@@ -217,7 +232,9 @@ class StorageManagementService {
   Future<int> clearActivitiesByMonth(String roomId, String month) async {
     final start = DateTime.parse('$month-01');
     final end = DateTime(start.year, start.month + 1);
-    final snap = await _firestore.collection('rooms').doc(roomId)
+    final snap = await _firestore
+        .collection('rooms')
+        .doc(roomId)
         .collection('activities')
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('createdAt', isLessThan: Timestamp.fromDate(end))
@@ -232,7 +249,9 @@ class StorageManagementService {
   Future<int> clearSettlementsByMonth(String roomId, String month) async {
     final start = DateTime.parse('$month-01');
     final end = DateTime(start.year, start.month + 1);
-    final snap = await _firestore.collection('rooms').doc(roomId)
+    final snap = await _firestore
+        .collection('rooms')
+        .doc(roomId)
         .collection('settlements')
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('createdAt', isLessThan: Timestamp.fromDate(end))
@@ -247,8 +266,9 @@ class StorageManagementService {
   Future<int> clearNotificationsByMonth(String userId, String month) async {
     final start = DateTime.parse('$month-01');
     final end = DateTime(start.year, start.month + 1);
-    final snap = await _firestore.collection('users').doc(userId)
+    final snap = await _firestore
         .collection('notifications')
+        .where('targetUserId', isEqualTo: userId)
         .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('createdAt', isLessThan: Timestamp.fromDate(end))
         .get();
@@ -259,7 +279,11 @@ class StorageManagementService {
     return snap.docs.length;
   }
 
-  Future<int> clearAllDataByMonth(String roomId, String userId, String month) async {
+  Future<int> clearAllDataByMonth(
+    String roomId,
+    String userId,
+    String month,
+  ) async {
     int total = 0;
     total += await clearExpensesByMonth(roomId, month);
     total += await clearBillsByMonth(roomId, month);
@@ -283,5 +307,4 @@ class StorageManagementService {
     } catch (_) {}
     return deleted;
   }
-
 }
