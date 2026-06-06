@@ -1,3 +1,4 @@
+import 'package:split_ex/models/bill_model.dart';
 import 'package:split_ex/models/expense_model.dart';
 
 class Debt {
@@ -10,9 +11,19 @@ class Debt {
 
 class BalanceService {
   /// Computes net balance for each user. Positive = owed money, Negative = owes money.
-  Map<String, double> computeNetBalances(List<ExpenseModel> expenses) {
+  Map<String, double> computeNetBalances({
+    required List<ExpenseModel> expenses,
+    required List<BillModel> bills,
+    required List<String> memberIds,
+  }) {
     final balances = <String, double>{};
 
+    // Initialize balances for all members to 0
+    for (final id in memberIds) {
+      balances[id] = 0;
+    }
+
+    // Process Expenses
     for (final expense in expenses) {
       final payer = expense.paidBy;
       final splitMembers = expense.splitAmong;
@@ -25,6 +36,22 @@ class BalanceService {
 
       // Each member owes their share
       for (final member in splitMembers) {
+        balances[member] = (balances[member] ?? 0) - share;
+      }
+    }
+
+    // Process Bills (Shared equally among all members)
+    for (final bill in bills) {
+      final payer = bill.paidBy;
+      if (memberIds.isEmpty) continue;
+
+      final share = bill.amount / memberIds.length;
+
+      // Payer is owed by others
+      balances[payer] = (balances[payer] ?? 0) + bill.amount;
+
+      // Each member owes their share
+      for (final member in memberIds) {
         balances[member] = (balances[member] ?? 0) - share;
       }
     }

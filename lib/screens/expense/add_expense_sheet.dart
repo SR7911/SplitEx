@@ -326,9 +326,12 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   _selectedMembers = checked ? [memberId] : [];
                 } else {
                   if (checked) {
-                    _selectedMembers.add(memberId);
+                    _selectedMembers.addAll([memberId, userId]);
+                    _selectedMembers = _selectedMembers.toSet().toList();
                   } else {
-                    _selectedMembers.remove(memberId);
+                    _selectedMembers = _selectedMembers
+                      .where((id) => id != memberId && id != userId)
+                      .toList();
                   }
                 }
               });

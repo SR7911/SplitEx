@@ -25,8 +25,9 @@ import 'package:split_ex/services/receipt_generator.dart';
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
+  final DateTime selectedMonthInHome;
   final int initialTabIndex;
-  const RoomDetailScreen({super.key, required this.roomId, this.initialTabIndex = 0});
+  const RoomDetailScreen({super.key, required this.roomId, required this.selectedMonthInHome, this.initialTabIndex = 0});
 
   @override
   ConsumerState<RoomDetailScreen> createState() => _RoomDetailScreenState();
@@ -35,13 +36,13 @@ class RoomDetailScreen extends ConsumerStatefulWidget {
 class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late DateTime _selectedMonth;
+  late DateTime _selectedMonth = widget.selectedMonthInHome;
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTabIndex);
     _tabController.addListener(() => setState(() {}));
-    _selectedMonth = DateTime.now();
+    // _selectedMonth = widget.selectedMonthInHome;
   }
 
   @override
@@ -817,6 +818,9 @@ class _BillsTab extends ConsumerWidget {
     final billsAsync = ref.watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: month)));
     final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
     final membersAsync = ref.watch(roomMembersProvider(members));
+    final userId = ref.read(currentUserIdProvider);
+    final room = ref.watch(currentRoomProvider);
+    final isAdmin = room?.isAdmin(userId) ?? false;
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
       for (final m in membersAsync.value!) {
@@ -834,14 +838,64 @@ class _BillsTab extends ConsumerWidget {
           children: bills.map((bill) {
             final paidBy = nameMap[bill.paidBy] ?? bill.paidBy;
             final icon = switch (bill.type) { BillType.rent => Icons.home, BillType.electricity => Icons.bolt, BillType.water => Icons.water_drop };
-            return Card(
-              child: ListTile(
-                leading: CircleAvatar(child: Icon(icon)),
-                title: Text(bill.typeName),
-                subtitle: Text('Paid by $paidBy \u2022 ${DateFormat('dd MMM').format(bill.date)}'),
-                trailing: Text('\u20b9${bill.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
+            final card = Card(
+                child: ListTile(
+                  leading: CircleAvatar(child: Icon(icon)),
+                  title: Text(bill.typeName),
+                  subtitle: Text('Paid by $paidBy \u2022 ${DateFormat('dd MMM').format(bill.date)}'),
+                  trailing: Text('\u20b9${bill.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
+                ),
+              );
+
+            if (!isAdmin) return card;
+
+            return Dismissible(
+              key: Key(bill.id),
+              direction: DismissDirection.endToStart,
+              background: Card(
+                color: Colors.red,
+                child: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
               ),
+              confirmDismiss: (_) async {
+                return await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete Bill'),
+                    content: Text('Delete "${bill.typeName}"?'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              onDismissed: (_) {
+                ref.read(billServiceProvider).deleteBill(roomId, bill.id);
+                ref.read(activityServiceProvider).log(
+                      roomId: roomId,
+                      type: ActivityType.expenseDeleted,
+                      performedBy: userId,
+                      description: 'Deleted "${bill.typeName}"',
+                      metadata: {
+                        'title': bill.typeName,
+                        'amount': bill.amount,
+                        'paidBy': bill.paidBy,
+                        'splitAmong': bill.splitAmong,
+                        'date': DateFormat('dd MMM yyyy').format(bill.date),
+                      },
+                    );
+              },
+              child: card,
             );
           }).toList(),
         );

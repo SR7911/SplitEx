@@ -6,7 +6,9 @@ class BillModel {
   final String id;
   final BillType type;
   final double amount;
+  final String splitType;
   final String paidBy;
+  final List<String> splitAmong;
   final String month;
   final DateTime date;
   final String? receiptUrl;
@@ -16,11 +18,13 @@ class BillModel {
     required this.id,
     required this.type,
     required this.amount,
+    required this.splitType,
     required this.paidBy,
+    required this.splitAmong,
     required this.month,
     required this.date,
     this.receiptUrl,
-    required this.createdAt,
+    required this.createdAt, 
   });
 
   String get typeName => switch (type) {
@@ -41,7 +45,9 @@ class BillModel {
       month: map['month'] ?? '',
       date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       receiptUrl: map['receiptUrl'],
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      splitType: map['splitType'],
+      splitAmong: List<String>.from(map['splitAmong'] ?? []),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(), 
     );
   }
 
@@ -51,6 +57,8 @@ class BillModel {
       'amount': amount,
       'paidBy': paidBy,
       'month': month,
+      'splitType': splitType,
+      'splitAmong': splitAmong,
       'date': Timestamp.fromDate(date),
       'receiptUrl': receiptUrl,
       'createdAt': FieldValue.serverTimestamp(),

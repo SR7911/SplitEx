@@ -147,7 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   if (!allowed) return;
 
                   ref.read(currentRoomProvider.notifier).state = room;
-                  context.push('/room/${room.id}');
+                  context.push('/room/${room.id}', extra: _selectedMonth);
                 },
               ),
               const SizedBox(height: 12),
@@ -169,7 +169,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 16),
 
               // 7. Recent Activity
-              _RecentActivitySection(),
+              _isCurrentMonth ? _RecentActivitySection() : SizedBox(),
 
               // 8. Tips
               _OnboardingTips(roomId: room.id, userId: userId),
@@ -678,6 +678,9 @@ class _ActivityItem extends StatelessWidget {
         ActivityType.memberLeft => Icons.person_remove,
         ActivityType.roomCreated => Icons.home_outlined,
         ActivityType.roomSettingsChanged => Icons.settings,
+        ActivityType.billAdded => Icons.add_circle_outline,
+        ActivityType.billEdited => Icons.edit,
+        ActivityType.billDeleted => Icons.delete_outline,
       };
 
   @override

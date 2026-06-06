@@ -43,12 +43,19 @@ class _AddBillScreenState extends ConsumerState<AddBillScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
+    final room = ref.read(currentRoomProvider);
+    if (room == null) return;
+
+    List<String> splitAmong = room.memberIds;
+
     final userId = ref.read(currentUserIdProvider);
     final bill = BillModel(
       id: '',
       type: _billType,
       amount: double.parse(_amountController.text.trim()),
       paidBy: userId,
+      splitType: 'equal',
+      splitAmong: splitAmong,
       month: DateFormat('yyyy-MM').format(_date),
       date: _date,
       receiptUrl: _receiptUrl,

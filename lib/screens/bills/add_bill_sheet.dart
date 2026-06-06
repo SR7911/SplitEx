@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:split_ex/models/activity_model.dart';
 import 'package:split_ex/models/bill_model.dart';
+import 'package:split_ex/providers/activity_provider.dart';
 import 'package:split_ex/providers/bill_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/widgets/receipt_picker.dart';
@@ -58,12 +60,19 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
+    final room = ref.read(currentRoomProvider);
+    if (room == null) return;
+
+    List<String> splitAmong = room.memberIds;
+
     final userId = ref.read(currentUserIdProvider);
     final bill = BillModel(
       id: '',
       type: _billType,
       amount: double.parse(_amountController.text.trim()),
       paidBy: userId,
+      splitType: 'equal',
+      splitAmong: splitAmong,
       month: DateFormat('yyyy-MM').format(_date),
       date: _date,
       receiptUrl: _receiptUrl,
@@ -72,6 +81,24 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
 
     try {
       await ref.read(billServiceProvider).addBill(widget.roomId, bill);
+      
+      // Log activity
+      await ref.read(activityServiceProvider).log(
+        roomId: widget.roomId,
+        type: ActivityType.billAdded,
+        performedBy: userId,
+        description: 'Added ${bill.typeName} bill: ₹${bill.amount}',
+        metadata: {
+          'title': bill.type.name,
+          'amount': bill.amount,
+          'category': bill.type.name,
+          'paidBy': bill.paidBy,
+          'splitAmong': splitAmong,
+          'date': DateFormat('dd MMM yyyy').format(bill.date),
+          'type': bill.type.name
+        },
+      );
+
       if (mounted) Navigator.pop(context);
     } on Exception catch (e) {
       if (mounted) {

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:split_ex/providers/bill_provider.dart';
 import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/services/balance_service.dart';
@@ -22,7 +23,19 @@ class MonthBalanceKey {
 final netBalancesProvider =
     Provider.family<Map<String, double>, String>((ref, roomId) {
   final expenses = ref.watch(expensesStreamProvider(roomId)).valueOrNull ?? [];
-  return ref.watch(balanceServiceProvider).computeNetBalances(expenses);
+  final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+  final memberIds = room?.memberIds ?? [];
+  
+  // For 'all time' balances, we'd ideally need all bills too. 
+  // However, the current app seems to focus on monthly views for bills.
+  // If there's no "all bills" provider, we might just use empty list or the current month's.
+  // For now, let's assume bills are also month-specific in most views.
+  return ref.watch(balanceServiceProvider).computeNetBalances(
+    expenses: expenses,
+    bills: [], // netBalancesProvider usually used for simplified debts across all time, 
+               // but the app structure seems to favor monthly for bills.
+    memberIds: memberIds,
+  );
 });
 
 /// Net balances for a room filtered by a specific month.
@@ -31,7 +44,19 @@ final monthNetBalancesProvider =
   final expenses = ref.watch(monthExpensesProvider(
     MonthRoomKey(roomId: key.roomId, month: key.month),
   )).valueOrNull ?? [];
-  return ref.watch(balanceServiceProvider).computeNetBalances(expenses);
+  
+  final bills = ref.watch(billsStreamProvider(
+    MonthBillKey(roomId: key.roomId, month: key.month),
+  )).valueOrNull ?? [];
+
+  final room = ref.watch(roomStreamProvider(key.roomId)).valueOrNull;
+  final memberIds = room?.memberIds ?? [];
+
+  return ref.watch(balanceServiceProvider).computeNetBalances(
+    expenses: expenses,
+    bills: bills,
+    memberIds: memberIds,
+  );
 });
 
 /// Current user balance for a room in a specific month.

@@ -121,6 +121,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/room/:roomId',
         builder: (context, state) {
           final tabParam = state.uri.queryParameters['tab'];
+          final selectedMonthInHome = state.extra as DateTime? ?? DateTime.now();
           var initialTabIndex = 0;
           if (tabParam != null) {
             switch (tabParam) {
@@ -137,6 +138,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           return RoomDetailScreen(
             roomId: state.pathParameters['roomId']!,
             initialTabIndex: initialTabIndex,
+            selectedMonthInHome: selectedMonthInHome
           );
         },
       ),

@@ -112,6 +112,9 @@ class _ActivityTile extends StatelessWidget {
         ActivityType.memberLeft => Icons.person_remove,
         ActivityType.roomCreated => Icons.home,
         ActivityType.roomSettingsChanged => Icons.settings,
+        ActivityType.billAdded => Icons.add_circle_outline,
+        ActivityType.billEdited => Icons.edit,
+        ActivityType.billDeleted => Icons.delete_outline,
       };
 
   Color get _color => switch (activity.type) {
@@ -124,6 +127,9 @@ class _ActivityTile extends StatelessWidget {
         ActivityType.memberLeft => Colors.grey,
         ActivityType.roomCreated => Colors.purple,
         ActivityType.roomSettingsChanged => Colors.amber,
+        ActivityType.billAdded => Colors.green,
+        ActivityType.billEdited => Colors.blue,
+        ActivityType.billDeleted => Colors.red,
       };
 
   String _actionText() {
