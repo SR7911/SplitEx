@@ -19,9 +19,7 @@ final userProfileProvider = StreamProvider<UserModel?>((ref) {
   return ref.watch(userServiceProvider).userStream(user.uid);
 });
 
-final profileExistsProvider = FutureProvider<bool>((ref) async {
-  final authState = ref.watch(authStateProvider);
-  final user = authState.valueOrNull;
-  if (user == null) return false;
-  return ref.watch(userServiceProvider).profileExists(user.uid);
+/// Reactive provider that updates when the user profile is created/updated.
+final profileExistsProvider = StreamProvider<bool>((ref) {
+  return ref.watch(userProfileProvider.stream).map((user) => user != null);
 });

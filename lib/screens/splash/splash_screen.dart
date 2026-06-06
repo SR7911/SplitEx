@@ -35,33 +35,35 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   }
 
   Future<void> _navigateToNext() async {
-    // Wait for a minimum time to ensure splash is visible even on fast devices
+    // Wait for animations and a minimum splash time
     await Future.delayed(const Duration(milliseconds: 500));
     
     if (!mounted) return;
 
     try {
-      // Robustly wait for the auth state to be determined
-      final user = await ref.read(authStateProvider.future);
+      // Ensure the initial auth state is loaded before deciding where to go
+      final authState = ref.read(authStateProvider);
+      if (authState.isLoading) {
+        await ref.read(authStateProvider.future);
+      }
       
       if (!mounted) return;
 
+      // With refreshListenable in router.dart, GoRouter might have already 
+      // triggered a redirect if the state was updated. 
+      // We perform a manual navigation here as a fallback/kickstart 
+      // to move away from the splash screen.
+      final user = ref.read(authStateProvider).valueOrNull;
+      
       if (user == null) {
         context.go('/login');
       } else {
-        // Check if profile exists for the authenticated user
         final profileExists = await ref.read(profileExistsProvider.future);
-        
         if (mounted) {
-          if (profileExists) {
-            context.go('/');
-          } else {
-            context.go('/profile-setup');
-          }
+          context.go(profileExists ? '/' : '/profile-setup');
         }
       }
     } catch (e) {
-      // Fallback to login if state cannot be determined
       if (mounted) context.go('/login');
     }
   }

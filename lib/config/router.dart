@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/models/expense_model.dart';
@@ -24,32 +25,63 @@ import 'package:split_ex/screens/settings/change_password_screen.dart';
 import 'package:split_ex/screens/settings/notification_preferences_screen.dart';
 import 'package:split_ex/screens/splash/splash_screen.dart';
 
+/// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+  RouterNotifier(this._ref) {
+    _ref.listen(authStateProvider, (_, __) => notifyListeners());
+    _ref.listen(profileExistsProvider, (_, __) => notifyListeners());
+  }
+}
+
+final routerNotifierProvider = Provider<RouterNotifier>((ref) => RouterNotifier(ref));
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final profileExists = ref.watch(profileExistsProvider);
+  // Use read here to prevent the GoRouter instance from being recreated
+  // which causes it to reset to the initialLocation ('/splash').
+  final notifier = ref.read(routerNotifierProvider);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
-      final isSplash = state.matchedLocation == '/splash';
-      final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register';
-      final isProfileSetup = state.matchedLocation == '/profile-setup';
+      final authState = ref.read(authStateProvider);
+      final profileExists = ref.read(profileExistsProvider);
 
-      // Don't redirect if we are on splash, let it handle the first navigation
-      if (isSplash) return null;
+      if (authState.isLoading) return null;
 
-      if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && isAuthRoute) {
-        final hasProfile = profileExists.valueOrNull ?? false;
-        if (!hasProfile) return '/profile-setup';
+      final user = authState.valueOrNull;
+      final isLoggedIn = user != null;
+      final matchedLocation = state.matchedLocation;
+      
+      final isSplash = matchedLocation == '/splash';
+      final isAuthRoute = matchedLocation == '/login' || matchedLocation == '/register';
+      final isProfileSetup = matchedLocation == '/profile-setup';
+
+      if (!isLoggedIn) {
+        return (isAuthRoute || isSplash) ? null : '/login';
+      }
+
+      // If logged in but profile existence is still being determined
+      if (profileExists.isLoading) return null;
+      
+      final hasProfile = profileExists.valueOrNull ?? false;
+
+      // Handle transitions from Splash or Auth screens
+      if (isSplash || isAuthRoute) {
+        return hasProfile ? '/' : '/profile-setup';
+      }
+
+      // Ensure user with no profile is sent to setup
+      if (!hasProfile && !isProfileSetup) {
+        return '/profile-setup';
+      }
+      
+      // Ensure user with profile doesn't stay on setup
+      if (hasProfile && isProfileSetup) {
         return '/';
       }
-      if (isLoggedIn && !isProfileSetup && !isAuthRoute) {
-        final hasProfile = profileExists.valueOrNull ?? false;
-        if (!hasProfile) return '/profile-setup';
-      }
+
       return null;
     },
     routes: [
