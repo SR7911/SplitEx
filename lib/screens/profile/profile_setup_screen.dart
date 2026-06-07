@@ -42,6 +42,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         uid: user.uid,
         name: _nameController.text.trim(),
         email: user.email ?? '',
+        isDeveloper: (user.email == 'sudharsan7911@gmail.com' || user.email == 'sudharsansr7911@gmail.com' || user.email == 'developersr7911@gmail.com') ? 'Y' : 'N',
         createdAt: DateTime.now(),
       );
       await ref.read(userServiceProvider).createUserProfile(userModel);

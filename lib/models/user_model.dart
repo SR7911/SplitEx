@@ -4,6 +4,7 @@ class UserModel {
   final String uid;
   final String name;
   final String email;
+  final String isDeveloper;
   final String? avatarUrl;
   final String? upiId;
   final List<String> rooms;
@@ -13,6 +14,7 @@ class UserModel {
     required this.uid,
     required this.name,
     required this.email,
+    required this.isDeveloper,
     this.avatarUrl,
     this.upiId,
     this.rooms = const [],
@@ -24,6 +26,7 @@ class UserModel {
       uid: uid,
       name: map['name'] ?? '',
       email: map['email'] ?? '',
+      isDeveloper: map['isDeveloper'] ?? 'false',
       avatarUrl: map['avatarUrl'],
       upiId: map['upiId'],
       rooms: List<String>.from(map['rooms'] ?? []),
@@ -35,6 +38,7 @@ class UserModel {
     return {
       'name': name,
       'email': email,
+      'isDeveloper': isDeveloper,
       'avatarUrl': avatarUrl,
       'upiId': upiId,
       'rooms': rooms,
@@ -52,6 +56,7 @@ class UserModel {
       uid: uid,
       name: name ?? this.name,
       email: email,
+      isDeveloper: isDeveloper,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       upiId: upiId ?? this.upiId,
       rooms: rooms ?? this.rooms,

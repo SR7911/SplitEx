@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/bill_provider.dart';
 import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
@@ -23,17 +24,14 @@ class MonthBalanceKey {
 final netBalancesProvider =
     Provider.family<Map<String, double>, String>((ref, roomId) {
   final expenses = ref.watch(expensesStreamProvider(roomId)).valueOrNull ?? [];
+  final month = ref.watch(currentMonthProvider);
+  final bills = ref.watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: month))).valueOrNull ?? [];
   final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
   final memberIds = room?.memberIds ?? [];
   
-  // For 'all time' balances, we'd ideally need all bills too. 
-  // However, the current app seems to focus on monthly views for bills.
-  // If there's no "all bills" provider, we might just use empty list or the current month's.
-  // For now, let's assume bills are also month-specific in most views.
   return ref.watch(balanceServiceProvider).computeNetBalances(
     expenses: expenses,
-    bills: [], // netBalancesProvider usually used for simplified debts across all time, 
-               // but the app structure seems to favor monthly for bills.
+    bills: bills,
     memberIds: memberIds,
   );
 });
@@ -73,6 +71,12 @@ final simplifiedDebtsProvider =
   return ref.watch(balanceServiceProvider).simplifyDebts(balances);
 });
 
+final monthSimplifiedDebtsProvider =
+    Provider.family<List<Debt>, MonthBalanceKey>((ref, key) {
+  final balances = ref.watch(monthNetBalancesProvider(key));
+  return ref.watch(balanceServiceProvider).simplifyDebts(balances);
+});
+
 final currentUserBalanceProvider =
     Provider.family<double, String>((ref, roomId) {
   final balances = ref.watch(netBalancesProvider(roomId));
@@ -83,6 +87,13 @@ final currentUserBalanceProvider =
 final currentUserDebtsProvider =
     Provider.family<List<Debt>, String>((ref, roomId) {
   final debts = ref.watch(simplifiedDebtsProvider(roomId));
+  final userId = ref.watch(currentUserIdProvider);
+  return debts.where((d) => d.from == userId || d.to == userId).toList();
+});
+
+final monthCurrentUserDebtsProvider =
+    Provider.family<List<Debt>, MonthBalanceKey>((ref, key) {
+  final debts = ref.watch(monthSimplifiedDebtsProvider(key));
   final userId = ref.watch(currentUserIdProvider);
   return debts.where((d) => d.from == userId || d.to == userId).toList();
 });
@@ -108,4 +119,97 @@ final monthOverallBalanceProvider =
     ));
   }
   return total;
+});
+
+// Add to your providers file (e.g., debt_details_provider.dart)
+
+// In debt_details_provider.dart
+class DebtTransaction {
+  final String id;
+  final String title;
+  final DateTime date;
+  final double totalAmount;
+  final double userShare;
+  final String paidBy;
+  final List<String> splitAmong;
+  final SplitType splitType;
+  final bool isBill; // new field
+
+  DebtTransaction({
+    required this.id,
+    required this.title,
+    required this.date,
+    required this.totalAmount,
+    required this.userShare,
+    required this.paidBy,
+    required this.splitAmong,
+    required this.splitType,
+    required this.isBill,
+  });
+}
+
+final detailedDebtsMapProvider = Provider.family<Map<String, Map<String, List<DebtTransaction>>>, MonthBalanceKey>((ref, key) {
+  final expenses = ref.watch(monthExpensesProvider(
+    MonthRoomKey(roomId: key.roomId, month: key.month),
+  )).valueOrNull ?? [];
+  
+  final bills = ref.watch(billsStreamProvider(
+    MonthBillKey(roomId: key.roomId, month: key.month),
+  )).valueOrNull ?? [];
+  
+  final room = ref.watch(roomStreamProvider(key.roomId)).valueOrNull;
+  final memberIds = room?.memberIds ?? [];
+  
+  final debtMap = <String, Map<String, List<DebtTransaction>>>{};
+  
+  // Process expenses
+  for (final expense in expenses) {
+    final payer = expense.paidBy;
+    final splitAmong = expense.splitAmong;
+    if (splitAmong.isEmpty) continue;
+    final share = expense.amount / splitAmong.length;
+    
+    for (final member in splitAmong) {
+      if (member == payer) continue;
+      debtMap.putIfAbsent(member, () => {});
+      debtMap[member]!.putIfAbsent(payer, () => []);
+      debtMap[member]![payer]!.add(DebtTransaction(
+        id: expense.id,
+        title: expense.title,
+        date: expense.date,
+        totalAmount: expense.amount,
+        userShare: share,
+        paidBy: payer,
+        splitAmong: splitAmong,
+        splitType: expense.splitType,
+        isBill: false,
+      ));
+    }
+  }
+  
+  // Process bills (always equal split among all members)
+  for (final bill in bills) {
+    final payer = bill.paidBy;
+    if (memberIds.isEmpty) continue;
+    final share = bill.amount / memberIds.length;
+    
+    for (final member in memberIds) {
+      if (member == payer) continue;
+      debtMap.putIfAbsent(member, () => {});
+      debtMap[member]!.putIfAbsent(payer, () => []);
+      debtMap[member]![payer]!.add(DebtTransaction(
+        id: bill.id,
+        title: bill.typeName,
+        date: bill.date,
+        totalAmount: bill.amount,
+        userShare: share,
+        paidBy: payer,
+        splitAmong: memberIds,
+        splitType: SplitType.equal,
+        isBill: true,
+      ));
+    }
+  }
+  
+  return debtMap;
 });

@@ -93,6 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final roomsAsync = ref.watch(userRoomsProvider);
     final userId = ref.watch(currentUserIdProvider);
+    final isDeveloper = ref.watch(isDeveloperProvider);
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final userName = profile?.name ?? 'User';
 
@@ -103,7 +104,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _NotificationBell(),
         ],
       ),
-      drawer: _AppDrawer(userName: userName, userId: userId),
+      drawer: _AppDrawer(userName: userName, userId: userId, isDeveloper: isDeveloper),
       body: roomsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -186,7 +187,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _AppDrawer extends ConsumerWidget {
   final String userName;
   final String userId;
-  const _AppDrawer({required this.userName, required this.userId});
+  final String isDeveloper;
+  const _AppDrawer({required this.userName, required this.userId, required this.isDeveloper});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -227,7 +229,7 @@ class _AppDrawer extends ConsumerWidget {
                 context.push('/room/${rooms.first.id}/settings');
               },
             ),
-          if (hasRoom && rooms.first.isAdmin(userId))
+          if (isDeveloper == 'Y' && hasRoom && rooms.first.isAdmin(userId))
             ListTile(
               leading: const Icon(Icons.storage),
               title: const Text('DB & Storage'),

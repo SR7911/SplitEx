@@ -21,6 +21,13 @@ class SettlementService {
     });
   }
 
+  Future<void> cancelSettlement(String roomId, String settlementId) async {
+    await _ref(roomId).doc(settlementId).update({
+      'status': SettlementStatus.cancelled.name,
+      'cancelledAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> addUpiRef(String roomId, String settlementId, String upiRef) async {
     await _ref(roomId).doc(settlementId).update({'upiRef': upiRef});
   }

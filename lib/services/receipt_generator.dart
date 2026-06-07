@@ -56,11 +56,11 @@ class ReceiptGenerator {
               children: [
                 pw.Text('Summary', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 8),
-                _summaryRow('Total Expenses', '\u20b9${totalExpenses.toStringAsFixed(2)}'),
-                _summaryRow('Total Bills', '\u20b9${totalBills.toStringAsFixed(2)}'),
+                _summaryRow('Total Expenses', 'Rs. ${totalExpenses.toStringAsFixed(2)}'),
+                _summaryRow('Total Bills', 'Rs. ${totalBills.toStringAsFixed(2)}'),
                 pw.Divider(),
-                _summaryRow('Grand Total', '\u20b9${grandTotal.toStringAsFixed(2)}'),
-                _summaryRow('Per Person ($memberCount members)', '\u20b9${perPerson.toStringAsFixed(2)}'),
+                _summaryRow('Grand Total', 'Rs. ${grandTotal.toStringAsFixed(2)}'),
+                _summaryRow('Per Person ($memberCount members)', 'Rs. ${perPerson.toStringAsFixed(2)}'),
               ],
             ),
           ),
@@ -77,7 +77,7 @@ class ReceiptGenerator {
               headers: ['Type', 'Amount', 'Paid By', 'Date'],
               data: bills.map((b) => [
                 b.typeName,
-                '\u20b9${b.amount.toStringAsFixed(2)}',
+                'Rs. ${b.amount.toStringAsFixed(2)}',
                 nameMap[b.paidBy] ?? b.paidBy,
                 DateFormat('dd MMM').format(b.date),
               ]).toList(),
@@ -97,7 +97,7 @@ class ReceiptGenerator {
               data: expenses.map((e) => [
                 e.title,
                 e.category,
-                '\u20b9${e.amount.toStringAsFixed(2)}',
+                'Rs. ${e.amount.toStringAsFixed(2)}',
                 nameMap[e.paidBy] ?? e.paidBy,
                 DateFormat('dd MMM').format(e.date),
               ]).toList(),
@@ -117,7 +117,7 @@ class ReceiptGenerator {
               data: debts.map((d) => [
                 nameMap[d.from] ?? d.from,
                 nameMap[d.to] ?? d.to,
-                '\u20b9${d.amount.toStringAsFixed(2)}',
+                'Rs. ${d.amount.toStringAsFixed(2)}',
               ]).toList(),
             ),
           ],
@@ -132,7 +132,28 @@ class ReceiptGenerator {
     );
 
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/SplitEx_${roomName}_$month.pdf');
+  
+    // Sanitize room name: replace characters that are invalid in file names
+    // Invalid on Android: / \ : * ? " < > | , space
+    final safeRoomName = roomName
+        .replaceAll('/', '_')
+        .replaceAll('\\', '_')
+        .replaceAll(':', '_')
+        .replaceAll('*', '_')
+        .replaceAll('?', '_')
+        .replaceAll('"', '_')
+        .replaceAll('<', '_')
+        .replaceAll('>', '_')
+        .replaceAll('|', '_')
+        .replaceAll(',', '_')
+        .replaceAll(' ', '_'); // optional, but safer
+    
+    final fileName = 'SplitEx_${safeRoomName}_$month.pdf';
+    final file = File('${dir.path}/$fileName');
+    
+    // Ensure directory exists (though getTemporaryDirectory should give existing dir)
+    await file.create(recursive: true);
+    
     await file.writeAsBytes(await pdf.save());
     return file;
   }

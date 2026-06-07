@@ -19,6 +19,7 @@ import 'package:split_ex/screens/expense/add_expense_sheet.dart';
 import 'package:split_ex/screens/expense/view_expense_sheet.dart';
 import 'package:split_ex/screens/bills/add_bill_sheet.dart';
 import 'package:split_ex/screens/bills/view_bill_sheet.dart';
+import 'package:split_ex/screens/room/pair_settlement_card.dart';
 import 'package:split_ex/screens/settlement/settlement_screen.dart';
 import 'package:split_ex/services/balance_service.dart';
 import 'package:split_ex/services/receipt_generator.dart';
@@ -99,7 +100,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
       MonthBillKey(roomId: widget.roomId, month: _monthKey),
     )).valueOrNull ?? [];
 
-    final debts = ref.read(simplifiedDebtsProvider(widget.roomId));
+    final debts = ref.read(monthSimplifiedDebtsProvider(MonthBalanceKey(roomId: widget.roomId, month: _monthKey)));
 
     final membersAsync = ref.read(roomMembersProvider(room.memberIds));
     final nameMap = <String, String>{};
@@ -171,7 +172,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
               children: [
                 _ExpensesTab(roomId: widget.roomId, month: _monthKey),
                 _BillsTab(roomId: widget.roomId, month: _monthKey),
-                _SettlementsTab(roomId: widget.roomId),
+                _SettlementsTab(roomId: widget.roomId, month: _monthKey),
               ],
             ),
           ),
@@ -905,15 +906,64 @@ class _BillsTab extends ConsumerWidget {
 }
 
 // ========== SETTLEMENTS TAB ==========
+// class _SettlementsTab extends ConsumerWidget {
+//   final String roomId;
+//   final String month;
+//   const _SettlementsTab({required this.roomId, required this.month});
+
+//   @override
+//   Widget build(BuildContext context, WidgetRef ref) {
+//     final userId = ref.watch(currentUserIdProvider);
+//     final balanceKey = MonthBalanceKey(roomId: roomId, month: month);
+//     final detailedMap = ref.watch(detailedDebtsMapProvider(balanceKey));
+//     final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
+//     final membersAsync = ref.watch(roomMembersProvider(members));
+//     final nameMap = <String, String>{};
+//     if (membersAsync.hasValue) {
+//       for (final m in membersAsync.value!) {
+//         nameMap[m.uid] = m.name;
+//       }
+//     }
+//     nameMap.putIfAbsent(userId, () => 'You');
+
+//     // Generate all unordered pairs
+//     final pairs = <(String, String)>[];
+//     for (int i = 0; i < members.length; i++) {
+//       for (int j = i + 1; j < members.length; j++) {
+//         pairs.add((members[i], members[j]));
+//       }
+//     }
+
+//     if (pairs.isEmpty) {
+//       return const Center(child: Text('No members in this room'));
+//     }
+
+//     return ListView(
+//       padding: const EdgeInsets.symmetric(vertical: 12),
+//       children: pairs.map((pair) {
+//         return PairSettlementCard(
+//           memberA: pair.$1,
+//           memberB: pair.$2,
+//           detailedMap: detailedMap,
+//           nameMap: nameMap,
+//           userId: userId,
+//           roomId: roomId,
+//         );
+//       }).toList(),
+//     );
+//   }
+// }
+
 class _SettlementsTab extends ConsumerWidget {
   final String roomId;
-  const _SettlementsTab({required this.roomId});
+  final String month;
+  const _SettlementsTab({required this.roomId, required this.month});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserIdProvider);
-    final userDebts = ref.watch(currentUserDebtsProvider(roomId));
-    final allDebts = ref.watch(simplifiedDebtsProvider(roomId));
+    final balanceKey = MonthBalanceKey(roomId: roomId, month: month);
+    final detailedMap = ref.watch(detailedDebtsMapProvider(balanceKey));
     final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
     final membersAsync = ref.watch(roomMembersProvider(members));
     final nameMap = <String, String>{};
@@ -924,53 +974,29 @@ class _SettlementsTab extends ConsumerWidget {
     }
     nameMap.putIfAbsent(userId, () => 'You');
 
-    if (allDebts.isEmpty) return const Center(child: Text('All settled up! \ud83c\udf89'));
+    final pairs = <(String, String)>[];
+    for (int i = 0; i < members.length; i++) {
+      for (int j = i + 1; j < members.length; j++) {
+        pairs.add((members[i], members[j]));
+      }
+    }
+
+    if (pairs.isEmpty) {
+      return const Center(child: Text('No members in this room'));
+    }
 
     return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        if (userDebts.isNotEmpty) ...[
-          Text('Your Settlements', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ...userDebts.map((d) {
-            final from = d.from == userId ? 'You' : (nameMap[d.from] ?? d.from);
-            final to = d.to == userId ? 'You' : (nameMap[d.to] ?? d.to);
-            final canSettle = d.from == userId;
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.swap_horiz),
-                title: Text('$from \u2192 $to'),
-                subtitle: canSettle
-                    ? TextButton.icon(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => SettlementScreen(roomId: roomId, debt: d, nameMap: nameMap),
-                        )),
-                        icon: const Icon(Icons.payment, size: 16),
-                        label: const Text('Settle Up'),
-                        style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                      )
-                    : null,
-                trailing: Text('\u20b9${d.amount.toStringAsFixed(0)}',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: d.from == userId ? Colors.red : Colors.green)),
-              ),
-            );
-          }),
-        ],
-        const SizedBox(height: 16),
-        Text('All Balances', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        ...allDebts.map((d) {
-          final from = d.from == userId ? 'You' : (nameMap[d.from] ?? d.from);
-          final to = d.to == userId ? 'You' : (nameMap[d.to] ?? d.to);
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.swap_horiz),
-              title: Text('$from \u2192 $to'),
-              trailing: Text('\u20b9${d.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          );
-        }),
-      ],
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      children: pairs.map((pair) {
+        return PairSettlementTimeline(
+          memberA: pair.$1,
+          memberB: pair.$2,
+          detailedMap: detailedMap,
+          nameMap: nameMap,
+          userId: userId,
+          roomId: roomId,
+        );
+      }).toList(),
     );
   }
 }

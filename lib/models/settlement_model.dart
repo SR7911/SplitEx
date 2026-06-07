@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum SettlementStatus { pending, confirmed }
+enum SettlementStatus { pending, confirmed, cancelled }
 
 class SettlementModel {
   final String id;
