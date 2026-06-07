@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/screens/auth/login_screen.dart';
 import 'package:split_ex/screens/auth/register_screen.dart';
-import 'package:split_ex/screens/bills/add_bill_screen.dart';
-import 'package:split_ex/screens/expense/add_expense_screen.dart';
-import 'package:split_ex/screens/expense/edit_expense_screen.dart';
 import 'package:split_ex/screens/home/home_screen.dart';
 import 'package:split_ex/screens/profile/profile_setup_screen.dart';
 import 'package:split_ex/screens/room/create_room_screen.dart';
@@ -143,12 +139,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: '/room/:roomId/dashboard',
-        builder: (context, state) => DashboardScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
-      ),
-      GoRoute(
         path: '/room/:roomId/activity',
         builder: (context, state) => ActivityScreen(
           roomId: state.pathParameters['roomId']!,
@@ -170,25 +160,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/room/:roomId/settings',
         builder: (context, state) => RoomSettingsScreen(
           roomId: state.pathParameters['roomId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/room/:roomId/add-expense',
-        builder: (context, state) => AddExpenseScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/room/:roomId/add-bill',
-        builder: (context, state) => AddBillScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/room/:roomId/edit-expense',
-        builder: (context, state) => EditExpenseScreen(
-          roomId: state.pathParameters['roomId']!,
-          expense: state.extra as ExpenseModel,
         ),
       ),
       GoRoute(

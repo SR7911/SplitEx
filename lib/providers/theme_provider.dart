@@ -15,7 +15,7 @@ final appPaletteProvider = StateNotifierProvider<AppPaletteNotifier, AppPalette>
 });
 
 class ThemeModeNotifier extends StateNotifier<AppThemeMode> {
-  ThemeModeNotifier() : super(AppThemeMode.system) {
+  ThemeModeNotifier() : super(AppThemeMode.light) {
     _load();
   }
 
@@ -24,7 +24,7 @@ class ThemeModeNotifier extends StateNotifier<AppThemeMode> {
     final value = prefs.getString(_themeKey);
     state = AppThemeMode.values.firstWhere(
       (m) => m.name == value,
-      orElse: () => AppThemeMode.system,
+      orElse: () => AppThemeMode.light,
     );
   }
 
@@ -36,7 +36,7 @@ class ThemeModeNotifier extends StateNotifier<AppThemeMode> {
 }
 
 class AppPaletteNotifier extends StateNotifier<AppPalette> {
-  AppPaletteNotifier() : super(AppPalette.purple) {
+  AppPaletteNotifier() : super(AppPalette.teal) {
     _load();
   }
 
@@ -46,7 +46,7 @@ class AppPaletteNotifier extends StateNotifier<AppPalette> {
     if (value != null) {
       state = AppPalette.values.firstWhere(
         (p) => p.name == value,
-        orElse: () => AppPalette.purple,
+        orElse: () => AppPalette.teal,
       );
     }
   }

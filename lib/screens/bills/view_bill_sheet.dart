@@ -12,6 +12,7 @@ void showViewBillSheet(BuildContext context, {required String roomId, required B
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    backgroundColor: Colors.transparent,
     builder: (_) => _ViewBillSheet(roomId: roomId, bill: bill),
   );
 }
@@ -97,6 +98,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -132,112 +134,199 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
     }
     final paidByName = nameMap[widget.bill.paidBy] ?? widget.bill.paidBy;
     final billIcon = switch (widget.bill.type) {
-      BillType.rent => Icons.home,
-      BillType.electricity => Icons.bolt,
-      BillType.water => Icons.water_drop,
+      BillType.rent => Icons.home_rounded,
+      BillType.electricity => Icons.bolt_rounded,
+      BillType.water => Icons.water_drop_rounded,
     };
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
-            ),
 
-            // Header
-            Row(
-              children: [
-                CircleAvatar(child: Icon(billIcon, size: 20)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Bill Details', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              // Header with icon and edit button
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(billIcon, size: 22, color: Theme.of(context).colorScheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Bill Details',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  if (_canEdit && !_editing)
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: 'Edit',
+                      onPressed: () => setState(() => _editing = true),
+                    ),
+                  if (_editing)
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Cancel',
+                      onPressed: _cancelEdit,
+                    ),
+                ],
+              ),
+              const Divider(height: 24, thickness: 1, color: Colors.grey),
+
+              // Bill type segmented button (full width)
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<BillType>(
+                  segments: const [
+                    ButtonSegment(value: BillType.rent, label: Text('Rent'), icon: Icon(Icons.home_rounded, size: 18)),
+                    ButtonSegment(value: BillType.electricity, label: Text('EB'), icon: Icon(Icons.bolt_rounded, size: 18)),
+                    ButtonSegment(value: BillType.water, label: Text('Water'), icon: Icon(Icons.water_drop_rounded, size: 18)),
+                  ],
+                  selected: {_billType},
+                  onSelectionChanged: _editing ? (v) => setState(() => _billType = v.first) : null,
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    backgroundColor: MaterialStateProperty.resolveWith((states) {
+                      if (states.contains(MaterialState.selected)) return Theme.of(context).colorScheme.primary;
+                      return Colors.transparent;
+                    }),
+                    foregroundColor: MaterialStateProperty.resolveWith((states) {
+                      if (states.contains(MaterialState.selected)) return Colors.white;
+                      return Colors.black87;
+                    }),
+                  ),
                 ),
-                if (_canEdit && !_editing)
-                  IconButton(icon: const Icon(Icons.edit_outlined), tooltip: 'Edit', onPressed: () => setState(() => _editing = true)),
-                if (_editing)
-                  IconButton(icon: const Icon(Icons.close), tooltip: 'Cancel', onPressed: _cancelEdit),
-              ],
-            ),
-            const Divider(height: 24),
+              ),
+              const SizedBox(height: 18),
 
-            // Bill type
-            SegmentedButton<BillType>(
-              segments: const [
-                ButtonSegment(value: BillType.rent, label: Text('Rent'), icon: Icon(Icons.home, size: 18)),
-                ButtonSegment(value: BillType.electricity, label: Text('EB'), icon: Icon(Icons.bolt, size: 18)),
-                ButtonSegment(value: BillType.water, label: Text('Water'), icon: Icon(Icons.water_drop, size: 18)),
-              ],
-              selected: {_billType},
-              onSelectionChanged: _editing ? (v) => setState(() => _billType = v.first) : null,
-              style: ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-            ),
-            const SizedBox(height: 14),
+              // Amount field
+              TextFormField(
+                controller: _amountController,
+                enabled: _editing,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Amount (₹)',
+                  labelStyle: const TextStyle(fontWeight: FontWeight.normal),
+                  prefixIcon: Icon(Icons.currency_rupee, color: Colors.grey.shade600),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 16),
 
-            // Amount
-            TextFormField(
-              controller: _amountController,
-              enabled: _editing,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount (₹)', prefixIcon: Icon(Icons.currency_rupee)),
-            ),
-            const SizedBox(height: 14),
+              // Date picker
+              InkWell(
+                onTap: _editing ? _pickDate : null,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_today, size: 18, color: _editing ? Colors.grey.shade700 : Colors.grey.shade500),
+                      const SizedBox(width: 8),
+                      Text(
+                        DateFormat('dd MMM yyyy').format(_date),
+                        style: TextStyle(
+                          fontWeight: FontWeight.normal,
+                          fontSize: 14,
+                          color: _editing ? null : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
 
-            // Date
-            InkWell(
-              onTap: _editing ? _pickDate : null,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              // Read-only info rows (styled as a card)
+              Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  border: Border.all(color: _editing ? Colors.grey.shade300 : Colors.grey.shade200),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    Icon(Icons.calendar_today, size: 18, color: _editing ? null : Colors.grey),
-                    const SizedBox(width: 10),
-                    Text(DateFormat('dd MMM yyyy').format(_date), style: TextStyle(color: _editing ? null : Colors.grey)),
+                    _InfoRow(label: 'Paid by', value: paidByName),
+                    const SizedBox(height: 6),
+                    _InfoRow(label: 'Month', value: widget.bill.month),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
 
-            // Read-only info
-            _InfoRow(label: 'Paid by', value: paidByName),
-            _InfoRow(label: 'Month', value: widget.bill.month),
-
-            if (widget.bill.receiptUrl != null) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => _showReceipt(widget.bill.receiptUrl!),
-                icon: const Icon(Icons.image, size: 18),
-                label: const Text('View Receipt'),
-              ),
-            ],
-
-            if (_editing) ...[
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isLoading ? null : _save,
-                  child: _isLoading
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Save Changes'),
+              // Receipt button (if available)
+              if (widget.bill.receiptUrl != null) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => _showReceipt(widget.bill.receiptUrl!),
+                  icon: const Icon(Icons.image, size: 18),
+                  label: const Text('View Receipt'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    side: BorderSide(color: Colors.grey.shade300),
+                  ),
                 ),
-              ),
+              ],
+
+              // Save button (only in edit mode)
+              if (_editing) ...[
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _save,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -251,14 +340,23 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          SizedBox(width: 80, child: Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-          Expanded(child: Text(value, style: Theme.of(context).textTheme.bodyMedium)),
-        ],
-      ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
+        ),
+      ],
     );
   }
 }

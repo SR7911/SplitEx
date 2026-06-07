@@ -9,12 +9,12 @@ import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/widgets/receipt_picker.dart';
 
-/// Shows the add expense bottom sheet. Call this instead of navigating.
 void showAddExpenseSheet(BuildContext context, {required String roomId, DateTime? initialDate}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    backgroundColor: Colors.transparent,
     builder: (_) => _AddExpenseSheet(roomId: roomId, initialDate: initialDate),
   );
 }
@@ -91,7 +91,6 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
           );
           return;
         }
-        // For one-to-one split, the selected person owes the full amount to the payer.
         splitAmong = [_selectedMembers.first];
         break;
     }
@@ -147,151 +146,246 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[400],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // Title
-              Text('Add Expense',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-
-              // Title field
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  prefixIcon: Icon(Icons.receipt_long),
-                  hintText: 'e.g. Groceries, Electricity',
-                ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Enter title' : null,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 14),
-
-              // Amount field
-              TextFormField(
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount (₹)',
-                  prefixIcon: Icon(Icons.currency_rupee),
-                ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter amount';
-                  if (double.tryParse(v) == null || double.parse(v) <= 0) {
-                    return 'Enter valid amount';
-                  }
-                  return null;
-                },
-                textInputAction: TextInputAction.done,
-              ),
-              const SizedBox(height: 14),
-
-              // Category & Date row
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: const InputDecoration(
-                        labelText: 'Category',
-                        prefixIcon: Icon(Icons.category),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      items: AppConstants.expenseCategories
-                          .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14))))
-                          .toList(),
-                      onChanged: (v) => setState(() => _category = v!),
-                      isExpanded: true,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 48,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  InkWell(
-                    onTap: _pickDate,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
+                ),
+                // Header
+                Row(
+                  children: [
+                    Icon(Icons.add_circle_outline, color: Theme.of(context).colorScheme.primary, size: 24),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Add Expense',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Title field
+                TextFormField(
+                  controller: _titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Title',
+                    labelStyle: const TextStyle(fontWeight: FontWeight.normal),
+                    prefixIcon: Icon(Icons.receipt_long, color: Colors.grey.shade600),
+                    hintText: 'e.g. Groceries, Electricity',
+                    hintStyle: TextStyle(fontWeight: FontWeight.w500, color: Colors.grey.shade500),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                  validator: (v) => v == null || v.trim().isEmpty ? 'Enter title' : null,
+                  textInputAction: TextInputAction.next,
+                ),
+                const SizedBox(height: 16),
+
+                // Amount field
+                TextFormField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Amount (₹)',
+                    labelStyle: const TextStyle(fontWeight: FontWeight.normal),
+                    prefixIcon: Icon(Icons.currency_rupee, color: Colors.grey.shade600),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter amount';
+                    if (double.tryParse(v) == null || double.parse(v) <= 0) {
+                      return 'Enter valid amount';
+                    }
+                    return null;
+                  },
+                  textInputAction: TextInputAction.done,
+                ),
+                const SizedBox(height: 16),
+
+                // Category & Date row
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        value: _category,
+                        decoration: InputDecoration(
+                          labelText: 'Category',
+                          labelStyle: const TextStyle(fontWeight: FontWeight.normal),
+                          prefixIcon: Icon(Icons.category, color: Colors.grey.shade600),
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                        items: AppConstants.expenseCategories
+                            .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14))))
+                            .toList(),
+                        onChanged: (v) => setState(() => _category = v!),
+                        isExpanded: true,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_today, size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              DateFormat('dd MMM yyyy').format(_date),
+                              style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Receipt picker
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: ReceiptPicker(
+                    roomId: widget.roomId,
+                    folder: 'expenses',
+                    onUploaded: (url) => _receiptUrl = url,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Split method section
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          const Icon(Icons.calendar_today, size: 18),
+                          Icon(Icons.splitscreen_rounded, size: 18, color: Colors.grey.shade700),
                           const SizedBox(width: 8),
-                          Text(DateFormat('dd MMM').format(_date), style: const TextStyle(fontSize: 14)),
+                          Text(
+                            'Split method',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<SplitType>(
+                          segments: const [
+                            ButtonSegment(value: SplitType.equal, label: Text('Equal')),
+                            ButtonSegment(value: SplitType.dynamic, label: Text('Custom')),
+                            ButtonSegment(value: SplitType.oneToOne, label: Text('1-to-1')),
+                          ],
+                          selected: {_splitType},
+                          onSelectionChanged: (v) => setState(() { _splitType = v.first; _selectedMembers = [];}),
+                          style: ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: MaterialStateProperty.resolveWith((states) {
+                              if (states.contains(MaterialState.selected)) return Theme.of(context).colorScheme.primary;
+                              return Colors.transparent;
+                            }),
+                            foregroundColor: MaterialStateProperty.resolveWith((states) {
+                              if (states.contains(MaterialState.selected)) return Colors.white;
+                              return Colors.black87;
+                            }),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Member selection (if not equal)
+                if (_splitType != SplitType.equal && room != null) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.people_alt_rounded, size: 18, color: Colors.grey.shade700),
+                            const SizedBox(width: 8),
+                            Text(
+                              _splitType == SplitType.oneToOne
+                                  ? 'Who owes the full amount?'
+                                  : 'Share with:',
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ..._buildMemberChips(room.memberIds),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 18),
+                const SizedBox(height: 24),
 
-              // Receipt attachment
-              ReceiptPicker(
-                roomId: widget.roomId,
-                folder: 'expenses',
-                onUploaded: (url) => _receiptUrl = url,
-              ),
-              const SizedBox(height: 18),
-
-              // Split type
-              Text('Split', style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              SegmentedButton<SplitType>(
-                segments: const [
-                  ButtonSegment(value: SplitType.equal, label: Text('Equal')),
-                  ButtonSegment(value: SplitType.dynamic, label: Text('Custom')),
-                  ButtonSegment(value: SplitType.oneToOne, label: Text('1-to-1')),
-                ],
-                selected: {_splitType},
-                onSelectionChanged: (v) => setState(() => _splitType = v.first),
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                // Save button
+                FilledButton(
+                  onPressed: _isLoading ? null : _save,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Add Expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
-              ),
-
-              // Member selection
-              if (_splitType != SplitType.equal && room != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _splitType == SplitType.oneToOne
-                      ? 'Select one person who owes the full amount:'
-                      : 'Split with:',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                ..._buildMemberChips(room.memberIds),
               ],
-              const SizedBox(height: 24),
-
-              // Save button
-              FilledButton(
-                onPressed: _isLoading ? null : _save,
-                child: _isLoading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Add Expense'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -311,14 +405,19 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
     final others = memberIds.where((id) => id != userId).toList();
 
     return [
-      const SizedBox(height: 8),
       Wrap(
-        spacing: 8,
-        runSpacing: 4,
+        spacing: 10,
+        runSpacing: 10,
         children: others.map((memberId) {
           final selected = _selectedMembers.contains(memberId);
           return FilterChip(
-            label: Text(nameMap[memberId] ?? memberId),
+            label: Text(
+              nameMap[memberId] ?? memberId,
+              style: const TextStyle(
+                fontWeight: FontWeight.normal,
+                fontFamily: 'Gilmer', // enforce Gilmer
+              ),
+            ),
             selected: selected,
             onSelected: (checked) {
               setState(() {
@@ -330,12 +429,16 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                     _selectedMembers = _selectedMembers.toSet().toList();
                   } else {
                     _selectedMembers = _selectedMembers
-                      .where((id) => id != memberId && id != userId)
-                      .toList();
+                        .where((id) => id != memberId && id != userId)
+                        .toList();
                   }
                 }
               });
             },
+            backgroundColor: Colors.grey.shade100,
+            selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+            checkmarkColor: Theme.of(context).colorScheme.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           );
         }).toList(),
       ),

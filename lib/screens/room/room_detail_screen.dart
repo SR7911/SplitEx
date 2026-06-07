@@ -213,15 +213,29 @@ class _AnalyticsSheet extends ConsumerWidget {
     final total = expenses.fold<double>(0, (s, e) => s + e.amount);
 
     if (expenses.isEmpty) {
-      return const Center(child: Text('No data this month'));
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.analytics_outlined, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text('No data this month', style: TextStyle(color: Colors.grey.shade600)),
+            ],
+          ),
+        ),
+      );
     }
 
+    // Category totals
     final catTotals = <String, double>{};
     for (final e in expenses) {
       catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
     }
-    final entries = catTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final catEntries = catTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
+    // Daily totals
     final dailyTotals = <int, double>{};
     for (final e in expenses) {
       dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
@@ -229,6 +243,7 @@ class _AnalyticsSheet extends ConsumerWidget {
     final days = dailyTotals.keys.toList()..sort();
     final maxY = dailyTotals.values.fold<double>(0, (a, b) => a > b ? a : b);
 
+    // Member totals
     final memberTotals = <String, double>{};
     for (final e in expenses) {
       memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
@@ -246,85 +261,226 @@ class _AnalyticsSheet extends ConsumerWidget {
       controller: scrollController,
       padding: const EdgeInsets.all(16),
       children: [
+        // Drag handle
         Center(
           child: Container(
-            width: 40, height: 4,
+            width: 40,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
         ),
-        Text('Analytics', style: Theme.of(context).textTheme.titleMedium),
-        Text('\u20b9${total.toStringAsFixed(0)} total this month', style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 120,
-          child: Row(
-            children: [
-              SizedBox(
-                width: 100, height: 100,
-                child: PieChart(PieChartData(
-                  sectionsSpace: 1, centerSpaceRadius: 16,
-                  sections: entries.asMap().entries.map((e) => PieChartSectionData(
-                    value: e.value.value, color: _colors[e.key % _colors.length], title: '', radius: 24,
-                  )).toList(),
-                )),
+        // Header: title + total
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            const Text('Analytics', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: total),
+              duration: const Duration(milliseconds: 600),
+              builder: (context, value, _) => Text(
+                '₹${value.toStringAsFixed(0)}',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: entries.take(6).toList().asMap().entries.map((e) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(children: [
-                      Container(width: 10, height: 10, decoration: BoxDecoration(color: _colors[e.key % _colors.length], borderRadius: BorderRadius.circular(2))),
-                      const SizedBox(width: 6),
-                      Expanded(child: Text('${e.value.key}', style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
-                      Text('\u20b9${e.value.value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    ]),
-                  )).toList(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text('Total spent this month', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        const SizedBox(height: 24),
+
+        // --- Categories Section (Pie + Legend) ---
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          color: Theme.of(context).colorScheme.surface,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Categories', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Pie chart (larger)
+                    SizedBox(
+                      width: 110,
+                      height: 110,
+                      child: PieChart(
+                        PieChartData(
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 0,
+                          sections: catEntries.asMap().entries.map((e) => PieChartSectionData(
+                            value: e.value.value,
+                            color: _colors[e.key % _colors.length],
+                            title: '',
+                            radius: 50,
+                          )).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Legend (scrollable if many)
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: catEntries.take(6).map((entry) {
+                          final index = catEntries.indexOf(entry);
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: _colors[index % _colors.length],
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(entry.key, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                                ),
+                                Text('₹${entry.value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 20),
-        const Text('Daily Spending', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
+
+        // --- Daily Spending (Bar Chart) ---
         if (days.isNotEmpty)
-          SizedBox(
-            height: 120,
-            child: BarChart(BarChartData(
-              alignment: BarChartAlignment.spaceAround, maxY: maxY * 1.2,
-              titlesData: FlTitlesData(
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v, _) => Text('${v.toInt()}', style: const TextStyle(fontSize: 8)))),
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            color: Theme.of(context).colorScheme.surface,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Daily Spending', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 140,
+                    child: BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: maxY * 1.2,
+                        titlesData: FlTitlesData(
+                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, _) {
+                                final day = value.toInt();
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(day.toString(), style: const TextStyle(fontSize: 10)),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        gridData: const FlGridData(show: false),
+                        borderData: FlBorderData(show: false),
+                        barGroups: days.map((day) => BarChartGroupData(
+                          x: day,
+                          barRods: [
+                            BarChartRodData(
+                              toY: dailyTotals[day]!,
+                              width: 14,
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ],
+                        )).toList(),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              gridData: const FlGridData(show: false),
-              borderData: FlBorderData(show: false),
-              barGroups: days.map((day) => BarChartGroupData(x: day, barRods: [
-                BarChartRodData(toY: dailyTotals[day]!, width: 10, borderRadius: const BorderRadius.vertical(top: Radius.circular(3)), color: Theme.of(context).colorScheme.primary),
-              ])).toList(),
-            )),
+            ),
           ),
-        const SizedBox(height: 20),
-        const Text('By Member', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ...memberTotals.entries.map((entry) {
-          final name = nameMap[entry.key] ?? entry.key;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              SizedBox(width: 60, child: Text(name, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
-              const SizedBox(width: 8),
-              Expanded(child: LinearProgressIndicator(value: total > 0 ? entry.value / total : 0, backgroundColor: Colors.grey[300])),
-              const SizedBox(width: 8),
-              Text('\u20b9${entry.value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-            ]),
-          );
-        }),
+        const SizedBox(height: 16),
+
+        // --- By Member (Contributors) ---
+        if (memberTotals.isNotEmpty)
+          Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            color: Theme.of(context).colorScheme.surface,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Who paid?', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  const SizedBox(height: 12),
+                  ...memberTotals.entries.map((entry) {
+                    final name = nameMap[entry.key] ?? entry.key;
+                    final percentage = total > 0 ? entry.value / total : 0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          // Avatar with initial
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                            child: Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.primary),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                const SizedBox(height: 4),
+                                LinearProgressIndicator(
+                                  value: percentage.toDouble(),
+                                  backgroundColor: Colors.grey.shade200,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  minHeight: 4,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '₹${entry.value.toStringAsFixed(0)}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -340,17 +496,55 @@ class _MonthSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCurrentMonth = month.year == DateTime.now().year && month.month == DateTime.now().month;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(icon: const Icon(Icons.chevron_left), onPressed: onPrev),
-          Text(DateFormat('MMMM yyyy').format(month), style: Theme.of(context).textTheme.titleMedium),
-          IconButton(icon: const Icon(Icons.chevron_right), onPressed: isCurrentMonth ? null : onNext),
-        ],
-      ),
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Previous button with subtle circle background
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.grey.shade100,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.chevron_left, size: 20),
+            onPressed: onPrev,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+        ),
+        
+        // Month text with divider lines on sides (optional)
+        Row(
+          children: [
+            Container(width: 24, height: 1, color: Colors.grey.shade300),
+            const SizedBox(width: 12),
+            Text(
+              DateFormat('MMMM yyyy').format(month),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(width: 24, height: 1, color: Colors.grey.shade300),
+          ],
+        ),
+        
+        // Next button (disabled if current month)
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isCurrentMonth ? Colors.grey.shade100 : Colors.grey.shade100,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.chevron_right, size: 20),
+            onPressed: isCurrentMonth ? null : onNext,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            color: isCurrentMonth ? Colors.grey.shade400 : null,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -451,62 +645,66 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
     return Column(
       children: [
         // Always-visible chip bar: sort chips + filter icon
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _sortChip('Newest', _SortOption.timeDesc),
-                      const SizedBox(width: 6),
-                      _sortChip('Oldest', _SortOption.timeAsc),
-                      const SizedBox(width: 6),
-                      _sortChip('Amount \u2191', _SortOption.amountAsc),
-                      const SizedBox(width: 6),
-                      _sortChip('Amount \u2193', _SortOption.amountDesc),
-                      if (_hasActiveFilters) ...[
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _clearFilters,
-                          child: Chip(
-                            label: const Text('Clear', style: TextStyle(fontSize: 11)),
-                            deleteIcon: const Icon(Icons.close, size: 14),
-                            onDeleted: _clearFilters,
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _sortChip('Newest', _SortOption.timeDesc),
+                        const SizedBox(width: 6),
+                        _sortChip('Oldest', _SortOption.timeAsc),
+                        const SizedBox(width: 6),
+                        _sortChip('Amount \u2191', _SortOption.amountAsc),
+                        const SizedBox(width: 6),
+                        _sortChip('Amount \u2193', _SortOption.amountDesc),
+                        if (_hasActiveFilters) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _clearFilters,
+                            child: Chip(
+                              label: const Text('Clear', style: TextStyle(fontSize: 11)),
+                              deleteIcon: const Icon(Icons.close, size: 14),
+                              onDeleted: _clearFilters,
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Filter icon
-              GestureDetector(
-                onTap: () => _showFilterSheet(nameMap),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _hasActiveFilters
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.tune,
-                    size: 20,
-                    color: _hasActiveFilters ? Colors.white : Theme.of(context).iconTheme.color,
+                const SizedBox(width: 8),
+                // Filter icon
+                GestureDetector(
+                  onTap: () => _showFilterSheet(nameMap),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _hasActiveFilters
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.tune,
+                      size: 20,
+                      color: _hasActiveFilters ? Colors.white : Theme.of(context).iconTheme.color,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
 
@@ -706,7 +904,13 @@ class _ExpenseTile extends ConsumerWidget {
 
     final tile = Card(
       child: ListTile(
-        leading: CircleAvatar(child: Icon(icon, size: 20)),
+        leading: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: Center(
+                  child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+                ),
+              ),
         title: Text(expense.title),
         subtitle: Text('${expense.category} \u2022 ${DateFormat('dd MMM').format(expense.date)} \u2022 $paidByName'),
         trailing: Row(
@@ -725,12 +929,20 @@ class _ExpenseTile extends ConsumerWidget {
       ),
     );
 
+    // Dismissible wrapper unchanged (only passes the tile)
     if (!isAdmin) return tile;
-
     return Dismissible(
       key: Key(expense.id),
       direction: DismissDirection.endToStart,
-      background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 16), color: Colors.red, child: const Icon(Icons.delete, color: Colors.white)),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red.shade400,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+      ),
       confirmDismiss: (_) async => await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -841,7 +1053,13 @@ class _BillsTab extends ConsumerWidget {
             final icon = switch (bill.type) { BillType.rent => Icons.home, BillType.electricity => Icons.bolt, BillType.water => Icons.water_drop };
             final card = Card(
                 child: ListTile(
-                  leading: CircleAvatar(child: Icon(icon)),
+                  leading: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                    child: Center(
+                      child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+                    ),
+                  ),
                   title: Text(bill.typeName),
                   subtitle: Text('Paid by $paidBy \u2022 ${DateFormat('dd MMM').format(bill.date)}'),
                   trailing: Text('\u20b9${bill.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),

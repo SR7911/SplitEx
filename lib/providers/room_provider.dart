@@ -12,10 +12,10 @@ final currentUserIdProvider = Provider<String>((ref) {
   return authState.valueOrNull?.uid ?? '';
 });
 
-final isDeveloperProvider = Provider<String>((ref) {
+final isDeveloperProvider = Provider<bool>((ref) {
   final authState = ref.watch(authStateProvider);
   final email = authState.valueOrNull?.email ?? '';
-  return (email == 'sudharsan7911@gmail.com' || email == 'sudharsansr7911@gmail.com' || email == 'developersr7911@gmail.com') ? 'Y' : 'N';
+  return (email == 'sudharsan7911@gmail.com' || email == 'sudharsansr7911@gmail.com' || email == 'developersr7911@gmail.com') ? true : false;
 });
 
 final userRoomsProvider = StreamProvider<List<RoomModel>>((ref) {
