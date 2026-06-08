@@ -101,6 +101,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
     )).valueOrNull ?? [];
 
     final debts = ref.read(monthSimplifiedDebtsProvider(MonthBalanceKey(roomId: widget.roomId, month: _monthKey)));
+    final detailedMap = ref.read(detailedDebtsMapProvider(MonthBalanceKey(roomId: widget.roomId, month: _monthKey)));
 
     final membersAsync = ref.read(roomMembersProvider(room.memberIds));
     final nameMap = <String, String>{};
@@ -119,6 +120,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
       nameMap: nameMap,
       debts: debts,
       memberCount: room.memberIds.length,
+      detailedDebtsMap: detailedMap,
+      memberIds: room.memberIds,
     );
 
     if (!mounted) return;

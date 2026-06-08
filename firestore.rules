@@ -9,6 +9,10 @@ service cloud.firestore {
       allow update: if request.auth.uid == userId;
       allow delete: if false;
     }
+    // Allow anyone to read app version config (needed before auth)
+    match /config/app_version {
+      allow read: if true;
+    }
 
     // Rooms collection
     match /rooms/{roomId} {

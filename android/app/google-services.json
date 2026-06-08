@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "341719116383-m9v2qlcb9cme4ceqjnsm4pq3s9aehccf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.splitex.in.app",
+            "certificate_hash": "2bc612a1e3d76208a02f7b33cccecd6911e1b5e0"
+          }
+        },
+        {
           "client_id": "341719116383-ttlbrk7eno681vftds800fqspg7eucgl.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

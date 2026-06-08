@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:split_ex/models/bill_model.dart';
 import 'package:split_ex/models/expense_model.dart';
+import 'package:split_ex/providers/dashboard_provider.dart';
 import 'package:split_ex/services/balance_service.dart';
 
 class ReceiptGenerator {
@@ -18,6 +19,8 @@ class ReceiptGenerator {
     required Map<String, String> nameMap,
     required List<Debt> debts,
     required int memberCount,
+    Map<String, Map<String, List<DebtTransaction>>>? detailedDebtsMap,
+    List<String>? memberIds,
   }) async {
     final pdf = pw.Document();
     final monthLabel = _formatMonth(month);
@@ -25,6 +28,10 @@ class ReceiptGenerator {
     final totalBills = bills.fold<double>(0, (s, b) => s + b.amount);
     final grandTotal = totalExpenses + totalBills;
     final perPerson = memberCount > 0 ? grandTotal / memberCount : 0.0;
+
+    final pairWidgets = (detailedDebtsMap != null && memberIds != null && memberIds.length > 1)
+        ? _buildPairDetails(detailedDebtsMap, memberIds, nameMap)
+        : <pw.Widget>[];
 
     pdf.addPage(
       pw.MultiPage(
@@ -120,7 +127,11 @@ class ReceiptGenerator {
                 'Rs. ${d.amount.toStringAsFixed(2)}',
               ]).toList(),
             ),
+            pw.SizedBox(height: 16),
           ],
+
+          // Pair-wise spending details
+          ...pairWidgets,
 
           pw.SizedBox(height: 24),
           pw.Center(
@@ -156,6 +167,100 @@ class ReceiptGenerator {
     
     await file.writeAsBytes(await pdf.save());
     return file;
+  }
+
+  List<pw.Widget> _buildPairDetails(
+    Map<String, Map<String, List<DebtTransaction>>> detailedMap,
+    List<String> memberIds,
+    Map<String, String> nameMap,
+  ) {
+    final widgets = <pw.Widget>[];
+    widgets.add(pw.Text('Pair-wise Spending Details',
+        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)));
+    widgets.add(pw.SizedBox(height: 6));
+
+    for (int i = 0; i < memberIds.length; i++) {
+      for (int j = i + 1; j < memberIds.length; j++) {
+        final a = memberIds[i];
+        final b = memberIds[j];
+        final nameA = nameMap[a] ?? a;
+        final nameB = nameMap[b] ?? b;
+
+        // B owes A (A paid)
+        final aPaid = detailedMap[b]?[a] ?? [];
+        // A owes B (B paid)
+        final bPaid = detailedMap[a]?[b] ?? [];
+
+        if (aPaid.isEmpty && bPaid.isEmpty) continue;
+
+        final totalOwedToA = aPaid.fold(0.0, (s, t) => s + t.userShare);
+        final totalOwedToB = bPaid.fold(0.0, (s, t) => s + t.userShare);
+        final net = totalOwedToA - totalOwedToB;
+
+        final netLabel = net.abs() < 0.01
+            ? 'Settled'
+            : (net > 0
+                ? '$nameB owes $nameA Rs. ${net.toStringAsFixed(2)}'
+                : '$nameA owes $nameB Rs. ${(-net).toStringAsFixed(2)}');
+
+        // Combine all transactions
+        final allTxns = <List<String>>[];
+        for (final txn in aPaid) {
+          allTxns.add([
+            txn.title,
+            nameA,
+            'Rs. ${txn.totalAmount.toStringAsFixed(2)}',
+            'Rs. ${txn.userShare.toStringAsFixed(2)}',
+            DateFormat('dd MMM').format(txn.date),
+          ]);
+        }
+        for (final txn in bPaid) {
+          allTxns.add([
+            txn.title,
+            nameB,
+            'Rs. ${txn.totalAmount.toStringAsFixed(2)}',
+            'Rs. ${txn.userShare.toStringAsFixed(2)}',
+            DateFormat('dd MMM').format(txn.date),
+          ]);
+        }
+
+        widgets.add(pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 12),
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey400),
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('$nameA  \u2194  $nameB',
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                  pw.Text(netLabel, style: const pw.TextStyle(fontSize: 10)),
+                ],
+              ),
+              pw.SizedBox(height: 6),
+              pw.TableHelper.fromTextArray(
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                cellStyle: const pw.TextStyle(fontSize: 9),
+                cellPadding: const pw.EdgeInsets.all(4),
+                headers: ['Title', 'Paid By', 'Total', 'Share Owed', 'Date'],
+                data: allTxns,
+              ),
+            ],
+          ),
+        ));
+      }
+    }
+
+    if (widgets.length <= 2) {
+      return []; // No pairs with transactions
+    }
+    return widgets;
   }
 
   pw.Widget _summaryRow(String label, String value) {
