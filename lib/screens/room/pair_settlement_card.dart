@@ -37,6 +37,7 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
     final b = widget.memberB;
     final nameA = widget.nameMap[a] ?? a;
     final nameB = widget.nameMap[b] ?? b;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Transactions where B owes A (A paid)
     final aPaid = widget.detailedMap[b]?[a] ?? [];
@@ -99,7 +100,9 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: net > 0 ? Colors.green.shade50 : Colors.red.shade50,
+                      color: net > 0
+                          ? (isDark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade50)
+                          : (isDark ? Colors.red.shade900.withOpacity(0.3) : Colors.red.shade50),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -246,6 +249,7 @@ class _TimelineTile extends StatelessWidget {
     final otherName = nameMap[otherId] ?? otherId;
     final isBill = txn.isBill == true;
     final isUserPayer = payerId == userId;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final debtorId = otherId;
     final creditorId = payerId;
@@ -258,29 +262,31 @@ class _TimelineTile extends StatelessWidget {
     Color pillBg;
     Color pillTextColor;
     if (debtorId == userId) {
-      pillBg = Colors.red.shade100;
-      pillTextColor = Colors.red.shade800;
+      pillBg = isDark ? Colors.red.shade900.withOpacity(0.3) : Colors.red.shade100;
+      pillTextColor = isDark ? Colors.red.shade300 : Colors.red.shade800;
     } else if (creditorId == userId) {
-      pillBg = Colors.green.shade100;
-      pillTextColor = Colors.green.shade800;
+      pillBg = isDark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade100;
+      pillTextColor = isDark ? Colors.green.shade300 : Colors.green.shade800;
     } else {
-      pillBg = Colors.grey.shade200;
-      pillTextColor = Colors.grey.shade800;
+      pillBg = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
+      pillTextColor = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
     }
 
     // Amount color based on whether user is involved
     final amountColor = (debtorId == userId || creditorId == userId)
-        ? (debtorId == userId ? Colors.red.shade700 : Colors.green.shade700)
-        : Colors.black87;
+        ? (debtorId == userId
+            ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
+            : (isDark ? Colors.green.shade300 : Colors.green.shade700))
+        : Theme.of(context).colorScheme.onSurface.withOpacity(0.87);
 
-    final tileColor = isBill ? Colors.blue.shade50 : null;
+    final tileColor = isBill ? (isDark ? Colors.blue.shade900.withOpacity(0.2) : Colors.blue.shade50) : null;
 
     return InkWell(
       onTap: () => _showDetailDialog(context, txn, payerName, otherName),
       child: Container(
         decoration: BoxDecoration(
           color: tileColor,
-          border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+          border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
@@ -291,13 +297,17 @@ class _TimelineTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isUserPayer ? Colors.green.shade50 : Colors.orange.shade50,
+                color: isUserPayer
+                    ? (isDark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade50)
+                    : (isDark ? Colors.orange.shade900.withOpacity(0.3) : Colors.orange.shade50),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 isBill ? Icons.receipt_long : Icons.payment,
                 size: 20,
-                color: isUserPayer ? Colors.green.shade700 : Colors.orange.shade700,
+                color: isUserPayer
+                    ? (isDark ? Colors.green.shade300 : Colors.green.shade700)
+                    : (isDark ? Colors.orange.shade300 : Colors.orange.shade700),
               ),
             ),
             const SizedBox(width: 12),
@@ -328,7 +338,7 @@ class _TimelineTile extends StatelessWidget {
                           text: ' • $payerName • ${_formatDate(txn.date)}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade700,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                           ),
                         ),
                       ],
@@ -339,7 +349,7 @@ class _TimelineTile extends StatelessWidget {
                   // Split type as plain text (no background)
                   Text(
                     _splitText(txn),
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                   ),
                 ],
               ),
@@ -417,17 +427,19 @@ class _TimelineTile extends StatelessWidget {
   Widget _detailRow(String label, String value, {bool highlight = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Colors.grey.shade600)),
-          Text(
-            value,
-            style: highlight
-                ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-                : const TextStyle(fontWeight: FontWeight.w500),
-          ),
-        ],
+      child: Builder(
+        builder: (context) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+            Text(
+              value,
+              style: highlight
+                  ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+                  : const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
       ),
     );
   }

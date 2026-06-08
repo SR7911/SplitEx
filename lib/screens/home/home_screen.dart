@@ -222,9 +222,9 @@ class _GreetingHeader extends StatelessWidget {
         const SizedBox(height: 6),
         Row(
           children: [
-            Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey.shade600),
+            Icon(Icons.calendar_today_rounded, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             const SizedBox(width: 6),
-            Text(monthStr, style: TextStyle(color: Colors.grey.shade700, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(monthStr, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 14, fontWeight: FontWeight.w600)),
             if (isCurrent)
               Container(
                 margin: const EdgeInsets.only(left: 8),
@@ -299,12 +299,13 @@ class _MonthBalanceCard extends ConsumerWidget {
     final isOwed = balance > 0.01;
     final owes = balance < -0.01;
     final color = isOwed ? Colors.green : owes ? Colors.red : Colors.grey;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgGradient = LinearGradient(
       colors: isOwed
-          ? [Colors.green.shade50, Colors.green.shade100]
+          ? (isDark ? [Colors.green.shade900.withOpacity(0.3), Colors.green.shade800.withOpacity(0.3)] : [Colors.green.shade50, Colors.green.shade100])
           : owes
-              ? [Colors.red.shade50, Colors.red.shade100]
-              : [Colors.grey.shade50, Colors.grey.shade100],
+              ? (isDark ? [Colors.red.shade900.withOpacity(0.3), Colors.red.shade800.withOpacity(0.3)] : [Colors.red.shade50, Colors.red.shade100])
+              : (isDark ? [Colors.grey.shade900.withOpacity(0.3), Colors.grey.shade800.withOpacity(0.3)] : [Colors.grey.shade50, Colors.grey.shade100]),
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
@@ -333,7 +334,7 @@ class _MonthBalanceCard extends ConsumerWidget {
                         icon: const Icon(Icons.chevron_left, size: 20),
                         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         padding: EdgeInsets.zero,
-                        style: IconButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black54),
+                        style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.surface, foregroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                       ),
                       Text(
                         DateFormat('MMMM yyyy').format(selectedMonth),
@@ -344,7 +345,7 @@ class _MonthBalanceCard extends ConsumerWidget {
                         icon: const Icon(Icons.chevron_right, size: 20),
                         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                         padding: EdgeInsets.zero,
-                        style: IconButton.styleFrom(backgroundColor: Colors.white, foregroundColor: isCurrentMonth ? Colors.grey : Colors.black54),
+                        style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.surface, foregroundColor: isCurrentMonth ? Colors.grey : Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                       ),
                     ],
                   ),
@@ -356,7 +357,7 @@ class _MonthBalanceCard extends ConsumerWidget {
                       children: [
                         Text(
                           label,
-                          style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
+                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7), fontSize: 12),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 4),
@@ -443,7 +444,6 @@ class _RoomHeader extends StatelessWidget {
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -461,7 +461,7 @@ class _RoomHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(roomName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                    Text('$memberCount members • Code: $inviteCode', style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text('$memberCount members • Code: $inviteCode', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -491,6 +491,7 @@ class _SpendingSummary extends StatelessWidget {
     final totalSpent = expenses.fold<double>(0, (s, e) => s + e.amount);
     final mySpent = expenses.where((e) => e.paidBy == userId).fold<double>(0, (s, e) => s + e.amount);
     final myPercentage = totalSpent > 0 ? (mySpent / totalSpent) : 0.0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       children: [
@@ -501,23 +502,23 @@ class _SpendingSummary extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: isDark ? Colors.blue.shade900.withOpacity(0.3) : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.group_rounded, size: 28, color: Colors.blue.shade700),
+                    Icon(Icons.group_rounded, size: 28, color: isDark ? Colors.blue.shade300 : Colors.blue.shade700),
                     const SizedBox(height: 2),
                     Text(
                       '₹${totalSpent.toStringAsFixed(0)}',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800),
                     ),
                     const SizedBox(height: 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Total spent', style: TextStyle(fontSize: 12, color: Colors.blue.shade600)),
-                        Text(' ($monthLabel)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.blue.shade400)),
+                        Text('Total spent', style: TextStyle(fontSize: 12, color: isDark ? Colors.blue.shade300 : Colors.blue.shade600)),
+                        Text(' ($monthLabel)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.blue.shade400 : Colors.blue.shade400)),
                       ],
                     ),
                   ],
@@ -530,23 +531,23 @@ class _SpendingSummary extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.purple.shade50,
+                  color: isDark ? Colors.purple.shade900.withOpacity(0.3) : Colors.purple.shade50,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Column(
                   children: [
-                    Icon(Icons.person_rounded, size: 28, color: Colors.purple.shade700),
+                    Icon(Icons.person_rounded, size: 28, color: isDark ? Colors.purple.shade300 : Colors.purple.shade700),
                     const SizedBox(height: 2),
                     Text(
                       '₹${mySpent.toStringAsFixed(0)}',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple.shade800),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.purple.shade200 : Colors.purple.shade800),
                     ),
                     const SizedBox(height: 2),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Your spend', style: TextStyle(fontSize: 12, color: Colors.purple.shade600)),
-                        Text(' ($monthLabel)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.purple.shade400)),
+                        Text('Your spend', style: TextStyle(fontSize: 12, color: isDark ? Colors.purple.shade300 : Colors.purple.shade600)),
+                        Text(' ($monthLabel)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.purple.shade400 : Colors.purple.shade400)),
                       ],
                     ),
                   ],
@@ -560,7 +561,7 @@ class _SpendingSummary extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: isDark ? Theme.of(context).colorScheme.surface : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -571,7 +572,7 @@ class _SpendingSummary extends StatelessWidget {
                 children: [
                   Text(
                     'Your share of total',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
                   ),
                   Text(
                     '${(myPercentage * 100).toStringAsFixed(0)}%',
@@ -584,7 +585,7 @@ class _SpendingSummary extends StatelessWidget {
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: myPercentage,
-                  backgroundColor: Colors.grey.shade200,
+                  backgroundColor: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
                   color: myPercentage > 0.5 ? Colors.blue.shade400 : Colors.purple.shade400,
                   minHeight: 6,
                 ),
@@ -594,7 +595,7 @@ class _SpendingSummary extends StatelessWidget {
                 myPercentage > 0.5
                     ? 'You paid most of the expenses this month'
                     : 'Others covered most of the expenses',
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
               ),
             ],
           ),
@@ -895,7 +896,7 @@ class _OnboardingTips extends ConsumerWidget {
         ...tips.map((t) => Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface, borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
             Icon(t.icon, size: 18, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 8),

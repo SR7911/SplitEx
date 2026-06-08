@@ -199,9 +199,9 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -267,9 +267,9 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
                 decoration: InputDecoration(
                   labelText: 'Title',
                   labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                  prefixIcon: Icon(Icons.receipt_long, color: Colors.grey.shade600),
+                  prefixIcon: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                   filled: true,
-                  fillColor: Colors.grey.shade50,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 ),
@@ -284,9 +284,9 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
                 decoration: InputDecoration(
                   labelText: 'Amount (₹)',
                   labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                  prefixIcon: Icon(Icons.currency_rupee, color: Colors.grey.shade600),
+                  prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                   filled: true,
-                  fillColor: Colors.grey.shade50,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 ),
@@ -302,9 +302,9 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
                       decoration: InputDecoration(
                         labelText: 'Category',
                         labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                        prefixIcon: Icon(Icons.category, color: Colors.grey.shade600),
+                        prefixIcon: Icon(Icons.category, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                         filled: true,
-                        fillColor: Colors.grey.shade50,
+                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -323,20 +323,20 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.calendar_today, size: 18, color: _editing ? Colors.grey.shade700 : Colors.grey.shade500),
+                          Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(_editing ? 0.6 : 0.4)),
                           const SizedBox(width: 8),
                           Text(
                             DateFormat('dd MMM yyyy').format(_date),
                             style: TextStyle(
                               fontWeight: FontWeight.normal,
                               fontSize: 14,
-                              color: _editing ? null : Colors.grey.shade600,
+                              color: _editing ? null : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                             ),
                           ),
                         ],
@@ -351,7 +351,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
@@ -428,7 +428,7 @@ class _InfoRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w500,
-              color: Colors.grey.shade700,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
         ),

@@ -499,6 +499,7 @@ class _MonthSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCurrentMonth = month.year == DateTime.now().year && month.month == DateTime.now().month;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -507,7 +508,7 @@ class _MonthSelector extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.grey.shade100,
+            color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100,
           ),
           child: IconButton(
             icon: const Icon(Icons.chevron_left, size: 20),
@@ -520,7 +521,7 @@ class _MonthSelector extends StatelessWidget {
         // Month text with divider lines on sides (optional)
         Row(
           children: [
-            Container(width: 24, height: 1, color: Colors.grey.shade300),
+            Container(width: 24, height: 1, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
             const SizedBox(width: 12),
             Text(
               DateFormat('MMMM yyyy').format(month),
@@ -529,7 +530,7 @@ class _MonthSelector extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Container(width: 24, height: 1, color: Colors.grey.shade300),
+            Container(width: 24, height: 1, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
           ],
         ),
         
@@ -537,7 +538,7 @@ class _MonthSelector extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isCurrentMonth ? Colors.grey.shade100 : Colors.grey.shade100,
+            color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100,
           ),
           child: IconButton(
             icon: const Icon(Icons.chevron_right, size: 20),
@@ -653,7 +654,7 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(

@@ -115,9 +115,9 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
@@ -161,7 +161,7 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.category, size: 18, color: Colors.grey.shade700),
+                        Icon(Icons.category, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                         const SizedBox(width: 8),
                         Text(
                           'Bill type',
@@ -189,7 +189,7 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                           }),
                           foregroundColor: MaterialStateProperty.resolveWith((states) {
                             if (states.contains(MaterialState.selected)) return Colors.white;
-                            return Colors.black87;
+                            return Theme.of(context).colorScheme.onSurface;
                           }),
                         ),
                       ),
@@ -205,9 +205,9 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   decoration: InputDecoration(
                     labelText: 'Amount (₹)',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.currency_rupee, color: Colors.grey.shade600),
+                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
@@ -226,13 +226,13 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.calendar_today, size: 18, color: Colors.grey.shade700),
+                        Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                         const SizedBox(width: 8),
                         Text(
                           DateFormat('dd MMM yyyy').format(_date),
@@ -247,7 +247,7 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                 // Receipt picker
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ReceiptPicker(
