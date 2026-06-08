@@ -4,7 +4,6 @@ import 'package:split_ex/config/constants.dart';
 import 'package:split_ex/config/router.dart';
 import 'package:split_ex/config/theme.dart';
 import 'package:split_ex/providers/theme_provider.dart';
-import 'package:split_ex/widgets/offline_banner.dart';
 
 class SplitExApp extends ConsumerWidget {
   const SplitExApp({super.key});
@@ -40,14 +39,6 @@ class SplitExApp extends ConsumerWidget {
       darkTheme: darkTheme,
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) {
-        return Column(
-          children: [
-            const OfflineBanner(),
-            Expanded(child: child ?? const SizedBox.shrink()),
-          ],
-        );
-      },
     );
   }
 }

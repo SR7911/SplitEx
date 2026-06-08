@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,8 +12,11 @@ import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/notification_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/screens/expense/add_expense_sheet.dart';
+import 'package:split_ex/screens/personal/personal_expense_tab.dart';
+import 'package:split_ex/services/recurring_processor.dart';
 import 'package:split_ex/services/user_service.dart';
 import 'package:split_ex/screens/settlement/upi_id_dialog.dart';
+import 'package:split_ex/widgets/offline_banner.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,9 +25,10 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStateMixin {
   late DateTime _selectedMonth;
   late AnimationController _animationController;
+  late TabController _tabController;
 
   @override
   void initState() {
@@ -37,11 +39,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       duration: const Duration(milliseconds: 300),
     );
     _animationController.forward();
+    _tabController = TabController(length: 2, vsync: this);
+    _processRecurring();
+  }
+
+  void _processRecurring() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = ref.read(authStateProvider).valueOrNull?.uid;
+      if (userId != null) {
+        RecurringProcessor().processRecurring(userId);
+      }
+    });
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -124,79 +138,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
       appBar: AppBar(
         title: const Text('SplitEx', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: false,
-        actions: const [_NotificationBell()],
+        actions: const [OfflineIndicator(), _NotificationBell()],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.home_rounded, size: 20), text: 'Room'),
+            Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 20), text: 'My Expenses'),
+          ],
+          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          indicatorSize: TabBarIndicatorSize.label,
+        ),
       ),
       drawer: _AppDrawer(userName: userName, userId: userId, isDeveloper: isDeveloper),
-      body: FadeTransition(
-        opacity: _animationController,
-        child: roomsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
-          data: (rooms) {
-            if (rooms.isEmpty) return const _EmptyState();
-            final room = rooms.first;
-            final expensesAsync = ref.watch(monthExpensesProvider(
-              MonthRoomKey(roomId: room.id, month: _monthKey),
-            ));
-            final expenses = expensesAsync.valueOrNull ?? [];
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Tab 1: Room Expenses (existing)
+          FadeTransition(
+            opacity: _animationController,
+            child: roomsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (rooms) {
+                if (rooms.isEmpty) return const _EmptyState();
+                final room = rooms.first;
+                final expensesAsync = ref.watch(monthExpensesProvider(
+                  MonthRoomKey(roomId: room.id, month: _monthKey),
+                ));
+                final expenses = expensesAsync.valueOrNull ?? [];
 
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                // Greeting with animated avatar
-                _GreetingHeader(userName: userName, selectedMonth: _selectedMonth),
-                const SizedBox(height: 20),
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  children: [
+                    _GreetingHeader(userName: userName, selectedMonth: _selectedMonth),
+                    const SizedBox(height: 20),
+                    _MonthBalanceCard(
+                      monthKey: _monthKey,
+                      selectedMonth: _selectedMonth,
+                      isCurrentMonth: _isCurrentMonth,
+                      onPrev: _prevMonth,
+                      onNext: _nextMonth,
+                    ),
+                    const SizedBox(height: 20),
+                    _RoomHeader(
+                      roomName: room.name,
+                      memberCount: room.memberIds.length,
+                      inviteCode: room.inviteCode,
+                      isAdmin: room.isAdmin(userId),
+                      onTap: () async {
+                        final allowed = await checkUpiExist();
+                        if (!allowed) return;
+                        ref.read(currentRoomProvider.notifier).state = room;
+                        context.push('/room/${room.id}', extra: _selectedMonth);
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    if (expenses.isNotEmpty) _CategoryBreakdown(expenses: expenses),
+                    if (expenses.isNotEmpty) const SizedBox(height: 20),
+                    _SpendingSummary(
+                      expenses: expenses,
+                      userId: userId,
+                      monthLabel: DateFormat('MMM').format(_selectedMonth),
+                    ),
+                    const SizedBox(height: 20),
+                    _QuickActions(roomId: room.id, selectedMonth: _selectedMonth, checkUpiExist: checkUpiExist),
+                    if (_isCurrentMonth) ...[
+                      const SizedBox(height: 20),
+                      _RecentActivitySection(),
+                    ],
+                    const SizedBox(height: 16),
+                    _OnboardingTips(roomId: room.id, userId: userId),
+                    const SizedBox(height: 40),
+                  ],
+                );
+              },
+            ),
+          ),
 
-                // Month Balance Card (improved)
-                _MonthBalanceCard(
-                  monthKey: _monthKey,
-                  selectedMonth: _selectedMonth,
-                  isCurrentMonth: _isCurrentMonth,
-                  onPrev: _prevMonth,
-                  onNext: _nextMonth,
-                ),
-                const SizedBox(height: 20),
-
-                // Room Header (modern)
-                _RoomHeader(
-                  roomName: room.name,
-                  memberCount: room.memberIds.length,
-                  inviteCode: room.inviteCode,
-                  isAdmin: room.isAdmin(userId),
-                  onTap: () async {
-                    final allowed = await checkUpiExist();
-                    if (!allowed) return;
-                    ref.read(currentRoomProvider.notifier).state = room;
-                    context.push('/room/${room.id}', extra: _selectedMonth);
-                  },
-                ),
-                const SizedBox(height: 20),
-
-                // Category Breakdown (re‑styled)
-                if (expenses.isNotEmpty) _CategoryBreakdown(expenses: expenses),
-                if (expenses.isNotEmpty) const SizedBox(height: 20),
-
-                // Spending Summary (two cards)
-                _SpendingSummary(
-                  expenses: expenses,
-                  userId: userId,
-                  monthLabel: DateFormat('MMM').format(_selectedMonth),
-                ),
-                const SizedBox(height: 20),
-
-                // Quick Actions (elevated)
-                _QuickActions(roomId: room.id, selectedMonth: _selectedMonth, checkUpiExist: checkUpiExist),
-                if (_isCurrentMonth) ...[
-                  const SizedBox(height: 20),
-                  _RecentActivitySection(),
-                ],
-                const SizedBox(height: 16),
-                _OnboardingTips(roomId: room.id, userId: userId),
-                const SizedBox(height: 40),
-              ],
-            );
-          },
-        ),
+          // Tab 2: Personal Expenses (separate module)
+          const PersonalExpenseTab(),
+        ],
       ),
     );
   }
@@ -999,11 +1020,11 @@ class _AppDrawer extends ConsumerWidget {
                 context.push('/room/${firstRoom.id}/settings');
               },
             ),
-          if (isDeveloper && hasRoom && isAdmin)
+          if (isDeveloper)
             ListTile(
               leading: const Icon(Icons.storage),
               title: const Text('DB & Storage'),
-              subtitle: const Text('Admin only', style: TextStyle(fontSize: 11)),
+              subtitle: const Text('Developer only', style: TextStyle(fontSize: 11)),
               onTap: () {
                 Navigator.pop(context);
                 context.push('/room/${firstRoom!.id}/storage');

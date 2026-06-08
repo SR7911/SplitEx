@@ -19,7 +19,7 @@ A mobile-first personal finance tracker focused on:
 Bottom Navigation
 --------------------------------
 🏠 Dashboard | 📋 Transactions
-📊 Reports   | ⚙️ Settings
+📊 Reports   
 ```
 
 A floating **➕ Add Transaction** button remains accessible across all screens.

@@ -2,13 +2,38 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Developer function - full project access
+    function isDeveloper() {
+      return request.auth != null && (
+        request.auth.token.email == 'sudharsan7911@gmail.com' ||
+        request.auth.token.email == 'sudharsansr7911@gmail.com' ||
+        request.auth.token.email == 'developersr7911@gmail.com'
+      );
+    }
+
     // Users collection - only owner can read/write their own profile
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth.uid == userId;
       allow update: if request.auth.uid == userId;
-      allow delete: if false;
+      allow delete: if isDeveloper();
+
+      // Personal transactions - owner only
+      match /personal_transactions/{txnId} {
+        allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
+      }
+
+      // Personal budgets - owner only
+      match /personal_budgets/{budgetId} {
+        allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
+      }
+
+      // Personal recurring - owner only
+      match /personal_recurring/{recurringId} {
+        allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
+      }
     }
+
     // Allow anyone to read app version config (needed before auth)
     match /config/app_version {
       allow read: if true;
@@ -25,62 +50,64 @@ service cloud.firestore {
       allow delete: if request.auth != null &&
         request.auth.uid == resource.data.adminId;
 
-      // Expenses subcollection - room members only
+      // Expenses subcollection - members can read/create, creator or room admin can edit/delete
       match /expenses/{expenseId} {
-        allow read: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+        allow read: if isDeveloper() || (request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
         allow create: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
         allow update: if request.auth != null &&
           (request.auth.uid == resource.data.createdBy ||
            request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId);
-        allow delete: if request.auth != null &&
-          request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId;
+        allow delete: if isDeveloper() || (request.auth != null &&
+          (request.auth.uid == resource.data.createdBy ||
+           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId));
       }
 
-      // Bills subcollection - room members only
+      // Bills subcollection - members can read/create, payer or room admin can edit/delete
       match /bills/{billId} {
-        allow read: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+        allow read: if isDeveloper() || (request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
         allow create: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
         allow update: if request.auth != null &&
           (request.auth.uid == resource.data.paidBy ||
            request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId);
-        allow delete: if request.auth != null &&
-          request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId;
+        allow delete: if isDeveloper() || (request.auth != null &&
+          (request.auth.uid == resource.data.paidBy ||
+           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId));
       }
 
       // Settlements subcollection
       match /settlements/{settlementId} {
-        allow read: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+        allow read: if isDeveloper() || (request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
         allow create: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
         allow update: if request.auth != null &&
           (request.auth.uid == resource.data.fromUserId ||
            request.auth.uid == resource.data.toUserId);
-        allow delete: if false;
+        allow delete: if isDeveloper();
       }
 
       // Activities subcollection
       match /activities/{activityId} {
-        allow read: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+        allow read: if isDeveloper() || (request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
         allow create: if request.auth != null &&
           request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
-        allow update, delete: if false;
+        allow update, delete: if isDeveloper();
       }
     }
 
     // Notifications collection
     match /notifications/{notificationId} {
-      allow read: if request.auth != null &&
-        request.auth.uid == resource.data.targetUserId;
+      allow read: if isDeveloper() || (request.auth != null &&
+        request.auth.uid == resource.data.targetUserId);
       allow create: if request.auth != null;
       allow update: if request.auth != null &&
         request.auth.uid == resource.data.targetUserId;
-      allow delete: if false;
+      allow delete: if isDeveloper();
     }
   }
 }

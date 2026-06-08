@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/screens/auth/login_screen.dart';
 import 'package:split_ex/screens/auth/register_screen.dart';
@@ -14,7 +15,10 @@ import 'package:split_ex/screens/dashboard/dashboard_screen.dart';
 import 'package:split_ex/screens/analytics/analytics_screen.dart';
 import 'package:split_ex/screens/reminders/notifications_screen.dart';
 import 'package:split_ex/screens/activity/activity_screen.dart';
-import 'package:split_ex/screens/admin/storage_management_screen.dart';
+import 'package:split_ex/screens/developer/storage_management_screen.dart';
+import 'package:split_ex/screens/personal/personal_budgets_screen.dart';
+import 'package:split_ex/screens/personal/personal_recurring_screen.dart';
+import 'package:split_ex/screens/personal/personal_transactions_screen.dart';
 import 'package:split_ex/screens/settings/settings_screen.dart';
 import 'package:split_ex/screens/settings/edit_profile_screen.dart';
 import 'package:split_ex/screens/settings/change_password_screen.dart';
@@ -161,6 +165,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => RoomSettingsScreen(
           roomId: state.pathParameters['roomId']!,
         ),
+      ),
+      // ─── Personal Expense Routes ───
+      GoRoute(
+        path: '/personal/transactions',
+        builder: (context, state) {
+          final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
+          return PersonalTransactionsScreen(monthKey: monthKey);
+        },
+      ),
+      GoRoute(
+        path: '/personal/budgets',
+        builder: (context, state) {
+          final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
+          return PersonalBudgetsScreen(monthKey: monthKey);
+        },
+      ),
+      GoRoute(
+        path: '/personal/recurring',
+        builder: (context, state) => const PersonalRecurringScreen(),
       ),
       GoRoute(
         path: '/settings',
