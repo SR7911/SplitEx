@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TransactionType { expense, income }
 enum RecurringFrequency { weekly, monthly }
+enum DebtType { lent, borrowed }
 
 class PersonalTransactionModel {
   final String id;
@@ -14,6 +15,10 @@ class PersonalTransactionModel {
   final String userId;
   final String month; // yyyy-MM
   final DateTime createdAt;
+  // Debt tracking fields
+  final DebtType? debtType;
+  final String? personName;
+  final bool isSettled;
 
   const PersonalTransactionModel({
     required this.id,
@@ -26,7 +31,12 @@ class PersonalTransactionModel {
     required this.userId,
     required this.month,
     required this.createdAt,
+    this.debtType,
+    this.personName,
+    this.isSettled = false,
   });
+
+  bool get hasDebt => debtType != null && personName != null && personName!.isNotEmpty;
 
   factory PersonalTransactionModel.fromMap(Map<String, dynamic> map, String id) {
     return PersonalTransactionModel(
@@ -43,6 +53,11 @@ class PersonalTransactionModel {
       userId: map['userId'] ?? '',
       month: map['month'] ?? '',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      debtType: map['debtType'] != null
+          ? DebtType.values.firstWhere((e) => e.name == map['debtType'], orElse: () => DebtType.lent)
+          : null,
+      personName: map['personName'],
+      isSettled: map['isSettled'] ?? false,
     );
   }
 
@@ -57,6 +72,9 @@ class PersonalTransactionModel {
       'userId': userId,
       'month': month,
       'createdAt': FieldValue.serverTimestamp(),
+      if (debtType != null) 'debtType': debtType!.name,
+      if (personName != null) 'personName': personName,
+      'isSettled': isSettled,
     };
   }
 

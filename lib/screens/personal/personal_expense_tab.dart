@@ -779,6 +779,15 @@ class _UtilitiesRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _UtilityCard(
+            icon: Icons.handshake_outlined,
+            label: 'Debts',
+            color: Colors.orange,
+            onTap: () => context.push('/personal/debts'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _UtilityCard(
             icon: Icons.repeat_rounded,
             label: 'Recurring',
             color: Colors.teal,

@@ -17,6 +17,7 @@ import 'package:split_ex/screens/reminders/notifications_screen.dart';
 import 'package:split_ex/screens/activity/activity_screen.dart';
 import 'package:split_ex/screens/developer/storage_management_screen.dart';
 import 'package:split_ex/screens/personal/personal_budgets_screen.dart';
+import 'package:split_ex/screens/personal/personal_debts_screen.dart';
 import 'package:split_ex/screens/personal/personal_recurring_screen.dart';
 import 'package:split_ex/screens/personal/personal_transactions_screen.dart';
 import 'package:split_ex/screens/settings/settings_screen.dart';
@@ -184,6 +185,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/personal/recurring',
         builder: (context, state) => const PersonalRecurringScreen(),
+      ),
+      GoRoute(
+        path: '/personal/debts',
+        builder: (context, state) => const PersonalDebtsScreen(),
       ),
       GoRoute(
         path: '/settings',

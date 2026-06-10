@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
+import 'package:split_ex/screens/personal/add_personal_transaction_screen.dart';
 import 'package:split_ex/screens/personal/view_personal_transaction_sheet.dart';
 
 class PersonalTransactionsScreen extends ConsumerStatefulWidget {
@@ -26,6 +27,10 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
 
     return Scaffold(
       appBar: AppBar(title: Text('Transactions • ${_formatMonth(widget.monthKey)}')),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showAddPersonalTransactionSheet(context),
+        child: const Icon(Icons.add),
+      ),
       body: txnsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) {
@@ -105,7 +110,7 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
               ),
               const SizedBox(height: 8),
 
-              // List
+              // Day-wise grouped list
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
@@ -118,14 +123,7 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) => _TxnCard(
-                          txn: filtered[i],
-                          onTap: () => showPersonalTransactionDetail(context, filtered[i]),
-                        ),
-                      ),
+                    : _DayWiseList(transactions: filtered),
               ),
             ],
           );
@@ -138,6 +136,64 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
     final parts = key.split('-');
     final dt = DateTime(int.parse(parts[0]), int.parse(parts[1]));
     return DateFormat('MMM yyyy').format(dt);
+  }
+}
+
+class _DayWiseList extends StatelessWidget {
+  final List<PersonalTransactionModel> transactions;
+  const _DayWiseList({required this.transactions});
+
+  @override
+  Widget build(BuildContext context) {
+    // Group by date
+    final grouped = <String, List<PersonalTransactionModel>>{};
+    for (final t in transactions) {
+      final key = DateFormat('yyyy-MM-dd').format(t.date);
+      grouped.putIfAbsent(key, () => []).add(t);
+    }
+    final sortedKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+      itemCount: sortedKeys.length,
+      itemBuilder: (context, i) {
+        final dateKey = sortedKeys[i];
+        final dayTxns = grouped[dateKey]!;
+        final date = DateTime.parse(dateKey);
+        final dayExpense = dayTxns.where((t) => t.isExpense).fold<double>(0, (s, t) => s + t.amount);
+        final dayIncome = dayTxns.where((t) => t.isIncome).fold<double>(0, (s, t) => s + t.amount);
+        final isToday = DateFormat('yyyy-MM-dd').format(DateTime.now()) == dateKey;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Day header
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Row(
+                children: [
+                  Text(
+                    isToday ? 'Today' : DateFormat('EEE, dd MMM').format(date),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                  ),
+                  const Spacer(),
+                  if (dayExpense > 0)
+                    Text('-₹${dayExpense.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red)),
+                  if (dayExpense > 0 && dayIncome > 0)
+                    const SizedBox(width: 8),
+                  if (dayIncome > 0)
+                    Text('+₹${dayIncome.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green)),
+                ],
+              ),
+            ),
+            ...dayTxns.map((txn) => _TxnCard(
+              txn: txn,
+              onTap: () => showPersonalTransactionDetail(context, txn),
+            )),
+          ],
+        );
+      },
+    );
   }
 }
 

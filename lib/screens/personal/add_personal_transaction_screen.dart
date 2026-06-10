@@ -13,9 +13,15 @@ const personalCategories = [
   'Groceries',
   'Shopping',
   'Health',
+  'Loan',
+  'EMI',
+  'Insurance',
+  'Gifts',
+  'Fuel',
   'Education',
   'Bills',
   'Salary',
+  'Home',
   'Freelance',
   'Investment',
   'Other',
@@ -43,17 +49,21 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
   final _amountCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _personCtrl = TextEditingController();
 
   TransactionType _type = TransactionType.expense;
   String _category = 'Food';
   DateTime _date = DateTime.now();
   bool _saving = false;
+  bool _involvesPerson = false;
+  DebtType _debtType = DebtType.lent;
 
   @override
   void dispose() {
     _amountCtrl.dispose();
     _titleCtrl.dispose();
     _notesCtrl.dispose();
+    _personCtrl.dispose();
     super.dispose();
   }
 
@@ -75,6 +85,8 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
       userId: userId,
       month: DateFormat('yyyy-MM').format(_date),
       createdAt: DateTime.now(),
+      debtType: _involvesPerson ? _debtType : null,
+      personName: _involvesPerson ? _personCtrl.text.trim() : null,
     );
 
     await ref.read(personalExpenseServiceProvider).addTransaction(userId, txn);
@@ -217,6 +229,42 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+
+                // Debt toggle
+                SwitchListTile(
+                  value: _involvesPerson,
+                  onChanged: (v) => setState(() => _involvesPerson = v),
+                  title: const Text('Involves someone else?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  secondary: Icon(Icons.people_outline, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  dense: true,
+                ),
+
+                if (_involvesPerson) ...[
+                  const SizedBox(height: 12),
+                  SegmentedButton<DebtType>(
+                    segments: const [
+                      ButtonSegment(value: DebtType.lent, label: Text('I Lent'), icon: Icon(Icons.call_made, size: 16)),
+                      ButtonSegment(value: DebtType.borrowed, label: Text('I Borrowed'), icon: Icon(Icons.call_received, size: 16)),
+                    ],
+                    selected: {_debtType},
+                    onSelectionChanged: (s) => setState(() => _debtType = s.first),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _personCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Person\'s name',
+                      hintText: 'e.g. John, Sarah',
+                      prefixIcon: Icon(Icons.person_outline, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                      filled: true,
+                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                    validator: (v) => _involvesPerson && (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 // Notes

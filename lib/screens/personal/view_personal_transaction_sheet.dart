@@ -158,6 +158,16 @@ class _TransactionDetailSheetState extends ConsumerState<_TransactionDetailSheet
                   _DetailRow(icon: isIncome ? Icons.arrow_downward : Icons.arrow_upward, label: 'Type', value: _type.name.toUpperCase()),
                   _DetailRow(icon: Icons.category, label: 'Category', value: widget.txn.category),
                   _DetailRow(icon: Icons.calendar_today, label: 'Date', value: DateFormat('dd MMM yyyy').format(widget.txn.date)),
+                  if (widget.txn.hasDebt) ...[
+                    _DetailRow(icon: Icons.person, label: 'Person', value: widget.txn.personName!),
+                    _DetailRow(
+                      icon: widget.txn.debtType == DebtType.lent ? Icons.call_made : Icons.call_received,
+                      label: 'Debt',
+                      value: widget.txn.debtType == DebtType.lent ? 'You Lent' : 'You Borrowed',
+                      valueColor: widget.txn.debtType == DebtType.lent ? Colors.green : Colors.red,
+                    ),
+                    _DetailRow(icon: Icons.check_circle_outline, label: 'Settled', value: widget.txn.isSettled ? 'Yes' : 'No'),
+                  ],
                   if (widget.txn.notes != null && widget.txn.notes!.isNotEmpty)
                     _DetailRow(icon: Icons.notes, label: 'Notes', value: widget.txn.notes!),
                 ],

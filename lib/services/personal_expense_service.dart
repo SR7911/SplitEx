@@ -40,6 +40,27 @@ class PersonalExpenseService {
     await _tracker.trackWrites(1);
   }
 
+  // ─── Debts ───
+
+  Stream<List<PersonalTransactionModel>> getDebtTransactionsStream(String userId) {
+    _tracker.trackReads(1);
+    return _txnCol(userId)
+        .where('debtType', isNull: false)
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((snap) {
+      _tracker.trackReads(snap.docs.length);
+      return snap.docs
+          .map((d) => PersonalTransactionModel.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .toList();
+    });
+  }
+
+  Future<void> settleTransaction(String userId, String txnId) async {
+    await _txnCol(userId).doc(txnId).update({'isSettled': true});
+    await _tracker.trackWrites(1);
+  }
+
   // ─── Category Budgets ───
 
   CollectionReference _budgetCol(String userId) =>

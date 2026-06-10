@@ -71,3 +71,29 @@ final personalCategorySpendingProvider =
   }
   return map;
 });
+
+// ─── Debts ───
+
+final personalDebtsProvider =
+    StreamProvider<List<PersonalTransactionModel>>((ref) {
+  final userId = ref.watch(authStateProvider).valueOrNull?.uid;
+  if (userId == null) return Stream.value([]);
+  return ref.watch(personalExpenseServiceProvider).getDebtTransactionsStream(userId);
+});
+
+/// Net balances per person: positive = they owe you, negative = you owe them
+final personalDebtBalancesProvider =
+    Provider<Map<String, double>>((ref) {
+  final debts = ref.watch(personalDebtsProvider).valueOrNull ?? [];
+  final map = <String, double>{};
+  for (final t in debts) {
+    if (t.personName == null || t.isSettled) continue;
+    final name = t.personName!;
+    if (t.debtType == DebtType.lent) {
+      map[name] = (map[name] ?? 0) + t.amount;
+    } else {
+      map[name] = (map[name] ?? 0) - t.amount;
+    }
+  }
+  return map;
+});
