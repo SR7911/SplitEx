@@ -45,7 +45,7 @@ class PersonalExpenseService {
   Stream<List<PersonalTransactionModel>> getDebtTransactionsStream(String userId) {
     _tracker.trackReads(1);
     return _txnCol(userId)
-        .where('debtType', isNull: false)
+        .where('debtType', whereIn: ['lent', 'borrowed'])
         .orderBy('date', descending: true)
         .snapshots()
         .map((snap) {

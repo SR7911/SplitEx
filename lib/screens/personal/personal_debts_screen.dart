@@ -10,18 +10,24 @@ class PersonalDebtsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final balances = ref.watch(personalDebtBalancesProvider);
     final debtsAsync = ref.watch(personalDebtsProvider);
-
-    // Sort: largest absolute balance first
-    final sorted = balances.entries.toList()..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
-    final totalOwedToYou = sorted.where((e) => e.value > 0).fold<double>(0, (s, e) => s + e.value);
-    final totalYouOwe = sorted.where((e) => e.value < 0).fold<double>(0, (s, e) => s + e.value.abs());
 
     return Scaffold(
       appBar: AppBar(title: const Text('Debts & Settlements')),
-      body: sorted.isEmpty
-          ? Center(
+      body: debtsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (allDebts) {
+          final unsettled = allDebts.where((t) => !t.isSettled).toList();
+          final lentTxns = unsettled.where((t) => t.debtType == DebtType.lent).toList();
+          final borrowedTxns = unsettled.where((t) => t.debtType == DebtType.borrowed).toList();
+
+          // Compute totals
+          final totalLent = lentTxns.fold<double>(0, (s, t) => s + t.amount);
+          final totalBorrowed = borrowedTxns.fold<double>(0, (s, t) => s + t.amount);
+
+          if (unsettled.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -32,73 +38,93 @@ class PersonalDebtsScreen extends ConsumerWidget {
                   Text('Link a person when adding expenses', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
                 ],
               ),
-            )
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Summary row
-                Row(
-                  children: [
-                    _SummaryChip(label: 'Owed to you', amount: totalOwedToYou, color: Colors.green),
-                    const SizedBox(width: 12),
-                    _SummaryChip(label: 'You owe', amount: totalYouOwe, color: Colors.red),
-                  ],
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Summary row
+              Row(
+                children: [
+                  _SummaryChip(
+                    label: 'You Lent',
+                    subtitle: 'They owe you',
+                    amount: totalLent,
+                    color: Colors.green,
+                    icon: Icons.call_made,
+                  ),
+                  const SizedBox(width: 12),
+                  _SummaryChip(
+                    label: 'You Borrowed',
+                    subtitle: 'You owe them',
+                    amount: totalBorrowed,
+                    color: Colors.red,
+                    icon: Icons.call_received,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Lent section
+              if (lentTxns.isNotEmpty) ...[
+                _SectionHeader(
+                  title: 'Money You Lent',
+                  subtitle: 'People who owe you',
+                  color: Colors.green,
+                  icon: Icons.call_made,
                 ),
-                const SizedBox(height: 20),
-                ...sorted.map((entry) {
-                  final name = entry.key;
-                  final balance = entry.value;
-                  final theyOweYou = balance > 0;
-                  final color = theyOweYou ? Colors.green : Colors.red;
-                  final label = theyOweYou ? '$name owes you' : 'You owe $name';
-
-                  return _DebtCard(
-                    name: name,
-                    label: label,
-                    amount: balance.abs(),
-                    color: color,
-                    theyOweYou: theyOweYou,
-                    onSettleUp: () => _showSettleSheet(context, ref, name, debtsAsync.valueOrNull ?? []),
-                  );
-                }),
+                const SizedBox(height: 10),
+                ...lentTxns.map((t) => _DebtTile(txn: t, isLent: true)),
+                const SizedBox(height: 24),
               ],
-            ),
-    );
-  }
 
-  void _showSettleSheet(BuildContext context, WidgetRef ref, String personName, List<PersonalTransactionModel> allDebts) {
-    final unsettled = allDebts.where((t) => t.personName == personName && !t.isSettled).toList();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _SettleSheet(personName: personName, unsettled: unsettled),
+              // Borrowed section
+              if (borrowedTxns.isNotEmpty) ...[
+                _SectionHeader(
+                  title: 'Money You Borrowed',
+                  subtitle: 'People you owe',
+                  color: Colors.red,
+                  icon: Icons.call_received,
+                ),
+                const SizedBox(height: 10),
+                ...borrowedTxns.map((t) => _DebtTile(txn: t, isLent: false)),
+              ],
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
 class _SummaryChip extends StatelessWidget {
   final String label;
+  final String subtitle;
   final double amount;
   final Color color;
-  const _SummaryChip({required this.label, required this.amount, required this.color});
+  final IconData icon;
+  const _SummaryChip({required this.label, required this.subtitle, required this.amount, required this.color, required this.icon});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Column(
           children: [
-            Text(label, style: TextStyle(fontSize: 12, color: color)),
-            const SizedBox(height: 4),
-            Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+            Icon(icon, size: 22, color: color),
+            const SizedBox(height: 6),
+            Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+            Text(subtitle, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
           ],
         ),
       ),
@@ -106,58 +132,108 @@ class _SummaryChip extends StatelessWidget {
   }
 }
 
-class _DebtCard extends StatelessWidget {
-  final String name;
-  final String label;
-  final double amount;
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
   final Color color;
-  final bool theyOweYou;
-  final VoidCallback onSettleUp;
-  const _DebtCard({required this.name, required this.label, required this.amount, required this.color, required this.theyOweYou, required this.onSettleUp});
+  final IconData icon;
+  const _SectionHeader({required this.title, required this.subtitle, required this.color, required this.icon});
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, size: 16, color: color),
+        ),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+            Text(subtitle, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DebtTile extends ConsumerWidget {
+  final PersonalTransactionModel txn;
+  final bool isLent;
+  const _DebtTile({required this.txn, required this.isLent});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final color = isLent ? Colors.green : Colors.red;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final personName = txn.personName ?? 'Unknown';
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border(left: BorderSide(color: color, width: 3)),
+        boxShadow: [
+          if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
+        ],
       ),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 22,
+            radius: 18,
             backgroundColor: color.withOpacity(0.1),
-            child: Icon(theyOweYou ? Icons.call_made : Icons.call_received, color: color, size: 20),
+            child: Text(
+              personName[0].toUpperCase(),
+              style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+            ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(personName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
-                Text(label, style: TextStyle(fontSize: 12, color: color)),
+                Text(
+                  txn.title,
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${txn.category} • ${DateFormat('dd MMM').format(txn.date)}',
+                  style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                ),
               ],
             ),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+              Text('₹${txn.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: onSettleUp,
+                onTap: () => _confirmSettle(context, ref),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: isLent ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text('Settle Up', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                  child: Text(
+                    isLent ? 'Settled?' : 'Settle Up',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isLent ? Colors.green : Colors.orange.shade700,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -166,109 +242,34 @@ class _DebtCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _SettleSheet extends ConsumerWidget {
-  final String personName;
-  final List<PersonalTransactionModel> unsettled;
-  const _SettleSheet({required this.personName, required this.unsettled});
+  void _confirmSettle(BuildContext context, WidgetRef ref) {
+    final personName = txn.personName ?? 'Unknown';
+    final message = isLent
+        ? 'Has $personName paid you back ₹${txn.amount.toStringAsFixed(0)} for "${txn.title}"?'
+        : 'Have you paid ₹${txn.amount.toStringAsFixed(0)} back to $personName for "${txn.title}"?';
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        children: [
-          Center(
-            child: Container(
-              width: 48, height: 5,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
-            ),
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isLent ? 'Mark as Settled?' : 'Settle Up?'),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final userId = ref.read(authStateProvider).valueOrNull?.uid;
+              if (userId == null) return;
+              await ref.read(personalExpenseServiceProvider).settleTransaction(userId, txn.id);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(isLent ? 'Marked as settled!' : 'Payment recorded!')),
+                );
+              }
+            },
+            child: Text(isLent ? 'Yes, Settled' : 'Yes, Paid'),
           ),
-          Row(
-            children: [
-              Icon(Icons.handshake, color: Theme.of(context).colorScheme.primary, size: 24),
-              const SizedBox(width: 10),
-              Text('Settle with $personName', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (unsettled.isEmpty)
-            const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('All settled!')))
-          else ...[
-            Text('${unsettled.length} unsettled transaction(s)', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
-            const SizedBox(height: 12),
-            ...unsettled.map((t) {
-              final isLent = t.debtType == DebtType.lent;
-              final color = isLent ? Colors.green : Colors.red;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: color.withOpacity(0.15)),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(t.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          Text('${t.category} • ${DateFormat('dd MMM').format(t.date)}', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
-                        ],
-                      ),
-                    ),
-                    Text('₹${t.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: () async {
-                        final userId = ref.read(authStateProvider).valueOrNull?.uid;
-                        if (userId == null) return;
-                        await ref.read(personalExpenseServiceProvider).settleTransaction(userId, t.id);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Settled: ${t.title}')));
-                          Navigator.pop(context);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
-                        child: const Text('Settle', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green)),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: () async {
-                final userId = ref.read(authStateProvider).valueOrNull?.uid;
-                if (userId == null) return;
-                final service = ref.read(personalExpenseServiceProvider);
-                for (final t in unsettled) {
-                  await service.settleTransaction(userId, t.id);
-                }
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('All settled with $personName!')));
-                  Navigator.pop(context);
-                }
-              },
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-              ),
-              child: const Text('Settle All', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            ),
-          ],
         ],
       ),
     );
