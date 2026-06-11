@@ -4,7 +4,9 @@
 
 ## What is SplitEx?
 
-SplitEx is a roommate expense-splitting app built with Flutter + Firebase. It lets users create shared rooms, log expenses, automatically calculate who owes whom, and settle dues via UPI.
+SplitEx is a dual-purpose expense management app built with Flutter + Firebase:
+1. **Room-based splitting** — Roommates create shared rooms, log expenses, auto-calculate who owes whom, and settle via UPI
+2. **Personal finance** — Track personal income/expenses, set budgets, manage recurring transactions, and track peer-to-peer debts (Lent/Borrowed)
 
 ---
 
@@ -156,6 +158,39 @@ Expense added/edited/deleted
 ```
 
 **Key files:** `notification_service.dart`, `notification_listener.dart`, `fcm_service.dart`, `notifications_screen.dart`
+
+---
+
+### 7. Personal Finance Flow
+```
+Personal Tab (Bottom Nav)
+    │
+    ├── Dashboard shows: greeting, financial status, income/expense pills,
+    │   budget usage, category budgets, pie chart, recent transactions, recurring
+    │
+    ├── Add Transaction (FAB)
+    │     ├── Enter: Amount, Title, Category, Date, Notes
+    │     ├── Optional: "Involves someone else?" toggle
+    │     │     ├── "I Lent" → person owes you
+    │     │     └── "I Borrowed" → you owe person
+    │     └── Save → Firestore (users/{uid}/personal_transactions)
+    │
+    ├── All Transactions → Day-wise grouped list + FAB
+    │     └── Tap → View/Edit bottom sheet (shows debt info if applicable)
+    │
+    ├── Reports → Bottom sheet with pie chart + daily bar chart
+    │
+    ├── Debts & Settlements
+    │     ├── Lent section: green, "Settled?" button
+    │     ├── Borrowed section: red, "Settle Up" button
+    │     └── Settled items: greyed out, strikethrough, no action
+    │
+    ├── Budgets → Category budget management
+    │
+    └── Recurring → Active/Past with add/pause/delete
+```
+
+**Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `personal_debts_screen.dart`, `personal_expense_service.dart`, `personal_expense_provider.dart`
 
 ---
 

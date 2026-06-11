@@ -16,7 +16,10 @@
 ```
 Firestore (Root)
 ├── users/{uid}                          ← User profiles
-│   └── notifications/{notificationId}   ← Per-user notifications (storage mgmt)
+│   ├── notifications/{notificationId}   ← Per-user notifications (storage mgmt)
+│   ├── personal_transactions/{txnId}    ← Personal income/expense tracking
+│   ├── personal_budgets/{budgetId}      ← Category budgets per month
+│   └── personal_recurring/{recurringId} ← Recurring transaction templates
 ├── rooms/{roomId}                       ← Groups/rooms
 │   ├── expenses/{expenseId}             ← Expenses in a room
 │   ├── bills/{billId}                   ← Bills (rent, electricity, water)
@@ -47,16 +50,91 @@ Firebase Storage
 | `rooms` | array\<string\> | List of room IDs the user belongs to |
 | `createdAt` | timestamp | Account creation time |
 
+---
+
+### 2. `users/{uid}/personal_transactions` (Subcollection)
+
+**Path:** `users/{uid}/personal_transactions/{txnId}`  
+**Service:** `PersonalExpenseService`  
+**Purpose:** Personal income and expense tracking with optional peer-to-peer debt linking.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Transaction description |
+| `amount` | number | Amount in ₹ |
+| `type` | string | `expense` or `income` |
+| `category` | string | Category (Food, Transport, Rent, etc.) |
+| `date` | timestamp | Transaction date |
+| `notes` | string? | Optional notes |
+| `userId` | string | Owner UID |
+| `month` | string | Month key (`yyyy-MM`) for filtering |
+| `createdAt` | timestamp | Record creation time |
+| `debtType` | string? | `lent` or `borrowed` (null = no debt) |
+| `personName` | string? | Name of person involved in debt |
+| `isSettled` | boolean | Whether debt has been settled (default: false) |
+
+**Indexes Required:**
+- `month` (ASC) + `date` (DESC) — for monthly transaction listing
+- `debtType` (ASC) + `date` (DESC) — for debt screen queries
+
 **Operations:**
-- Create profile on sign-up
-- Read profile (stream or one-time)
-- Update profile fields (name, avatar, UPI ID)
-- Check if profile exists
-- Add/remove room IDs from `rooms` array
+- Add transaction (with optional debt fields)
+- Update transaction
+- Delete transaction
+- Stream by month
+- Stream debt transactions (`debtType` whereIn `['lent', 'borrowed']`)
+- Settle transaction (set `isSettled: true`)
 
 ---
 
-### 2. `users/{uid}/notifications` (Subcollection)
+### 3. `users/{uid}/personal_budgets` (Subcollection)
+
+**Path:** `users/{uid}/personal_budgets/{budgetId}`  
+**Service:** `PersonalExpenseService`  
+**Purpose:** Per-category spending limits per month.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `category` | string | Category name |
+| `budget` | number | Budget amount in ₹ |
+| `userId` | string | Owner UID |
+| `month` | string | Month key (`yyyy-MM`) |
+
+**Operations:**
+- Set/update budget (upsert by category + month)
+- Delete budget
+- Stream budgets by month
+
+---
+
+### 4. `users/{uid}/personal_recurring` (Subcollection)
+
+**Path:** `users/{uid}/personal_recurring/{recurringId}`  
+**Service:** `PersonalExpenseService`  
+**Purpose:** Templates for recurring expenses that auto-generate transactions.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Recurring item name |
+| `amount` | number | Amount in ₹ |
+| `category` | string | Category |
+| `type` | string | `expense` or `income` |
+| `frequency` | string | `weekly` or `monthly` |
+| `dayOfMonth` | number | Day to execute (1-31) |
+| `active` | boolean | Whether currently enabled |
+| `userId` | string | Owner UID |
+| `lastRunDate` | timestamp? | Last execution date |
+| `endDate` | timestamp? | Optional end date (null = no expiry) |
+
+**Operations:**
+- Add recurring template
+- Toggle active/inactive
+- Delete recurring
+- Stream all recurring for user
+
+---
+
+### 5. `users/{uid}/notifications` (Subcollection)
 
 **Path:** `users/{uid}/notifications/{notificationId}`  
 **Service:** `StorageManagementService`  
@@ -66,13 +144,9 @@ Firebase Storage
 |-------|------|-------------|
 | `createdAt` | timestamp | When notification was created |
 
-**Operations:**
-- Count notifications per month (for storage stats)
-- Clear notifications by month (batch delete)
-
 ---
 
-### 3. `rooms` (Top-level)
+### 6. `rooms` (Top-level)
 
 **Path:** `rooms/{roomId}`  
 **Service:** `RoomService`  
@@ -88,16 +162,9 @@ Firebase Storage
 | `currentMonth` | string | Current active month (`yyyy-MM`) |
 | `isLocked` | boolean | Whether room is locked |
 
-**Operations:**
-- Create room (generates invite code)
-- Join room via invite code
-- Stream user's rooms (where `memberIds` arrayContains userId)
-- Stream single room
-- Remove member / leave room
-
 ---
 
-### 4. `rooms/{roomId}/expenses` (Subcollection)
+### 7. `rooms/{roomId}/expenses` (Subcollection)
 
 **Path:** `rooms/{roomId}/expenses/{expenseId}`  
 **Service:** `ExpenseService`, `StorageManagementService`  
@@ -107,7 +174,7 @@ Firebase Storage
 |-------|------|-------------|
 | `title` | string | Expense description |
 | `amount` | number | Amount in currency |
-| `category` | string | Category (e.g., "Food", "Transport", "Other") |
+| `category` | string | Category |
 | `date` | timestamp | Date of expense |
 | `paidBy` | string | UID of person who paid |
 | `splitType` | string | `equal`, `dynamic`, or `oneToOne` |
@@ -118,21 +185,12 @@ Firebase Storage
 | `month` | string | Month identifier (`yyyy-MM`) |
 | `receiptUrl` | string? | Firebase Storage URL of receipt image |
 
-**Operations:**
-- Add expense
-- Update expense (title, amount, category, split, etc.)
-- Delete expense
-- Stream expenses by month
-- Stream all expenses
-- Clear expenses by month (storage mgmt)
-
 ---
 
-### 5. `rooms/{roomId}/bills` (Subcollection)
+### 8. `rooms/{roomId}/bills` (Subcollection)
 
 **Path:** `rooms/{roomId}/bills/{billId}`  
 **Service:** `BillService`, `StorageManagementService`  
-**Purpose:** Recurring bills like rent, electricity, water.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -144,20 +202,12 @@ Firebase Storage
 | `receiptUrl` | string? | Receipt image URL |
 | `createdAt` | timestamp | Record creation time |
 
-**Operations:**
-- Add bill
-- Update bill
-- Delete bill
-- Stream bills by month
-- Clear bills by month (storage mgmt)
-
 ---
 
-### 6. `rooms/{roomId}/settlements` (Subcollection)
+### 9. `rooms/{roomId}/settlements` (Subcollection)
 
 **Path:** `rooms/{roomId}/settlements/{settlementId}`  
 **Service:** `SettlementService`, `StorageManagementService`  
-**Purpose:** Records of payments between members to settle debts.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -170,48 +220,29 @@ Firebase Storage
 | `createdAt` | timestamp | When settlement was created |
 | `confirmedAt` | timestamp? | When receiver confirmed it |
 
-**Operations:**
-- Create settlement (status = pending)
-- Confirm settlement (status = confirmed + confirmedAt)
-- Add UPI reference
-- Stream all settlements (ordered by createdAt desc)
-- Stream pending settlements for a user (receiver)
-- Clear settlements by month (storage mgmt)
-
 ---
 
-### 7. `rooms/{roomId}/activities` (Subcollection)
+### 10. `rooms/{roomId}/activities` (Subcollection)
 
 **Path:** `rooms/{roomId}/activities/{activityId}`  
 **Service:** `ActivityService`, `StorageManagementService`  
-**Purpose:** Audit log of all actions in a room.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `type` | string | Activity type (see enum below) |
+| `type` | string | Activity type |
 | `performedBy` | string | UID of person who performed action |
 | `description` | string | Human-readable description |
 | `createdAt` | timestamp | When action occurred |
 | `metadata` | map? | Extra context data |
 
-**Activity Types:**
-- `expenseAdded`, `expenseEdited`, `expenseDeleted`
-- `settlementCreated`, `settlementConfirmed`
-- `memberJoined`, `memberLeft`
-- `roomCreated`, `roomSettingsChanged`
-
-**Operations:**
-- Log activity
-- Stream activities (limit 100, ordered by createdAt desc)
-- Clear activities by month (storage mgmt)
+**Activity Types:** `expenseAdded`, `expenseEdited`, `expenseDeleted`, `settlementCreated`, `settlementConfirmed`, `memberJoined`, `memberLeft`, `roomCreated`, `roomSettingsChanged`
 
 ---
 
-### 8. `notifications` (Top-level)
+### 11. `notifications` (Top-level)
 
 **Path:** `notifications/{notificationId}`  
 **Service:** `NotificationService`  
-**Purpose:** Push-style notifications sent to users about room events.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -219,19 +250,9 @@ Firebase Storage
 | `targetUserId` | string | UID of recipient |
 | `title` | string | Notification title |
 | `body` | string | Notification body text |
-| `type` | string | Notification type (see enum below) |
+| `type` | string | Notification type |
 | `isRead` | boolean | Whether user has read it |
 | `createdAt` | timestamp | When notification was sent |
-
-**Notification Types:**
-- `expenseAdded`, `expenseDeleted`
-- `reminder`, `settlement`, `memberJoined`
-
-**Operations:**
-- Send notification to multiple users (batch write)
-- Stream notifications for a user (limit 50)
-- Mark as read (single or all)
-- Stream unread count
 
 ---
 
@@ -239,13 +260,6 @@ Firebase Storage
 
 **Path:** `receipts/{roomId}/{subfolder}/{filename}`  
 **Service:** `UploadService`, `StorageManagementService`  
-**Purpose:** Stores receipt images uploaded with expenses or bills.
-
-**Operations:**
-- Upload image (from `UploadService`)
-- List all images in a room
-- Delete all images in a room (storage mgmt)
-- Estimate storage usage (~512KB per image)
 
 ---
 
@@ -256,24 +270,6 @@ Firebase Storage
 | `usage_date` | string | Date string (`yyyy-MM-dd`) of last tracking |
 | `daily_reads` | int | Firestore reads tracked today |
 | `daily_writes` | int | Firestore writes tracked today |
-
-**Purpose:** Tracks approximate daily Firestore usage to stay within free-tier limits.
-
----
-
-## Data Cleanup (StorageManagementService)
-
-Every collection supports clearing by month:
-
-| Method | Target |
-|--------|--------|
-| `clearExpensesByMonth(roomId, month)` | `rooms/{roomId}/expenses` where `month == x` |
-| `clearBillsByMonth(roomId, month)` | `rooms/{roomId}/bills` where `month == x` |
-| `clearActivitiesByMonth(roomId, month)` | `rooms/{roomId}/activities` by timestamp range |
-| `clearSettlementsByMonth(roomId, month)` | `rooms/{roomId}/settlements` by timestamp range |
-| `clearNotificationsByMonth(userId, month)` | `users/{uid}/notifications` by timestamp range |
-| `clearAllDataByMonth(roomId, userId, month)` | All 5 above combined |
-| `clearAllImages(roomId)` | Firebase Storage `receipts/{roomId}/` |
 
 ---
 
@@ -289,6 +285,12 @@ Every collection supports clearing by month:
 ┌─────────────────────────────────────────────────────┐
 │                   users/{uid}                         │
 │  rooms: [roomId1, roomId2, ...]                      │
+├─────────────────────────────────────────────────────┤
+│  ├── personal_transactions/{id} ← expense/income     │
+│  │     └── optional: debtType, personName, isSettled │
+│  ├── personal_budgets/{id}      ← category budgets   │
+│  ├── personal_recurring/{id}    ← recurring templates│
+│  └── notifications/{id}                              │
 └────────────────────────┬────────────────────────────┘
                          │ references
                          ▼
@@ -316,12 +318,15 @@ Every collection supports clearing by month:
 | # | Collection | Type | Doc Count Growth |
 |---|-----------|------|------------------|
 | 1 | `users` | Top-level | 1 per user |
-| 2 | `users/{uid}/notifications` | Subcollection | Used by storage mgmt |
-| 3 | `rooms` | Top-level | 1 per group |
-| 4 | `rooms/{roomId}/expenses` | Subcollection | Many per room/month |
-| 5 | `rooms/{roomId}/bills` | Subcollection | Few per room/month |
-| 6 | `rooms/{roomId}/settlements` | Subcollection | Per debt resolution |
-| 7 | `rooms/{roomId}/activities` | Subcollection | 1 per action |
-| 8 | `notifications` | Top-level | Per event × recipients |
+| 2 | `users/{uid}/personal_transactions` | Subcollection | Many per user/month |
+| 3 | `users/{uid}/personal_budgets` | Subcollection | Few per user/month |
+| 4 | `users/{uid}/personal_recurring` | Subcollection | Few per user |
+| 5 | `users/{uid}/notifications` | Subcollection | Used by storage mgmt |
+| 6 | `rooms` | Top-level | 1 per group |
+| 7 | `rooms/{roomId}/expenses` | Subcollection | Many per room/month |
+| 8 | `rooms/{roomId}/bills` | Subcollection | Few per room/month |
+| 9 | `rooms/{roomId}/settlements` | Subcollection | Per debt resolution |
+| 10 | `rooms/{roomId}/activities` | Subcollection | 1 per action |
+| 11 | `notifications` | Top-level | Per event × recipients |
 
-**Total: 1 Firestore database, 8 collections, 1 Storage bucket, 1 local store.**
+**Total: 1 Firestore database, 11 collections, 1 Storage bucket, 1 local store.**

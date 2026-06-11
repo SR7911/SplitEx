@@ -8,6 +8,12 @@ import 'package:split_ex/providers/personal_expense_provider.dart';
 class PersonalDebtsScreen extends ConsumerWidget {
   const PersonalDebtsScreen({super.key});
 
+  List<PersonalTransactionModel> _sortedBySettled(List<PersonalTransactionModel> list) {
+    final unsettled = list.where((t) => !t.isSettled).toList();
+    final settled = list.where((t) => t.isSettled).toList();
+    return [...unsettled, ...settled];
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final debtsAsync = ref.watch(personalDebtsProvider);
@@ -18,15 +24,14 @@ class PersonalDebtsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (allDebts) {
-          final unsettled = allDebts.where((t) => !t.isSettled).toList();
-          final lentTxns = unsettled.where((t) => t.debtType == DebtType.lent).toList();
-          final borrowedTxns = unsettled.where((t) => t.debtType == DebtType.borrowed).toList();
+          final lentTxns = allDebts.where((t) => t.debtType == DebtType.lent).toList();
+          final borrowedTxns = allDebts.where((t) => t.debtType == DebtType.borrowed).toList();
 
-          // Compute totals
-          final totalLent = lentTxns.fold<double>(0, (s, t) => s + t.amount);
-          final totalBorrowed = borrowedTxns.fold<double>(0, (s, t) => s + t.amount);
+          // Compute totals (only unsettled)
+          final totalLent = lentTxns.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.amount);
+          final totalBorrowed = borrowedTxns.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.amount);
 
-          if (unsettled.isEmpty) {
+          if (allDebts.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -68,6 +73,7 @@ class PersonalDebtsScreen extends ConsumerWidget {
 
               // Lent section
               if (lentTxns.isNotEmpty) ...[
+                // Show unsettled first, then settled
                 _SectionHeader(
                   title: 'Money You Lent',
                   subtitle: 'People who owe you',
@@ -75,7 +81,7 @@ class PersonalDebtsScreen extends ConsumerWidget {
                   icon: Icons.call_made,
                 ),
                 const SizedBox(height: 10),
-                ...lentTxns.map((t) => _DebtTile(txn: t, isLent: true)),
+                ..._sortedBySettled(lentTxns).map((t) => _DebtTile(txn: t, isLent: true)),
                 const SizedBox(height: 24),
               ],
 
@@ -88,7 +94,7 @@ class PersonalDebtsScreen extends ConsumerWidget {
                   icon: Icons.call_received,
                 ),
                 const SizedBox(height: 10),
-                ...borrowedTxns.map((t) => _DebtTile(txn: t, isLent: false)),
+                ..._sortedBySettled(borrowedTxns).map((t) => _DebtTile(txn: t, isLent: false)),
               ],
             ],
           );
@@ -171,74 +177,103 @@ class _DebtTile extends ConsumerWidget {
     final color = isLent ? Colors.green : Colors.red;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final personName = txn.personName ?? 'Unknown';
+    final settled = txn.isSettled;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border(left: BorderSide(color: color, width: 3)),
-        boxShadow: [
-          if (!isDark) BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: color.withOpacity(0.1),
-            child: Text(
-              personName[0].toUpperCase(),
-              style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+    return Opacity(
+      opacity: settled ? 0.5 : 1.0,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border(left: BorderSide(color: settled ? Colors.grey : color, width: 3)),
+          boxShadow: [
+            if (!isDark && !settled) BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: (settled ? Colors.grey : color).withOpacity(0.1),
+              child: settled
+                  ? Icon(Icons.check, color: Colors.grey, size: 16)
+                  : Text(
+                      personName[0].toUpperCase(),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+                    ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(personName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, decoration: settled ? TextDecoration.lineThrough : null)),
+                      if (settled) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.grey.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                          child: const Text('Settled', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.grey)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    txn.title,
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '${txn.category} • ${DateFormat('dd MMM').format(txn.date)}',
+                    style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(personName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
                 Text(
-                  txn.title,
-                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  '₹${txn.amount.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: settled ? Colors.grey : color,
+                    decoration: settled ? TextDecoration.lineThrough : null,
+                  ),
                 ),
-                Text(
-                  '${txn.category} • ${DateFormat('dd MMM').format(txn.date)}',
-                  style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
-                ),
+                const SizedBox(height: 6),
+                if (!settled)
+                  GestureDetector(
+                    onTap: () => _confirmSettle(context, ref),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: isLent ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isLent ? 'Settled?' : 'Settle Up',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isLent ? Colors.green : Colors.orange.shade700,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  Icon(Icons.check_circle, size: 18, color: Colors.grey.shade400),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text('₹${txn.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: () => _confirmSettle(context, ref),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isLent ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isLent ? 'Settled?' : 'Settle Up',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isLent ? Colors.green : Colors.orange.shade700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

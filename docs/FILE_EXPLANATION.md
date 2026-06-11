@@ -46,6 +46,10 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Step-by-step Play Store publishing guide with asset requirements.
 - **Why:** Covers everything needed to get the app from code to live on the store.
 
+### `docs/PERSONAL_EXPENSE.md`
+- **What:** Personal finance tracker screen reference — all screens, data models, providers, and navigation flows.
+- **Why:** Documents the personal expense section including debt tracking, budgets, recurring, reports, and settlements.
+
 ### `docs/APP_HELPER.md`
 - **What:** High-level app flow, architecture diagram, and design decisions.
 - **Why:** Helps new developers (or future-you) understand how the app works without reading every file.
@@ -166,6 +170,10 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Firebase Cloud Messaging setup — token management, topic subscription.
 - **Why:** Enables push notifications when the app upgrades to Blaze plan or uses server triggers.
 
+### `lib/services/personal_expense_service.dart`
+- **What:** Firestore CRUD for personal_transactions, personal_budgets, personal_recurring subcollections. Includes debt queries and settlement.
+- **Why:** All personal finance Firestore operations in one service — transactions, budgets, recurring, and debt settlement.
+
 ### `lib/services/upi_service.dart`
 - **What:** Constructs UPI intent URLs and launches payment apps (GPay, PhonePe, Paytm).
 - **Why:** Allows one-tap settlement payments with pre-filled receiver ID and amount.
@@ -217,6 +225,10 @@ Every file in the project explained with **What** it does and **Why** it exists.
 ### `lib/providers/notification_provider.dart`
 - **What:** notificationsStreamProvider, unreadCountProvider.
 - **Why:** Powers the notification bell badge and notification list screen.
+
+### `lib/providers/personal_expense_provider.dart`
+- **What:** Providers for personal transactions, budgets, recurring, monthly summary, category spending, debts stream, and net debt balances.
+- **Why:** Reactive state for the personal expense tab — screens watch these to display financial data.
 
 ### `lib/providers/theme_provider.dart`
 - **What:** themeModeProvider, appPaletteProvider — persisted to SharedPreferences.
@@ -326,6 +338,38 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Admin-only screen showing Firestore document counts and storage usage.
 - **Why:** Helps admins stay within free tier limits and identify cleanup needs.
 
+### `lib/screens/personal/personal_expense_tab.dart`
+- **What:** Main personal finance dashboard tab with month navigation, financial summary, budget tracking, pie chart, recent transactions, recurring preview, and utility shortcuts.
+- **Why:** The primary view for personal expense tracking — provides at-a-glance financial status.
+
+### `lib/screens/personal/add_personal_transaction_screen.dart`
+- **What:** Bottom sheet form to add income/expense with optional debt tracking (Lent/Borrowed with person name).
+- **Why:** Primary data entry for personal transactions. Debt toggle enables peer-to-peer tracking.
+
+### `lib/screens/personal/personal_transactions_screen.dart`
+- **What:** Full transaction list with search, filter chips, and day-wise grouping showing daily totals. Includes FAB.
+- **Why:** Users browse and search all transactions grouped by date with spending summaries per day.
+
+### `lib/screens/personal/view_personal_transaction_sheet.dart`
+- **What:** Dual-mode bottom sheet — view transaction details (with debt info) or edit inline.
+- **Why:** Quick view/edit without navigating to a new screen.
+
+### `lib/screens/personal/personal_budgets_screen.dart`
+- **What:** Manage category budgets with progress bars. Add dialog merges hardcoded + spent categories.
+- **Why:** Users set spending limits per category and monitor usage.
+
+### `lib/screens/personal/personal_recurring_screen.dart`
+- **What:** Active/Past recurring transactions with detail sheets, pause/resume, delete, and add recurring.
+- **Why:** Automate regular expenses (rent, subscriptions) without manual entry each month.
+
+### `lib/screens/personal/personal_reports_screen.dart`
+- **What:** Bottom sheet with income/expense pills, category pie chart, breakdown list, and daily spending bar chart.
+- **Why:** Monthly spending insights — category distribution and day-by-day spending patterns.
+
+### `lib/screens/personal/personal_debts_screen.dart`
+- **What:** Debts dashboard with separate Lent/Borrowed sections, contextual settle buttons, and settled items shown disabled.
+- **Why:** Tracks peer-to-peer money — who owes you and who you owe — with settlement workflow.
+
 ### `lib/screens/settings/settings_screen.dart`
 - **What:** Main settings page — edit profile, change password, delete account, currency, notifications, legal, logout, version.
 - **Why:** Centralized user preferences and account management.
@@ -398,13 +442,13 @@ Every file in the project explained with **What** it does and **Why** it exists.
 |-------|-------|---------|
 | Config | 4 files | Theme, routing, constants, dev flags |
 | Models | 7 files | Data structures for Firestore documents |
-| Services | 16 files | Firebase operations & business logic |
-| Providers | 10 files | Reactive state management |
-| Screens | 24 files | User interface |
+| Services | 17 files | Firebase operations & business logic |
+| Providers | 11 files | Reactive state management |
+| Screens | 32 files | User interface |
 | Widgets | 2 files | Reusable UI components |
 | Utils | 1 file | Pure utility functions |
-| Docs | 5 files | Documentation & guides |
-| **Total** | **~69 files** | |
+| Docs | 7 files | Documentation & guides |
+| **Total** | **~78 files** | |
 
 ---
 

@@ -72,7 +72,11 @@ class PersonalBudgetsScreen extends ConsumerWidget {
   }
 
   void _showAddBudgetDialog(BuildContext context, WidgetRef ref) {
-    String category = personalCategories.first;
+    final spending = ref.read(personalCategorySpendingProvider(monthKey));
+    // Merge hardcoded categories with any categories user has spent on
+    final allCategories = <String>{...personalCategories, ...spending.keys}.toList()..sort();
+
+    String category = allCategories.first;
     final amountCtrl = TextEditingController();
 
     showDialog(
@@ -86,7 +90,7 @@ class PersonalBudgetsScreen extends ConsumerWidget {
               DropdownButtonFormField<String>(
                 value: category,
                 decoration: const InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
-                items: personalCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                items: allCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) => setDialogState(() => category = v!),
               ),
               const SizedBox(height: 12),

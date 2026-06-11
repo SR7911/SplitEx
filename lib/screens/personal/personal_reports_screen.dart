@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
 
 void showPersonalReportsSheet(BuildContext context, String monthKey) {
@@ -24,6 +25,7 @@ class _PersonalReportsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(personalMonthlySummaryProvider(monthKey));
     final spending = ref.watch(personalCategorySpendingProvider(monthKey));
+    final txns = ref.watch(personalTransactionsProvider(monthKey)).valueOrNull ?? [];
     final entries = spending.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final totalExpense = summary.expenses;
 
@@ -111,6 +113,10 @@ class _PersonalReportsSheet extends ConsumerWidget {
                   ),
                 );
               }),
+              const SizedBox(height: 24),
+
+              // Daily spending bar chart
+              _DailySpendingChart(monthKey: monthKey, transactions: txns),
             ] else
               const Padding(padding: EdgeInsets.all(40), child: Center(child: Text('No data for this month'))),
           ],
@@ -148,6 +154,132 @@ class _SummaryPill extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _DailySpendingChart extends StatelessWidget {
+  final String monthKey;
+  final List<PersonalTransactionModel> transactions;
+  const _DailySpendingChart({required this.monthKey, required this.transactions});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = monthKey.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+
+    // Build daily expense map
+    final dailyExpense = <int, double>{};
+    for (final t in transactions) {
+      if (t.isExpense) {
+        dailyExpense[t.date.day] = (dailyExpense[t.date.day] ?? 0) + t.amount;
+      }
+    }
+
+    final maxVal = dailyExpense.values.isEmpty ? 100.0 : dailyExpense.values.reduce((a, b) => a > b ? a : b);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Daily Spending', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 180,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxVal * 1.2,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  tooltipRoundedRadius: 8,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final day = group.x;
+                    final date = DateTime(year, month, day);
+                    final dayName = DateFormat('EEE').format(date);
+                    return BarTooltipItem(
+                      '$dayName, ${day.toString().padLeft(2, '0')}\n₹${rod.toY.toStringAsFixed(0)}',
+                      TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 11, fontWeight: FontWeight.w600),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, meta) {
+                      final day = value.toInt();
+                      // Show every 5th day + first and last
+                      if (day == 1 || day == daysInMonth || day % 5 == 0) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text('$day', style: TextStyle(fontSize: 9, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: const FlGridData(show: false),
+              barGroups: List.generate(daysInMonth, (i) {
+                final day = i + 1;
+                final amount = dailyExpense[day] ?? 0;
+                final date = DateTime(year, month, day);
+                final isWeekend = date.weekday == DateTime.saturday || date.weekday == DateTime.sunday;
+                return BarChartGroupData(
+                  x: day,
+                  barRods: [
+                    BarChartRodData(
+                      toY: amount,
+                      width: daysInMonth > 28 ? 6 : 8,
+                      color: amount > 0
+                          ? (isWeekend ? Colors.orange : Theme.of(context).colorScheme.primary)
+                          : Colors.grey.withOpacity(0.15),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Legend
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _LegendDot(color: Theme.of(context).colorScheme.primary, label: 'Weekday'),
+            const SizedBox(width: 16),
+            _LegendDot(color: Colors.orange, label: 'Weekend'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+  const _LegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+      ],
     );
   }
 }

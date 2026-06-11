@@ -68,8 +68,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       
       final hasProfile = profileExists.valueOrNull ?? false;
 
-      // Handle transitions from Splash or Auth screens
-      if (isSplash || isAuthRoute) {
+      // Let splash screen handle its own navigation
+      if (isSplash) return null;
+
+      // Handle transitions from Auth screens
+      if (isAuthRoute) {
         return hasProfile ? '/' : '/profile-setup';
       }
 
