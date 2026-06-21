@@ -213,9 +213,10 @@ class _AnalyticsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expenses = ref.watch(monthExpensesProvider(MonthRoomKey(roomId: roomId, month: monthKey))).valueOrNull ?? [];
+    final bills = ref.watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: monthKey))).valueOrNull ?? [];
     final total = expenses.fold<double>(0, (s, e) => s + e.amount);
 
-    if (expenses.isEmpty) {
+    if (expenses.isEmpty && bills.isEmpty) {
       return Center(
         child: Container(
           padding: const EdgeInsets.all(32),
@@ -236,11 +237,17 @@ class _AnalyticsSheet extends ConsumerWidget {
     for (final e in expenses) {
       catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
     }
+    for (final e in bills) {
+      catTotals[e.type.toString()] = (catTotals[e.type.toString()] ?? 0) + e.amount;
+    }
     final catEntries = catTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     // Daily totals
     final dailyTotals = <int, double>{};
     for (final e in expenses) {
+      dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
+    }
+    for (final e in bills) {
       dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
     }
     final days = dailyTotals.keys.toList()..sort();
@@ -249,6 +256,9 @@ class _AnalyticsSheet extends ConsumerWidget {
     // Member totals
     final memberTotals = <String, double>{};
     for (final e in expenses) {
+      memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
+    }
+    for (final e in bills) {
       memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
     }
     final members = ref.watch(currentRoomProvider)?.memberIds ?? [];

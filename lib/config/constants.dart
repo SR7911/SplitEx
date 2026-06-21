@@ -4,9 +4,7 @@ class AppConstants {
   static const appName = 'SplitEx';
 
   static const List<String> expenseCategories = [
-    'Rent',
     'Groceries',
-    'Electricity',
     'Maid',
     'Wi-Fi',
     'Food',
@@ -15,9 +13,7 @@ class AppConstants {
   ];
 
   static const Map<String, IconData> categoryIcons = {
-    'Rent': Icons.home,
     'Groceries': Icons.shopping_cart,
-    'Electricity': Icons.bolt,
     'Maid': Icons.cleaning_services,
     'Wi-Fi': Icons.wifi,
     'Food': Icons.restaurant,

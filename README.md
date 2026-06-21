@@ -134,6 +134,8 @@ lib/
 
 ## Resources
 
+### Known issues
+- Image upload issue
 - [Flutter Documentation](https://docs.flutter.dev/)
 - [Firebase for Flutter](https://firebase.google.com/docs/flutter/setup)
 - [Riverpod](https://riverpod.dev/)
