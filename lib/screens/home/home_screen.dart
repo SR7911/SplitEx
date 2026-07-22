@@ -12,7 +12,9 @@ import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/notification_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/screens/expense/add_expense_sheet.dart';
+import 'package:split_ex/screens/groups/groups_list_screen.dart';
 import 'package:split_ex/screens/personal/personal_expense_tab.dart';
+import 'package:split_ex/screens/projects/projects_list_screen.dart';
 import 'package:split_ex/services/recurring_processor.dart';
 import 'package:split_ex/services/user_service.dart';
 import 'package:split_ex/screens/settlement/upi_id_dialog.dart';
@@ -39,7 +41,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
       duration: const Duration(milliseconds: 300),
     );
     _animationController.forward();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _processRecurring();
   }
 
@@ -141,8 +143,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
         actions: const [OfflineIndicator(), _NotificationBell()],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(icon: Icon(Icons.home_rounded, size: 20), text: 'Room'),
+            Tab(icon: Icon(Icons.groups_rounded, size: 20), text: 'Groups'),
+            Tab(icon: Icon(Icons.construction_rounded, size: 20), text: 'Projects'),
             Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 20), text: 'My Expenses'),
           ],
           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
@@ -215,7 +221,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
             ),
           ),
 
-          // Tab 2: Personal Expenses (separate module)
+          // Tab 2: Groups
+          const GroupsListScreen(),
+
+          // Tab 3: Projects
+          const ProjectsListScreen(),
+
+          // Tab 4: Personal Expenses (separate module)
           const PersonalExpenseTab(),
         ],
       ),

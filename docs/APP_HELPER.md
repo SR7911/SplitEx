@@ -4,9 +4,11 @@
 
 ## What is SplitEx?
 
-SplitEx is a dual-purpose expense management app built with Flutter + Firebase:
+SplitEx is a multi-module expense management app built with Flutter + Firebase:
 1. **Room-based splitting** — Roommates create shared rooms, log expenses, auto-calculate who owes whom, and settle via UPI
 2. **Personal finance** — Track personal income/expenses, set budgets, manage recurring transactions, and track peer-to-peer debts (Lent/Borrowed)
+3. **Group Expenses** — Create/join groups with invite codes, split expenses equally or selectively, view simplified debts
+4. **Project Tracker** — Personal project budgets with category breakdown, vendor tracking, and status management
 
 ---
 
@@ -192,6 +194,48 @@ Personal Tab (Bottom Nav)
 
 **Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `personal_debts_screen.dart`, `personal_expense_service.dart`, `personal_expense_provider.dart`
 
+### 8. Group Expenses Flow
+```
+Groups Tab (Home Screen)
+    │
+    ├── List of user's groups (with archived badge)
+    │
+    ├── Create Group → name, description, start/end dates → generates 6-char invite code
+    │
+    ├── Join Group → enter 6-char code → added to group memberIds
+    │
+    └── Group Dashboard (3 tabs)
+          ├── Overview: invite code card, per-member balance cards
+          ├── Expenses: list with long-press delete, FAB to add
+          │     └── Add Expense Sheet: title, amount, category, date,
+          │           split type (equal / select members)
+          └── Settle Up: simplified debts (reuses BalanceService.simplifyDebts)
+
+Admin controls: archive/restore group
+Member controls: leave group
+```
+
+**Key files:** `groups_list_screen.dart`, `group_dashboard_screen.dart`, `group_expense_sheet.dart`, `group_service.dart`, `group_provider.dart`
+
+### 9. Project Tracker Flow
+```
+Projects Tab (Home Screen)
+    │
+    ├── List of user's projects (budget progress bar, status badge)
+    │
+    ├── Create Project → name, description, type, estimated budget, dates
+    │
+    └── Project Dashboard (2 tabs)
+          ├── Overview: budget card (spent vs estimated), category breakdown bars
+          └── Expenses: list with long-press delete, FAB to add
+                └── Add Expense Sheet: title, amount, category (15 universal),
+                      vendor, payment method (cash/UPI/card/bank), notes
+
+Status management: active → completed / paused (popup menu)
+```
+
+**Key files:** `projects_list_screen.dart`, `project_dashboard_screen.dart`, `add_project_expense_sheet.dart`, `project_service.dart`, `project_provider.dart`
+
 ---
 
 ## State Management Pattern
@@ -278,10 +322,21 @@ rooms/{roomId}/settlements/{settlementId}
 rooms/{roomId}/activities/{activityId}
 ```
 
-This ensures:
-- Users only see data from their own rooms
-- Firestore rules can enforce membership checks
-- Multiple rooms don't interfere with each other
+## Group Data Isolation
+
+Group data lives at root level, scoped by groupId:
+```
+groups/{groupId}/expenses/{expenseId}
+```
+Membership enforced via `memberIds` array on the group document.
+
+## Project Data Isolation
+
+Projects are user-private, scoped under the user's document:
+```
+users/{uid}/projects/{projectId}/expenses/{expenseId}
+```
+No sharing — only the owner can read/write.
 
 ---
 

@@ -25,6 +25,13 @@ import 'package:split_ex/screens/settings/edit_profile_screen.dart';
 import 'package:split_ex/screens/settings/change_password_screen.dart';
 import 'package:split_ex/screens/settings/notification_preferences_screen.dart';
 import 'package:split_ex/screens/splash/splash_screen.dart';
+import 'package:split_ex/screens/groups/groups_list_screen.dart';
+import 'package:split_ex/screens/groups/create_group_screen.dart';
+import 'package:split_ex/screens/groups/join_group_screen.dart';
+import 'package:split_ex/screens/groups/group_dashboard_screen.dart';
+import 'package:split_ex/screens/projects/projects_list_screen.dart';
+import 'package:split_ex/screens/projects/create_project_screen.dart';
+import 'package:split_ex/screens/projects/project_dashboard_screen.dart';
 
 /// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
 class RouterNotifier extends ChangeNotifier {
@@ -208,6 +215,40 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/notifications',
         builder: (context, state) => const NotificationPreferencesScreen(),
+      ),
+      // ─── Groups Routes ───
+      GoRoute(
+        path: '/groups',
+        builder: (context, state) => const GroupsListScreen(),
+      ),
+      GoRoute(
+        path: '/groups/create',
+        builder: (context, state) => const CreateGroupScreen(),
+      ),
+      GoRoute(
+        path: '/groups/join',
+        builder: (context, state) => const JoinGroupScreen(),
+      ),
+      GoRoute(
+        path: '/groups/:groupId',
+        builder: (context, state) => GroupDashboardScreen(
+          groupId: state.pathParameters['groupId']!,
+        ),
+      ),
+      // ─── Projects Routes ───
+      GoRoute(
+        path: '/projects',
+        builder: (context, state) => const ProjectsListScreen(),
+      ),
+      GoRoute(
+        path: '/projects/create',
+        builder: (context, state) => const CreateProjectScreen(),
+      ),
+      GoRoute(
+        path: '/projects/:projectId',
+        builder: (context, state) => ProjectDashboardScreen(
+          projectId: state.pathParameters['projectId']!,
+        ),
       ),
     ],
   );

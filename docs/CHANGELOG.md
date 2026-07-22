@@ -2,6 +2,18 @@
 
 ---
 
+## SPLITEX008
+- Added Group Expenses module — create/join groups with invite codes, track shared expenses across any group type
+- Added Project Expense Tracker module — personal project budgets with category breakdown and status tracking
+- Group features: equal/select split, simplified debt view (Settle Up tab), admin archive/restore, member leave
+- Project features: budget progress bar, category breakdown bars, status management (active/completed/paused)
+- Universal project categories: Materials, Labor, Services, Equipment, Transport, Food & Catering, Decoration, Venue, Clothing & Attire, Electronics, Furniture, Utilities, Fees & Permits, Marketing, Miscellaneous
+- Home screen tabs expanded from 2 to 4 (scrollable): Room, Personal, Groups, Projects
+- Added 7 new routes: `/groups`, `/groups/create`, `/groups/join`, `/groups/:groupId`, `/projects`, `/projects/create`, `/projects/:projectId`
+- Firestore structure: groups at root `groups/{groupId}/expenses/{expenseId}`, projects under `users/{uid}/projects/{projectId}/expenses/{expenseId}`
+- GroupBalanceService reuses existing `BalanceService.simplifyDebts()` for consistent debt simplification
+- No image/file upload in new modules — Firestore only
+
 ## SPLITEX007
 - Added personal peer-to-peer debt tracking (Lent/Borrowed) to personal expense section
 - Add Transaction sheet now has "Involves someone else?" toggle with Lent/Borrowed switcher and person name field

@@ -19,16 +19,20 @@ Firestore (Root)
 │   ├── notifications/{notificationId}   ← Per-user notifications (storage mgmt)
 │   ├── personal_transactions/{txnId}    ← Personal income/expense tracking
 │   ├── personal_budgets/{budgetId}      ← Category budgets per month
-│   └── personal_recurring/{recurringId} ← Recurring transaction templates
-├── rooms/{roomId}                       ← Groups/rooms
+│   ├── personal_recurring/{recurringId} ← Recurring transaction templates
+│   └── projects/{projectId}            ← Personal project tracker
+│       └── expenses/{expenseId}         ← Project expense items
+├── rooms/{roomId}                       ← Roommate groups
 │   ├── expenses/{expenseId}             ← Expenses in a room
 │   ├── bills/{billId}                   ← Bills (rent, electricity, water)
 │   ├── settlements/{settlementId}       ← Payment settlements
 │   └── activities/{activityId}          ← Activity log
+├── groups/{groupId}                     ← Shared expense groups
+│   └── expenses/{expenseId}             ← Group expense items
 └── notifications/{notificationId}       ← Top-level notifications (notification service)
 
 Firebase Storage
-└── receipts/{roomId}/{folder}/{imageFile}  ← Receipt images
+└── receipts/{roomId}/{folder}/{imageFile}  ← Receipt images (rooms only)
 ```
 
 ---
@@ -134,7 +138,55 @@ Firebase Storage
 
 ---
 
-### 5. `users/{uid}/notifications` (Subcollection)
+### 5. `users/{uid}/projects` (Subcollection)
+
+**Path:** `users/{uid}/projects/{projectId}`  
+**Service:** `ProjectService`  
+**Purpose:** Personal project budget envelopes. Private to the owner — not shared.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Project name |
+| `description` | string? | Optional description |
+| `projectType` | string | Type label (Wedding, Construction, Event, etc.) |
+| `estimatedBudget` | number | Total budget in ₹ |
+| `startDate` | timestamp? | Project start date |
+| `targetEndDate` | timestamp? | Target completion date |
+| `status` | string | `active`, `completed`, or `paused` |
+| `createdBy` | string | Owner UID |
+| `createdAt` | timestamp | Record creation time |
+
+**Operations:**
+- Create project
+- Update status
+- Delete project (cascades expenses)
+- Stream all projects for user
+
+---
+
+### 6. `users/{uid}/projects/{projectId}/expenses` (Subcollection)
+
+**Path:** `users/{uid}/projects/{projectId}/expenses/{expenseId}`  
+**Service:** `ProjectExpenseService`  
+**Purpose:** Individual expense items tracked against a project budget.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Expense description |
+| `amount` | number | Amount in ₹ |
+| `category` | string | Universal category (Materials, Labor, Services, etc.) |
+| `vendor` | string? | Vendor or payee name |
+| `paymentMethod` | string | `cash`, `upi`, `card`, or `bankTransfer` |
+| `notes` | string? | Optional notes |
+| `date` | timestamp | Expense date |
+| `createdBy` | string | Owner UID |
+| `createdAt` | timestamp | Record creation time |
+
+**Project Categories:** Materials, Labor, Services, Equipment, Transport, Food & Catering, Decoration, Venue, Clothing & Attire, Electronics, Furniture, Utilities, Fees & Permits, Marketing, Miscellaneous
+
+---
+
+### 7. `users/{uid}/notifications` (Subcollection)
 
 **Path:** `users/{uid}/notifications/{notificationId}`  
 **Service:** `StorageManagementService`  
@@ -146,7 +198,7 @@ Firebase Storage
 
 ---
 
-### 6. `rooms` (Top-level)
+### 8. `rooms` (Top-level)
 
 **Path:** `rooms/{roomId}`  
 **Service:** `RoomService`  
@@ -164,7 +216,7 @@ Firebase Storage
 
 ---
 
-### 7. `rooms/{roomId}/expenses` (Subcollection)
+### 9. `rooms/{roomId}/expenses` (Subcollection)
 
 **Path:** `rooms/{roomId}/expenses/{expenseId}`  
 **Service:** `ExpenseService`, `StorageManagementService`  
@@ -187,7 +239,7 @@ Firebase Storage
 
 ---
 
-### 8. `rooms/{roomId}/bills` (Subcollection)
+### 10. `rooms/{roomId}/bills` (Subcollection)
 
 **Path:** `rooms/{roomId}/bills/{billId}`  
 **Service:** `BillService`, `StorageManagementService`  
@@ -204,7 +256,7 @@ Firebase Storage
 
 ---
 
-### 9. `rooms/{roomId}/settlements` (Subcollection)
+### 11. `rooms/{roomId}/settlements` (Subcollection)
 
 **Path:** `rooms/{roomId}/settlements/{settlementId}`  
 **Service:** `SettlementService`, `StorageManagementService`  
@@ -222,7 +274,7 @@ Firebase Storage
 
 ---
 
-### 10. `rooms/{roomId}/activities` (Subcollection)
+### 12. `rooms/{roomId}/activities` (Subcollection)
 
 **Path:** `rooms/{roomId}/activities/{activityId}`  
 **Service:** `ActivityService`, `StorageManagementService`  
@@ -239,7 +291,7 @@ Firebase Storage
 
 ---
 
-### 11. `notifications` (Top-level)
+### 14. `notifications` (Top-level)
 
 **Path:** `notifications/{notificationId}`  
 **Service:** `NotificationService`  
@@ -253,6 +305,63 @@ Firebase Storage
 | `type` | string | Notification type |
 | `isRead` | boolean | Whether user has read it |
 | `createdAt` | timestamp | When notification was sent |
+
+---
+
+### 13. `groups` (Top-level)
+
+**Path:** `groups/{groupId}`  
+**Service:** `GroupService`  
+**Purpose:** Shared expense groups. Any user can create or join via invite code.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Group name |
+| `description` | string? | Optional description |
+| `startDate` | timestamp? | Group start date |
+| `endDate` | timestamp? | Group end date |
+| `currency` | string | Currency code (default: INR) |
+| `inviteCode` | string | 6-char alphanumeric code for joining |
+| `createdBy` | string | UID of group creator (admin) |
+| `memberIds` | array\<string\> | List of member UIDs |
+| `status` | string | `active` or `archived` |
+| `createdAt` | timestamp | Group creation time |
+
+**Operations:**
+- Create group (auto-generate invite code)
+- Join by invite code
+- Leave group
+- Archive / restore (admin only)
+- Stream user's groups
+
+---
+
+### 15. `groups/{groupId}/expenses` (Subcollection)
+
+**Path:** `groups/{groupId}/expenses/{expenseId}`  
+**Service:** `GroupExpenseService`  
+**Purpose:** Expenses shared among group members.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Expense description |
+| `amount` | number | Total amount |
+| `category` | string | Expense category |
+| `notes` | string? | Optional notes |
+| `paidBy` | string | UID of person who paid |
+| `splitType` | string | `equal` or `select` |
+| `splitAmong` | array\<string\> | UIDs sharing the cost |
+| `customSplits` | map\<string, number\>? | Manual split amounts per UID |
+| `date` | timestamp | Expense date |
+| `createdBy` | string | UID who added the expense |
+| `createdAt` | timestamp | Record creation time |
+| `updatedAt` | timestamp? | Last update time |
+
+**Operations:**
+- Add expense
+- Update expense
+- Delete expense
+- Stream expenses for group
 
 ---
 
@@ -290,6 +399,8 @@ Firebase Storage
 │  │     └── optional: debtType, personName, isSettled │
 │  ├── personal_budgets/{id}      ← category budgets   │
 │  ├── personal_recurring/{id}    ← recurring templates│
+│  ├── projects/{id}              ← project envelopes  │
+│  │     └── expenses/{id}        ← project expenses   │
 │  └── notifications/{id}                              │
 └────────────────────────┬────────────────────────────┘
                          │ references
@@ -303,6 +414,14 @@ Firebase Storage
 │  ├── bills/{id}     ← paidBy: uid                    │
 │  ├── settlements/{id} ← fromUserId, toUserId: uid    │
 │  └── activities/{id}  ← performedBy: uid             │
+└─────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────┐
+│                 groups/{groupId}                      │
+│  memberIds: [uid1, uid2, ...]                        │
+│  createdBy: uid (admin)                              │
+├─────────────────────────────────────────────────────┤
+│  └── expenses/{id}  ← paidBy: uid, splitAmong: [uid] │
 └─────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────┐
@@ -321,12 +440,16 @@ Firebase Storage
 | 2 | `users/{uid}/personal_transactions` | Subcollection | Many per user/month |
 | 3 | `users/{uid}/personal_budgets` | Subcollection | Few per user/month |
 | 4 | `users/{uid}/personal_recurring` | Subcollection | Few per user |
-| 5 | `users/{uid}/notifications` | Subcollection | Used by storage mgmt |
-| 6 | `rooms` | Top-level | 1 per group |
-| 7 | `rooms/{roomId}/expenses` | Subcollection | Many per room/month |
-| 8 | `rooms/{roomId}/bills` | Subcollection | Few per room/month |
-| 9 | `rooms/{roomId}/settlements` | Subcollection | Per debt resolution |
-| 10 | `rooms/{roomId}/activities` | Subcollection | 1 per action |
-| 11 | `notifications` | Top-level | Per event × recipients |
+| 5 | `users/{uid}/projects` | Subcollection | Few per user |
+| 6 | `users/{uid}/projects/{id}/expenses` | Subcollection | Many per project |
+| 7 | `users/{uid}/notifications` | Subcollection | Used by storage mgmt |
+| 8 | `rooms` | Top-level | 1 per room |
+| 9 | `rooms/{roomId}/expenses` | Subcollection | Many per room/month |
+| 10 | `rooms/{roomId}/bills` | Subcollection | Few per room/month |
+| 11 | `rooms/{roomId}/settlements` | Subcollection | Per debt resolution |
+| 12 | `rooms/{roomId}/activities` | Subcollection | 1 per action |
+| 13 | `groups` | Top-level | 1 per group |
+| 14 | `groups/{groupId}/expenses` | Subcollection | Many per group |
+| 15 | `notifications` | Top-level | Per event × recipients |
 
-**Total: 1 Firestore database, 11 collections, 1 Storage bucket, 1 local store.**
+**Total: 1 Firestore database, 15 collections, 1 Storage bucket, 1 local store.**

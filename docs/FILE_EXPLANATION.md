@@ -90,6 +90,18 @@ Every file in the project explained with **What** it does and **Why** it exists.
 
 ## `lib/models/` — Data Models
 
+### `lib/models/group_model.dart`
+- **What:** GroupModel data class — id, name, description, startDate, endDate, currency, inviteCode, createdBy, memberIds, status (active/archived), createdAt. Helpers: isArchived, isMember, isAdmin, copyWith.
+- **Why:** Represents a shared group for expense splitting outside of rooms. Supports any group type (friends, family, trips).
+
+### `lib/models/group_expense_model.dart`
+- **What:** GroupExpenseModel — id, groupId, title, amount, category, notes, paidBy, splitType (GroupSplitType enum: equal/select), splitAmong, customSplits, date, createdBy, createdAt, updatedAt. Has shareFor() and toUpdateMap().
+- **Why:** Core data unit for group expenses. Supports equal split across all members or selective split among chosen members.
+
+### `lib/models/project_model.dart`
+- **What:** ProjectModel (id, name, description, projectType, estimatedBudget, startDate, targetEndDate, status, createdBy, createdAt) and ProjectExpenseModel (adds vendor, notes, paymentMethod: cash/upi/card/bankTransfer).
+- **Why:** Represents a personal project with a budget envelope. ProjectExpenseModel tracks individual spend items against that budget.
+
 ### `lib/models/user_model.dart`
 - **What:** User data class — uid, name, email, avatarUrl, upiId, rooms list, createdAt.
 - **Why:** Represents a user profile in Firestore. Used for displaying names in rooms and UPI settlements.
@@ -121,6 +133,14 @@ Every file in the project explained with **What** it does and **Why** it exists.
 ---
 
 ## `lib/services/` — Business Logic & Firebase Operations
+
+### `lib/services/group_service.dart`
+- **What:** GroupService (createGroup with random 6-char invite code, joinByCode, leaveGroup, archiveGroup, restoreGroup, getUserGroupsStream, getGroupStream), GroupExpenseService (addExpense, updateExpense, deleteExpense, getExpensesStream), GroupBalanceService (computeNetBalances delegating to BalanceService.simplifyDebts).
+- **Why:** All Firestore operations for the Groups module. Reuses existing debt simplification logic for consistency.
+
+### `lib/services/project_service.dart`
+- **What:** ProjectService (createProject, updateStatus, deleteProject, getProjectsStream, getProjectStream — scoped under `users/{uid}/projects`), ProjectExpenseService (addExpense, deleteExpense, getExpensesStream).
+- **Why:** All Firestore operations for the Project Tracker module. Projects are user-private (not shared).
 
 ### `lib/services/auth_service.dart`
 - **What:** Firebase Auth operations — signIn (email/Google), signUp, signOut, resetPassword, deleteAccount.
@@ -193,6 +213,14 @@ Every file in the project explained with **What** it does and **Why** it exists.
 ---
 
 ## `lib/providers/` — State Management (Riverpod)
+
+### `lib/providers/group_provider.dart`
+- **What:** groupServiceProvider, groupExpenseServiceProvider, groupBalanceServiceProvider, userGroupsProvider, groupStreamProvider, groupExpensesProvider, groupNetBalancesProvider, groupSimplifiedDebtsProvider, groupUserBalanceProvider, groupTotalExpenseProvider.
+- **Why:** Reactive state for the Groups module. Imports currentUserIdProvider from room_provider.dart.
+
+### `lib/providers/project_provider.dart`
+- **What:** projectServiceProvider, projectExpenseServiceProvider, userProjectsProvider, projectStreamProvider, projectExpensesProvider, projectTotalSpentProvider, projectCategoryBreakdownProvider.
+- **Why:** Reactive state for the Project Tracker module. Imports currentUserIdProvider from room_provider.dart.
 
 ### `lib/providers/auth_provider.dart`
 - **What:** Exposes authServiceProvider, userServiceProvider, authStateProvider (stream), userProfileProvider.
@@ -338,6 +366,42 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Admin-only screen showing Firestore document counts and storage usage.
 - **Why:** Helps admins stay within free tier limits and identify cleanup needs.
 
+### `lib/screens/groups/groups_list_screen.dart`
+- **What:** Lists all groups the user belongs to. Shows archived badge, FAB to create, action button to join by code.
+- **Why:** Entry point for the Groups module. Navigates to group dashboard on tap.
+
+### `lib/screens/groups/create_group_screen.dart`
+- **What:** Form to create a new group — name, description, start/end date pickers.
+- **Why:** Users create a shared group before adding expenses.
+
+### `lib/screens/groups/join_group_screen.dart`
+- **What:** 6-character invite code entry with uppercase enforcement.
+- **Why:** Second user onboarding — join an existing group via shared code.
+
+### `lib/screens/groups/group_dashboard_screen.dart`
+- **What:** 3-tab screen: Overview (invite code card + balance cards), Expenses (list with long-press delete), Settle Up (simplified debts). Admin gets archive/restore menu; non-admin gets leave button.
+- **Why:** Central hub for a group — all group data and actions in one place.
+
+### `lib/screens/groups/group_expense_sheet.dart`
+- **What:** Bottom sheet for adding group expenses — equal/select split, category dropdown, date picker, member filter chips.
+- **Why:** Quick expense entry within a group context.
+
+### `lib/screens/projects/projects_list_screen.dart`
+- **What:** Lists all user projects with budget progress bar and status color badge per project.
+- **Why:** Entry point for the Project Tracker module.
+
+### `lib/screens/projects/create_project_screen.dart`
+- **What:** Form to create a project — name, description, project type dropdown, estimated budget, start/end dates.
+- **Why:** Users define a project envelope before tracking expenses against it.
+
+### `lib/screens/projects/project_dashboard_screen.dart`
+- **What:** 2-tab screen: Overview (budget card + category breakdown bars), Expenses (list with long-press delete). Status change via popup menu.
+- **Why:** Central hub for a project — budget tracking and expense history.
+
+### `lib/screens/projects/add_project_expense_sheet.dart`
+- **What:** Bottom sheet for adding project expenses — universal categories, vendor field, payment method chips (cash/UPI/card/bank transfer), notes.
+- **Why:** Expense entry scoped to a project with vendor and payment context.
+
 ### `lib/screens/personal/personal_expense_tab.dart`
 - **What:** Main personal finance dashboard tab with month navigation, financial summary, budget tracking, pie chart, recent transactions, recurring preview, and utility shortcuts.
 - **Why:** The primary view for personal expense tracking — provides at-a-glance financial status.
@@ -441,14 +505,14 @@ Every file in the project explained with **What** it does and **Why** it exists.
 | Layer | Count | Purpose |
 |-------|-------|---------|
 | Config | 4 files | Theme, routing, constants, dev flags |
-| Models | 7 files | Data structures for Firestore documents |
-| Services | 17 files | Firebase operations & business logic |
-| Providers | 11 files | Reactive state management |
-| Screens | 32 files | User interface |
+| Models | 10 files | Data structures for Firestore documents |
+| Services | 19 files | Firebase operations & business logic |
+| Providers | 13 files | Reactive state management |
+| Screens | 41 files | User interface |
 | Widgets | 2 files | Reusable UI components |
 | Utils | 1 file | Pure utility functions |
-| Docs | 7 files | Documentation & guides |
-| **Total** | **~78 files** | |
+| Docs | 5 files | Documentation & guides |
+| **Total** | **~89 files** | |
 
 ---
 
