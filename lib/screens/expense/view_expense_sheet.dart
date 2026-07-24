@@ -9,6 +9,7 @@ import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/activity_provider.dart';
 import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void showViewExpenseSheet(
   BuildContext context, {
@@ -40,6 +41,8 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
   late TextEditingController _amountController;
   late String _category;
   late DateTime _date;
+  late SplitType _splitType;
+  late List<String> _selectedMembers;
 
   @override
   void initState() {
@@ -48,6 +51,8 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
     _amountController = TextEditingController(text: widget.expense.amount.toStringAsFixed(0));
     _category = widget.expense.category;
     _date = widget.expense.date;
+    _splitType = widget.expense.splitType;
+    _selectedMembers = List<String>.from(widget.expense.splitAmong);
   }
 
   @override
@@ -79,6 +84,32 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) return;
 
+    final room = ref.read(currentRoomProvider);
+    List<String> splitAmong;
+    switch (_splitType) {
+      case SplitType.equal:
+        splitAmong = room?.memberIds ?? widget.expense.splitAmong;
+        break;
+      case SplitType.dynamic:
+        if (_selectedMembers.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Select at least one member')),
+          );
+          return;
+        }
+        splitAmong = _selectedMembers;
+        break;
+      case SplitType.oneToOne:
+        if (_selectedMembers.length != 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Select exactly one person')),
+          );
+          return;
+        }
+        splitAmong = [_selectedMembers.first];
+        break;
+    }
+
     setState(() => _isLoading = true);
     final userId = ref.read(currentUserIdProvider);
     try {
@@ -89,7 +120,10 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
           'title': _titleController.text.trim(),
           'amount': amount,
           'category': _category,
-          'date': _date,
+          'date': Timestamp.fromDate(_date),
+          'splitType': _splitType.name,
+          'splitAmong': splitAmong,
+          'month': DateFormat('yyyy-MM').format(_date),
         },
       );
       ref.read(activityServiceProvider).log(
@@ -102,7 +136,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
           'amount': amount,
           'category': _category,
           'paidBy': widget.expense.paidBy,
-          'splitAmong': widget.expense.splitAmong,
+          'splitAmong': splitAmong,
           'date': DateFormat('dd MMM yyyy').format(_date),
         },
       );
@@ -123,6 +157,8 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
       _amountController.text = widget.expense.amount.toStringAsFixed(0);
       _category = widget.expense.category;
       _date = widget.expense.date;
+      _splitType = widget.expense.splitType;
+      _selectedMembers = List<String>.from(widget.expense.splitAmong);
     });
   }
 
@@ -386,6 +422,75 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
                 ),
               ],
 
+              // Split method (edit mode only)
+              if (_editing) ...[
+                const SizedBox(height: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.splitscreen_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                        const SizedBox(width: 8),
+                        Text('Split method', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<SplitType>(
+                        segments: const [
+                          ButtonSegment(value: SplitType.equal, label: Text('Equal')),
+                          ButtonSegment(value: SplitType.dynamic, label: Text('Custom')),
+                          ButtonSegment(value: SplitType.oneToOne, label: Text('1-to-1')),
+                        ],
+                        selected: {_splitType},
+                        onSelectionChanged: (v) => setState(() { _splitType = v.first; _selectedMembers = []; }),
+                        style: ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          backgroundColor: MaterialStateProperty.resolveWith((states) {
+                            if (states.contains(MaterialState.selected)) return Theme.of(context).colorScheme.primary;
+                            return Colors.transparent;
+                          }),
+                          foregroundColor: MaterialStateProperty.resolveWith((states) {
+                            if (states.contains(MaterialState.selected)) return Colors.white;
+                            return Theme.of(context).colorScheme.onSurface;
+                          }),
+                        ),
+                      ),
+                    ),
+                    if (_splitType != SplitType.equal && room != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.people_alt_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _splitType == SplitType.oneToOne ? 'Who owes the full amount?' : 'Share with:',
+                                  style: const TextStyle(fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildMemberChips(room.memberIds),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+
               // Save button (only in edit mode)
               if (_editing) ...[
                 const SizedBox(height: 28),
@@ -407,6 +512,46 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildMemberChips(List<String> memberIds) {
+    final userId = ref.read(currentUserIdProvider);
+    final membersAsync = ref.watch(roomMembersProvider(memberIds));
+    final nameMap = <String, String>{};
+    if (membersAsync.hasValue) {
+      for (final m in membersAsync.value!) {
+        nameMap[m.uid] = m.name;
+      }
+    }
+    final others = memberIds.where((id) => id != userId).toList();
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: others.map((memberId) {
+        final selected = _selectedMembers.contains(memberId);
+        return FilterChip(
+          label: Text(nameMap[memberId] ?? memberId, style: const TextStyle(fontWeight: FontWeight.normal)),
+          selected: selected,
+          onSelected: (checked) {
+            setState(() {
+              if (_splitType == SplitType.oneToOne) {
+                _selectedMembers = checked ? [memberId] : [];
+              } else {
+                if (checked) {
+                  _selectedMembers = {..._selectedMembers, memberId, userId}.toList();
+                } else {
+                  _selectedMembers = _selectedMembers.where((id) => id != memberId && id != userId).toList();
+                }
+              }
+            });
+          },
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+          selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+          checkmarkColor: Theme.of(context).colorScheme.primary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        );
+      }).toList(),
     );
   }
 }

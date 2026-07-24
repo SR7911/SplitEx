@@ -58,19 +58,21 @@ class ProjectModel {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-  ProjectModel copyWith({ProjectStatus? status}) => ProjectModel(
+  ProjectModel copyWith({String? name, String? description, String? projectType, double? estimatedBudget, DateTime? startDate, DateTime? targetEndDate, ProjectStatus? status}) => ProjectModel(
         id: id,
-        name: name,
-        description: description,
-        projectType: projectType,
-        estimatedBudget: estimatedBudget,
-        startDate: startDate,
-        targetEndDate: targetEndDate,
+        name: name ?? this.name,
+        description: description ?? this.description,
+        projectType: projectType ?? this.projectType,
+        estimatedBudget: estimatedBudget ?? this.estimatedBudget,
+        startDate: startDate ?? this.startDate,
+        targetEndDate: targetEndDate ?? this.targetEndDate,
         status: status ?? this.status,
         createdBy: createdBy,
         createdAt: createdAt,
       );
 }
+
+enum ProjectDebtType { lent, borrowed }
 
 class ProjectExpenseModel {
   final String id;
@@ -84,6 +86,9 @@ class ProjectExpenseModel {
   final DateTime date;
   final String createdBy;
   final DateTime createdAt;
+  final ProjectDebtType? debtType;
+  final String? personName;
+  final bool isSettled;
 
   const ProjectExpenseModel({
     required this.id,
@@ -97,7 +102,12 @@ class ProjectExpenseModel {
     required this.date,
     required this.createdBy,
     required this.createdAt,
+    this.debtType,
+    this.personName,
+    this.isSettled = false,
   });
+
+  bool get hasDebt => debtType != null;
 
   factory ProjectExpenseModel.fromMap(Map<String, dynamic> map, String id) {
     return ProjectExpenseModel(
@@ -115,6 +125,11 @@ class ProjectExpenseModel {
       date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       createdBy: map['createdBy'] ?? '',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      debtType: map['debtType'] != null
+          ? ProjectDebtType.values.firstWhere((e) => e.name == map['debtType'], orElse: () => ProjectDebtType.lent)
+          : null,
+      personName: map['personName'],
+      isSettled: map['isSettled'] ?? false,
     );
   }
 
@@ -129,5 +144,38 @@ class ProjectExpenseModel {
         'date': Timestamp.fromDate(date),
         'createdBy': createdBy,
         'createdAt': FieldValue.serverTimestamp(),
+        'debtType': debtType?.name,
+        'personName': personName,
+        'isSettled': isSettled,
       };
+
+  ProjectExpenseModel copyWith({
+    String? title,
+    double? amount,
+    String? category,
+    String? vendor,
+    String? notes,
+    PaymentMethod? paymentMethod,
+    DateTime? date,
+    ProjectDebtType? debtType,
+    String? personName,
+    bool? isSettled,
+    bool clearDebt = false,
+  }) =>
+      ProjectExpenseModel(
+        id: id,
+        projectId: projectId,
+        title: title ?? this.title,
+        amount: amount ?? this.amount,
+        category: category ?? this.category,
+        vendor: vendor ?? this.vendor,
+        notes: notes ?? this.notes,
+        paymentMethod: paymentMethod ?? this.paymentMethod,
+        date: date ?? this.date,
+        createdBy: createdBy,
+        createdAt: createdAt,
+        debtType: clearDebt ? null : (debtType ?? this.debtType),
+        personName: clearDebt ? null : (personName ?? this.personName),
+        isSettled: isSettled ?? this.isSettled,
+      );
 }

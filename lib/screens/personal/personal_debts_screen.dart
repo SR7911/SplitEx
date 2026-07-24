@@ -127,7 +127,7 @@ class _SummaryChip extends StatelessWidget {
           children: [
             Icon(icon, size: 22, color: color),
             const SizedBox(height: 6),
-            Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            Text('\u20B9${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
             const SizedBox(height: 2),
             Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
             Text(subtitle, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
@@ -240,7 +240,7 @@ class _DebtTile extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '₹${txn.amount.toStringAsFixed(0)}',
+                  '\u20B9${txn.amount.toStringAsFixed(0)}',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -281,8 +281,8 @@ class _DebtTile extends ConsumerWidget {
   void _confirmSettle(BuildContext context, WidgetRef ref) {
     final personName = txn.personName ?? 'Unknown';
     final message = isLent
-        ? 'Has $personName paid you back ₹${txn.amount.toStringAsFixed(0)} for "${txn.title}"?'
-        : 'Have you paid ₹${txn.amount.toStringAsFixed(0)} back to $personName for "${txn.title}"?';
+        ? 'Has $personName paid you back \u20B9${txn.amount.toStringAsFixed(0)} for "${txn.title}"?'
+        : 'Have you paid \u20B9${txn.amount.toStringAsFixed(0)} back to $personName for "${txn.title}"?';
 
     showDialog(
       context: context,

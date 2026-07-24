@@ -106,7 +106,7 @@ class _PersonalReportsSheet extends ConsumerWidget {
                       Container(width: 12, height: 12, decoration: BoxDecoration(color: _colors[e.key % _colors.length], borderRadius: BorderRadius.circular(3))),
                       const SizedBox(width: 12),
                       Expanded(child: Text(e.value.key, style: const TextStyle(fontSize: 13))),
-                      Text('₹${e.value.value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      Text('\u20B9${e.value.value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                       const SizedBox(width: 12),
                       SizedBox(width: 40, child: Text('$pct%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), textAlign: TextAlign.right)),
                     ],
@@ -150,7 +150,7 @@ class _SummaryPill extends StatelessWidget {
           children: [
             Text(label, style: TextStyle(fontSize: 12, color: color)),
             const SizedBox(height: 4),
-            Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+            Text('\u20B9${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
           ],
         ),
       ),
@@ -200,7 +200,7 @@ class _DailySpendingChart extends StatelessWidget {
                     final date = DateTime(year, month, day);
                     final dayName = DateFormat('EEE').format(date);
                     return BarTooltipItem(
-                      '$dayName, ${day.toString().padLeft(2, '0')}\n₹${rod.toY.toStringAsFixed(0)}',
+                      '$dayName, ${day.toString().padLeft(2, '0')}\n\u20B9${rod.toY.toStringAsFixed(0)}',
                       TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 11, fontWeight: FontWeight.w600),
                     );
                   },

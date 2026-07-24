@@ -13,20 +13,21 @@ class GroupsListScreen extends ConsumerWidget {
     final groupsAsync = ref.watch(userGroupsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Groups', style: TextStyle(fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.group_add_outlined),
-            tooltip: 'Join Group',
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
             onPressed: () => context.push('/groups/join'),
+            heroTag: 'join-group',
+            child: const Icon(Icons.group_add_outlined),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            onPressed: () => context.push('/groups/create'),
+            heroTag: 'create-group',
+            child: const Icon(Icons.add),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/groups/create'),
-        icon: const Icon(Icons.add),
-        label: const Text('New Group'),
       ),
       body: groupsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -34,10 +35,13 @@ class GroupsListScreen extends ConsumerWidget {
         data: (groups) {
           if (groups.isEmpty) return const _EmptyGroupsState();
           return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: groups.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (_, i) => _GroupCard(group: groups[i]),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            itemCount: groups.length + 1,
+            separatorBuilder: (_, i) => i == 0 ? const SizedBox(height: 16) : const SizedBox(height: 10),
+            itemBuilder: (_, i) {
+              if (i == 0) return _GroupsSummaryHeader(groups: groups);
+              return _GroupCard(group: groups[i - 1]);
+            },
           );
         },
       ),
@@ -119,6 +123,97 @@ class _GroupCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _GroupsSummaryHeader extends ConsumerWidget {
+  final List<GroupModel> groups;
+  const _GroupsSummaryHeader({required this.groups});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeGroups = groups.where((g) => !g.isArchived).toList();
+    final totalMembers = activeGroups.fold<int>(0, (s, g) => s + g.memberIds.length);
+    // Sum net balance across all active groups
+    double netBalance = 0;
+    for (final g in activeGroups) {
+      netBalance += ref.watch(groupUserBalanceProvider(g.id));
+    }
+    final isOwed = netBalance > 0.01;
+    final owes = netBalance < -0.01;
+    final balanceColor = isOwed ? Colors.green : owes ? Colors.red : Colors.grey;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _SummaryPill(
+                icon: Icons.groups_rounded,
+                label: 'Groups',
+                value: '${activeGroups.length}',
+                color: Theme.of(context).colorScheme.primary,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SummaryPill(
+                icon: Icons.person_rounded,
+                label: 'Members',
+                value: '$totalMembers',
+                color: Colors.teal,
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _SummaryPill(
+                icon: isOwed ? Icons.arrow_downward_rounded : owes ? Icons.arrow_upward_rounded : Icons.check_circle_rounded,
+                label: isOwed ? 'You are owed' : owes ? 'You owe' : 'Settled',
+                value: netBalance.abs() < 0.01 ? '—' : '₹${netBalance.abs().toStringAsFixed(0)}',
+                color: balanceColor,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text('Your Groups', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7))),
+      ],
+    );
+  }
+}
+
+class _SummaryPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final bool isDark;
+  const _SummaryPill({required this.icon, required this.label, required this.value, required this.color, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 22, color: color),
+          const SizedBox(height: 4),
+          Text(value, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: color)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)), textAlign: TextAlign.center),
+        ],
       ),
     );
   }

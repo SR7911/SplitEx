@@ -26,7 +26,7 @@ class AnalyticsScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text('Total: ₹${total.toStringAsFixed(0)}',
+              Text('Total: \u20B9${total.toStringAsFixed(0)}',
                   style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 24),
               Text('By Category',
@@ -119,7 +119,7 @@ class _CategoryPieChart extends StatelessWidget {
                       height: 12,
                       color: _colors[idx % _colors.length]),
                   const SizedBox(width: 6),
-                  Text('${entry.key} ₹${entry.value.toStringAsFixed(0)}',
+                  Text('${entry.key} \u20B9${entry.value.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 12)),
                 ],
               ),
@@ -154,7 +154,7 @@ class _DailyBarChart extends StatelessWidget {
           touchTooltipData: BarTouchTooltipData(
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
-                '₹${rod.toY.toStringAsFixed(0)}',
+                '\u20B9${rod.toY.toStringAsFixed(0)}',
                 const TextStyle(color: Colors.white, fontSize: 12),
               );
             },

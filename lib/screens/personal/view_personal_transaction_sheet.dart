@@ -30,10 +30,13 @@ class _TransactionDetailSheetState extends ConsumerState<_TransactionDetailSheet
   late TextEditingController _titleCtrl;
   late TextEditingController _amountCtrl;
   late TextEditingController _notesCtrl;
+  late TextEditingController _personCtrl;
   late String _category;
   late TransactionType _type;
   late DateTime _date;
   bool _saving = false;
+  late bool _involvesPerson;
+  late DebtType _debtType;
 
   @override
   void initState() {
@@ -41,9 +44,12 @@ class _TransactionDetailSheetState extends ConsumerState<_TransactionDetailSheet
     _titleCtrl = TextEditingController(text: widget.txn.title);
     _amountCtrl = TextEditingController(text: widget.txn.amount.toStringAsFixed(0));
     _notesCtrl = TextEditingController(text: widget.txn.notes ?? '');
+    _personCtrl = TextEditingController(text: widget.txn.personName ?? '');
     _category = widget.txn.category;
     _type = widget.txn.type;
     _date = widget.txn.date;
+    _involvesPerson = widget.txn.hasDebt;
+    _debtType = widget.txn.debtType ?? DebtType.lent;
   }
 
   @override
@@ -51,6 +57,7 @@ class _TransactionDetailSheetState extends ConsumerState<_TransactionDetailSheet
     _titleCtrl.dispose();
     _amountCtrl.dispose();
     _notesCtrl.dispose();
+    _personCtrl.dispose();
     super.dispose();
   }
 
@@ -71,6 +78,9 @@ class _TransactionDetailSheetState extends ConsumerState<_TransactionDetailSheet
       'date': Timestamp.fromDate(_date),
       'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       'month': DateFormat('yyyy-MM').format(_date),
+      'debtType': _involvesPerson ? _debtType.name : null,
+      'personName': _involvesPerson ? _personCtrl.text.trim() : null,
+      'isSettled': _involvesPerson ? widget.txn.isSettled : false,
     });
 
     if (mounted) {
@@ -259,6 +269,39 @@ class _TransactionDetailSheetState extends ConsumerState<_TransactionDetailSheet
                 ),
                 maxLines: 2,
               ),
+              const SizedBox(height: 16),
+              // Debt toggle
+              SwitchListTile(
+                value: _involvesPerson,
+                onChanged: (v) => setState(() => _involvesPerson = v),
+                title: const Text('Involves someone else?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                secondary: Icon(Icons.people_outline, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                dense: true,
+              ),
+              if (_involvesPerson) ...[
+                const SizedBox(height: 12),
+                SegmentedButton<DebtType>(
+                  segments: const [
+                    ButtonSegment(value: DebtType.lent, label: Text('I Lent'), icon: Icon(Icons.call_made, size: 16)),
+                    ButtonSegment(value: DebtType.borrowed, label: Text('I Borrowed'), icon: Icon(Icons.call_received, size: 16)),
+                  ],
+                  selected: {_debtType},
+                  onSelectionChanged: (s) => setState(() => _debtType = s.first),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _personCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Person\'s name',
+                    hintText: 'e.g. John, Sarah',
+                    prefixIcon: Icon(Icons.person_outline, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               Row(
                 children: [

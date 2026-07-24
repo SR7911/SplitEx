@@ -140,7 +140,7 @@ class _ActivityTile extends StatelessWidget {
     if (meta != null && meta.isNotEmpty) {
       final title = meta['title'] ?? '';
       final amount = meta['amount'];
-      final amountStr = amount != null ? ' ₹${(amount as num).toStringAsFixed(0)}' : '';
+      final amountStr = amount != null ? ' \u20B9${(amount as num).toStringAsFixed(0)}' : '';
 
       return switch (activity.type) {
         ActivityType.expenseAdded => '$actor added "$title"$amountStr',
@@ -179,13 +179,13 @@ class _ActivityTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (amount != null)
-              _detailRow('Amount', '₹${(amount as num).toStringAsFixed(2)}'),
+              _detailRow('Amount', '\u20B9${(amount as num).toStringAsFixed(2)}'),
             _detailRow('Category', category),
             _detailRow('Paid by', paidByName),
             if (date.isNotEmpty) _detailRow('Date', date),
             if (splitNames.isNotEmpty) _detailRow('Split among', splitNames),
             if (splitAmount > 0)
-              _detailRow('Per person', '₹${splitAmount.toStringAsFixed(2)}'),
+              _detailRow('Per person', '\u20B9${splitAmount.toStringAsFixed(2)}'),
           ],
         ),
         actions: [

@@ -32,6 +32,10 @@ class ProjectService {
     return project;
   }
 
+  Future<void> updateProject(String uid, String projectId, Map<String, dynamic> data) async {
+    await _projectsRef(uid).doc(projectId).update(data);
+  }
+
   Future<void> updateStatus(String uid, String projectId, ProjectStatus status) async {
     await _projectsRef(uid).doc(projectId).update({'status': status.name});
   }
@@ -65,6 +69,10 @@ class ProjectExpenseService {
     await doc.set(expense.toMap());
     return ProjectExpenseModel.fromMap(
         {...expense.toMap(), 'createdAt': Timestamp.now()}, doc.id);
+  }
+
+  Future<void> updateExpense(String uid, String projectId, String expenseId, Map<String, dynamic> data) async {
+    await _expensesRef(uid, projectId).doc(expenseId).update(data);
   }
 
   Future<void> deleteExpense(String uid, String projectId, String expenseId) async {

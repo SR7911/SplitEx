@@ -57,8 +57,31 @@ class PersonalExpenseService {
   }
 
   Future<void> settleTransaction(String userId, String txnId) async {
+    final doc = await _txnCol(userId).doc(txnId).get();
+    await _tracker.trackReads(1);
+    final data = doc.data() as Map<String, dynamic>?;
+
     await _txnCol(userId).doc(txnId).update({'isSettled': true});
     await _tracker.trackWrites(1);
+
+    // If lent, add an income entry to return the amount to totals
+    if (data != null && data['debtType'] == 'lent') {
+      final now = DateTime.now();
+      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      await _txnCol(userId).add({
+        'title': 'Settlement: ${data['personName'] ?? 'Unknown'} repaid',
+        'amount': data['amount'],
+        'type': 'income',
+        'category': data['category'] ?? 'Other',
+        'date': Timestamp.fromDate(now),
+        'notes': 'Auto-generated on settling "${data['title']}"',
+        'userId': userId,
+        'month': month,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isSettled': false,
+      });
+      await _tracker.trackWrites(1);
+    }
   }
 
   // ─── Category Budgets ───

@@ -32,11 +32,44 @@ service cloud.firestore {
       match /personal_recurring/{recurringId} {
         allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
       }
+
+      // Projects - owner only
+      match /projects/{projectId} {
+        allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
+
+        match /expenses/{expenseId} {
+          allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
+        }
+      }
     }
 
     // Allow anyone to read app version config (needed before auth)
     match /config/app_version {
       allow read: if true;
+    }
+
+    // Groups collection
+    match /groups/{groupId} {
+      allow read: if request.auth != null &&
+        request.auth.uid in resource.data.memberIds || isDeveloper();
+      allow create: if request.auth != null;
+      allow update: if request.auth != null &&
+        request.auth.uid in resource.data.memberIds;
+      allow delete: if request.auth != null &&
+        request.auth.uid == resource.data.createdBy || isDeveloper();
+
+      match /expenses/{expenseId} {
+        allow read: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds || isDeveloper();
+        allow create: if request.auth != null &&
+          request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+        allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.paidBy ||
+           request.auth.uid == get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy);
+        allow delete: if request.auth != null &&
+          (request.auth.uid == resource.data.paidBy ||
+           request.auth.uid == get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy) || isDeveloper();
+      }
     }
 
     // Rooms collection

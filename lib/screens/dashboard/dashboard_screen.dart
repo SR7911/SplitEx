@@ -142,7 +142,7 @@ class _BalanceSummaryCard extends StatelessWidget {
             Text(label, style: Theme.of(context).textTheme.titleMedium),
             if (isPositive || isNegative)
               Text(
-                '₹${displayAmount.toStringAsFixed(2)}',
+                '\u20B9${displayAmount.toStringAsFixed(2)}',
                 style: Theme.of(context)
                     .textTheme
                     .headlineMedium
@@ -200,7 +200,7 @@ class _DebtTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '₹${debt.amount.toStringAsFixed(2)}',
+              '\u20B9${debt.amount.toStringAsFixed(2)}',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: debt.from == currentUserId ? Colors.red : Colors.green,

@@ -27,21 +27,14 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   late DateTime _selectedMonth;
-  late AnimationController _animationController;
-  late TabController _tabController;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedMonth = DateTime.now();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _animationController.forward();
-    _tabController = TabController(length: 4, vsync: this);
     _processRecurring();
   }
 
@@ -56,31 +49,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
   String get _monthKey => DateFormat('yyyy-MM').format(_selectedMonth);
 
-  void _prevMonth() {
-    setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
-      _animationController.reset();
-      _animationController.forward();
-    });
-  }
+  void _prevMonth() => setState(() {
+        _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+      });
 
   void _nextMonth() {
     final now = DateTime.now();
     final next = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
     if (!next.isAfter(DateTime(now.year, now.month))) {
-      setState(() {
-        _selectedMonth = next;
-        _animationController.reset();
-        _animationController.forward();
-      });
+      setState(() => _selectedMonth = next);
     }
+  }
+
+  void _onNavItemTapped(int index) {
+    if (_selectedIndex == index) return;
+    setState(() => _selectedIndex = index);
   }
 
   Future<bool> checkUpiExist() async {
@@ -136,100 +124,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final userName = profile?.name ?? 'User';
 
+    final _appBarTitles = ['Room', 'Groups', 'Projects', 'Personal'];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SplitEx', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('SplitEx', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
         centerTitle: false,
         actions: const [OfflineIndicator(), _NotificationBell()],
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: const [
-            Tab(icon: Icon(Icons.home_rounded, size: 20), text: 'Room'),
-            Tab(icon: Icon(Icons.groups_rounded, size: 20), text: 'Groups'),
-            Tab(icon: Icon(Icons.construction_rounded, size: 20), text: 'Projects'),
-            Tab(icon: Icon(Icons.account_balance_wallet_rounded, size: 20), text: 'My Expenses'),
-          ],
-          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          indicatorSize: TabBarIndicatorSize.label,
-        ),
       ),
       drawer: _AppDrawer(userName: userName, userId: userId, isDeveloper: isDeveloper),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // Tab 1: Room Expenses (existing)
-          FadeTransition(
-            opacity: _animationController,
-            child: roomsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (rooms) {
-                if (rooms.isEmpty) return const _EmptyState();
-                final room = rooms.first;
-                final expensesAsync = ref.watch(monthExpensesProvider(
-                  MonthRoomKey(roomId: room.id, month: _monthKey),
-                ));
-                final expenses = expensesAsync.valueOrNull ?? [];
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        switchInCurve: Curves.easeInOut,
+        switchOutCurve: Curves.easeInOut,
+        child: [
+          // Index 0: Personal Expenses
+          const PersonalExpenseTab(key: ValueKey('personal')),
 
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  children: [
-                    _GreetingHeader(userName: userName, selectedMonth: _selectedMonth),
+          // Index 1: Groups
+          const GroupsListScreen(key: ValueKey('groups')),
+
+          // Index 2: Room
+          roomsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+            data: (rooms) {
+              if (rooms.isEmpty) return const _EmptyState();
+              final room = rooms.first;
+              final expensesAsync = ref.watch(monthExpensesProvider(
+                MonthRoomKey(roomId: room.id, month: _monthKey),
+              ));
+              final expenses = expensesAsync.valueOrNull ?? [];
+
+              return ListView(
+                key: const ValueKey('room'),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children: [
+                  _GreetingHeader(userName: userName, selectedMonth: _selectedMonth),
+                  const SizedBox(height: 20),
+                  _MonthBalanceCard(
+                    monthKey: _monthKey,
+                    selectedMonth: _selectedMonth,
+                    isCurrentMonth: _isCurrentMonth,
+                    onPrev: _prevMonth,
+                    onNext: _nextMonth,
+                  ),
+                  const SizedBox(height: 20),
+                  _RoomHeader(
+                    roomName: room.name,
+                    memberCount: room.memberIds.length,
+                    inviteCode: room.inviteCode,
+                    isAdmin: room.isAdmin(userId),
+                    onTap: () async {
+                      final allowed = await checkUpiExist();
+                      if (!allowed) return;
+                      ref.read(currentRoomProvider.notifier).state = room;
+                      context.push('/room/${room.id}', extra: _selectedMonth);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  if (expenses.isNotEmpty) _CategoryBreakdown(expenses: expenses),
+                  if (expenses.isNotEmpty) const SizedBox(height: 20),
+                  _SpendingSummary(
+                    expenses: expenses,
+                    userId: userId,
+                    monthLabel: DateFormat('MMM').format(_selectedMonth),
+                  ),
+                  const SizedBox(height: 20),
+                  _QuickActions(roomId: room.id, selectedMonth: _selectedMonth, checkUpiExist: checkUpiExist),
+                  if (_isCurrentMonth) ...[
                     const SizedBox(height: 20),
-                    _MonthBalanceCard(
-                      monthKey: _monthKey,
-                      selectedMonth: _selectedMonth,
-                      isCurrentMonth: _isCurrentMonth,
-                      onPrev: _prevMonth,
-                      onNext: _nextMonth,
-                    ),
-                    const SizedBox(height: 20),
-                    _RoomHeader(
-                      roomName: room.name,
-                      memberCount: room.memberIds.length,
-                      inviteCode: room.inviteCode,
-                      isAdmin: room.isAdmin(userId),
-                      onTap: () async {
-                        final allowed = await checkUpiExist();
-                        if (!allowed) return;
-                        ref.read(currentRoomProvider.notifier).state = room;
-                        context.push('/room/${room.id}', extra: _selectedMonth);
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    if (expenses.isNotEmpty) _CategoryBreakdown(expenses: expenses),
-                    if (expenses.isNotEmpty) const SizedBox(height: 20),
-                    _SpendingSummary(
-                      expenses: expenses,
-                      userId: userId,
-                      monthLabel: DateFormat('MMM').format(_selectedMonth),
-                    ),
-                    const SizedBox(height: 20),
-                    _QuickActions(roomId: room.id, selectedMonth: _selectedMonth, checkUpiExist: checkUpiExist),
-                    if (_isCurrentMonth) ...[
-                      const SizedBox(height: 20),
-                      _RecentActivitySection(),
-                    ],
-                    const SizedBox(height: 16),
-                    _OnboardingTips(roomId: room.id, userId: userId),
-                    const SizedBox(height: 40),
+                    _RecentActivitySection(),
                   ],
-                );
-              },
-            ),
+                  const SizedBox(height: 16),
+                  _OnboardingTips(roomId: room.id, userId: userId),
+                  const SizedBox(height: 40),
+                ],
+              );
+            },
           ),
 
-          // Tab 2: Groups
-          const GroupsListScreen(),
-
-          // Tab 3: Projects
-          const ProjectsListScreen(),
-
-          // Tab 4: Personal Expenses (separate module)
-          const PersonalExpenseTab(),
-        ],
+          // Index 3: Projects
+          const ProjectsListScreen(key: ValueKey('projects')),
+        ][_selectedIndex],
+      ),
+      bottomNavigationBar: _BottomNavBar(
+        selectedIndex: _selectedIndex,
+        onTap: _onNavItemTapped,
       ),
     );
   }
@@ -405,7 +386,7 @@ class _MonthBalanceCard extends ConsumerWidget {
                                 tween: Tween<double>(begin: 0, end: balance.abs()),
                                 duration: const Duration(milliseconds: 600),
                                 builder: (context, value, _) => Text(
-                                  '₹${value.toStringAsFixed(0)}',
+                                  '\u20B9${value.toStringAsFixed(0)}',
                                   style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
                                 ),
                               )
@@ -543,7 +524,7 @@ class _SpendingSummary extends StatelessWidget {
                     Icon(Icons.group_rounded, size: 28, color: isDark ? Colors.blue.shade300 : Colors.blue.shade700),
                     const SizedBox(height: 2),
                     Text(
-                      '₹${totalSpent.toStringAsFixed(0)}',
+                      '\u20B9${totalSpent.toStringAsFixed(0)}',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.blue.shade200 : Colors.blue.shade800),
                     ),
                     const SizedBox(height: 2),
@@ -572,7 +553,7 @@ class _SpendingSummary extends StatelessWidget {
                     Icon(Icons.person_rounded, size: 28, color: isDark ? Colors.purple.shade300 : Colors.purple.shade700),
                     const SizedBox(height: 2),
                     Text(
-                      '₹${mySpent.toStringAsFixed(0)}',
+                      '\u20B9${mySpent.toStringAsFixed(0)}',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.purple.shade200 : Colors.purple.shade800),
                     ),
                     const SizedBox(height: 2),
@@ -764,7 +745,7 @@ class _CategoryChip extends StatelessWidget {
           Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 6),
           Text(
-            '$label ₹${amount.toStringAsFixed(0)}',
+            '$label \u20B9${amount.toStringAsFixed(0)}',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: color),
           ),
         ],
@@ -1097,6 +1078,89 @@ class _NotificationBell extends ConsumerWidget {
     return IconButton(
       icon: Badge(isLabelVisible: count > 0, label: Text('$count', style: const TextStyle(fontSize: 10)), child: const Icon(Icons.notifications_none_rounded)),
       onPressed: () => context.push('/notifications'),
+    );
+  }
+}
+
+class _BottomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+  const _BottomNavBar({required this.selectedIndex, required this.onTap});
+
+  static const _items = [
+    (icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet_rounded, label: 'Personal'),
+    (icon: Icons.groups_outlined, activeIcon: Icons.groups_rounded, label: 'Groups'),
+    (icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Room'),
+    (icon: Icons.construction_outlined, activeIcon: Icons.construction_rounded, label: 'Projects'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Container(
+          height: 64,
+          decoration: BoxDecoration(
+            color: isDark ? cs.surfaceContainerHigh : cs.surface,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.3 : 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: List.generate(_items.length, (i) {
+              final item = _items[i];
+              final selected = selectedIndex == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onTap(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: selected ? cs.primary.withOpacity(0.12) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            selected ? item.activeIcon : item.icon,
+                            key: ValueKey(selected),
+                            size: 22,
+                            color: selected ? cs.primary : cs.onSurface.withOpacity(0.45),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                            color: selected ? cs.primary : cs.onSurface.withOpacity(0.45),
+                          ),
+                          child: Text(item.label),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
     );
   }
 }

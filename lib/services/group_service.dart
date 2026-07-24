@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:split_ex/models/group_model.dart';
 import 'package:split_ex/models/group_expense_model.dart';
+import 'package:split_ex/models/settlement_model.dart';
 import 'package:split_ex/services/balance_service.dart';
 
 class GroupService {
@@ -113,6 +114,38 @@ class GroupExpenseService {
         .orderBy('date', descending: true)
         .snapshots()
         .map((s) => s.docs.map((d) => GroupExpenseModel.fromMap(d.data(), d.id)).toList());
+  }
+}
+
+class GroupSettlementService {
+  final _db = FirebaseFirestore.instance;
+
+  CollectionReference<Map<String, dynamic>> _ref(String groupId) =>
+      _db.collection('groups').doc(groupId).collection('settlements');
+
+  Future<void> createSettlement(String groupId, SettlementModel s) async {
+    final doc = _ref(groupId).doc();
+    await doc.set({...s.toMap(), 'roomId': groupId});
+  }
+
+  Future<void> confirmSettlement(String groupId, String id) async {
+    await _ref(groupId).doc(id).update({
+      'status': SettlementStatus.confirmed.name,
+      'confirmedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> cancelSettlement(String groupId, String id) async {
+    await _ref(groupId).doc(id).update({
+      'status': SettlementStatus.cancelled.name,
+    });
+  }
+
+  Stream<List<SettlementModel>> getSettlementsStream(String groupId) {
+    return _ref(groupId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => SettlementModel.fromMap(d.data(), d.id)).toList());
   }
 }
 
