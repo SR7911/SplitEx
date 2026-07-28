@@ -19,6 +19,8 @@ class PersonalTransactionModel {
   final DebtType? debtType;
   final String? personName;
   final bool isSettled;
+  final double settledAmount;
+  final List<Map<String, dynamic>> partialSettlements;
 
   const PersonalTransactionModel({
     required this.id,
@@ -34,9 +36,12 @@ class PersonalTransactionModel {
     this.debtType,
     this.personName,
     this.isSettled = false,
+    this.settledAmount = 0,
+    this.partialSettlements = const [],
   });
 
   bool get hasDebt => debtType != null && personName != null && personName!.isNotEmpty;
+  double get remainingAmount => amount - settledAmount;
 
   factory PersonalTransactionModel.fromMap(Map<String, dynamic> map, String id) {
     return PersonalTransactionModel(
@@ -58,6 +63,8 @@ class PersonalTransactionModel {
           : null,
       personName: map['personName'],
       isSettled: map['isSettled'] ?? false,
+      settledAmount: (map['settledAmount'] ?? 0).toDouble(),
+      partialSettlements: List<Map<String, dynamic>>.from(map['partialSettlements'] ?? []),
     );
   }
 
@@ -75,6 +82,8 @@ class PersonalTransactionModel {
       if (debtType != null) 'debtType': debtType!.name,
       if (personName != null) 'personName': personName,
       'isSettled': isSettled,
+      'settledAmount': settledAmount,
+      'partialSettlements': partialSettlements,
     };
   }
 

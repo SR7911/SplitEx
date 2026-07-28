@@ -79,6 +79,38 @@ class ProjectExpenseService {
     await _expensesRef(uid, projectId).doc(expenseId).delete();
   }
 
+  Future<void> settleExpense(String uid, String projectId, String expenseId) async {
+    final doc = await _expensesRef(uid, projectId).doc(expenseId).get();
+    final data = doc.data();
+    if (data == null) return;
+    final totalAmount = (data['amount'] ?? 0).toDouble();
+    final now = DateTime.now();
+    final existing = List<Map<String, dynamic>>.from(data['partialSettlements'] ?? []);
+    existing.add({'amount': totalAmount, 'date': now.toIso8601String(), 'note': 'Full settlement'});
+    await _expensesRef(uid, projectId).doc(expenseId).update({
+      'isSettled': true,
+      'settledAmount': totalAmount,
+      'partialSettlements': existing,
+    });
+  }
+
+  Future<void> partialSettleExpense(String uid, String projectId, String expenseId, double partialAmount, String? note) async {
+    final doc = await _expensesRef(uid, projectId).doc(expenseId).get();
+    final data = doc.data();
+    if (data == null) return;
+    final totalAmount = (data['amount'] ?? 0).toDouble();
+    final currentSettled = (data['settledAmount'] ?? 0).toDouble();
+    final newSettled = currentSettled + partialAmount;
+    final now = DateTime.now();
+    final existing = List<Map<String, dynamic>>.from(data['partialSettlements'] ?? []);
+    existing.add({'amount': partialAmount, 'date': now.toIso8601String(), 'note': note ?? ''});
+    await _expensesRef(uid, projectId).doc(expenseId).update({
+      'settledAmount': newSettled,
+      'isSettled': newSettled >= totalAmount,
+      'partialSettlements': existing,
+    });
+  }
+
   Stream<List<ProjectExpenseModel>> getExpensesStream(String uid, String projectId) {
     return _expensesRef(uid, projectId)
         .orderBy('date', descending: true)

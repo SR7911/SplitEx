@@ -1,45 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/providers/auth_provider.dart';
-import 'package:split_ex/providers/personal_expense_provider.dart';
+import 'package:split_ex/models/project_model.dart';
+import 'package:split_ex/providers/project_provider.dart';
+import 'package:split_ex/providers/room_provider.dart';
 
-class PersonalDebtsScreen extends ConsumerWidget {
-  const PersonalDebtsScreen({super.key});
+class ProjectDebtsScreen extends ConsumerWidget {
+  final String projectId;
+  const ProjectDebtsScreen({super.key, required this.projectId});
 
-  List<PersonalTransactionModel> _sortedBySettled(List<PersonalTransactionModel> list) {
-    final unsettled = list.where((t) => !t.isSettled).toList();
-    final settled = list.where((t) => t.isSettled).toList();
+  List<ProjectExpenseModel> _sortedBySettled(List<ProjectExpenseModel> list) {
+    final unsettled = list.where((e) => !e.isSettled).toList();
+    final settled = list.where((e) => e.isSettled).toList();
     return [...unsettled, ...settled];
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final debtsAsync = ref.watch(personalDebtsProvider);
+    final expensesAsync = ref.watch(projectExpensesProvider(projectId));
+    final projectAsync = ref.watch(projectStreamProvider(projectId));
+    final projectName = projectAsync.valueOrNull?.name ?? 'Project';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Debts & Settlements')),
-      body: debtsAsync.when(
+      appBar: AppBar(
+        title: Text('$projectName • Debts', style: const TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: expensesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (allDebts) {
-          final lentTxns = allDebts.where((t) => t.debtType == DebtType.lent).toList();
-          final borrowedTxns = allDebts.where((t) => t.debtType == DebtType.borrowed).toList();
+        data: (allExpenses) {
+          final debtExpenses = allExpenses.where((e) => e.hasDebt).toList();
+          final lentList = debtExpenses.where((e) => e.debtType == ProjectDebtType.lent).toList();
+          final borrowedList = debtExpenses.where((e) => e.debtType == ProjectDebtType.borrowed).toList();
 
-          final totalLent = lentTxns.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.remainingAmount);
-          final totalBorrowed = borrowedTxns.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.remainingAmount);
+          final totalLent = lentList.where((e) => !e.isSettled).fold<double>(0, (s, e) => s + e.remainingAmount);
+          final totalBorrowed = borrowedList.where((e) => !e.isSettled).fold<double>(0, (s, e) => s + e.remainingAmount);
 
-          if (allDebts.isEmpty) {
+          if (debtExpenses.isEmpty) {
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.handshake_outlined, size: 64, color: Colors.grey.shade300),
                   const SizedBox(height: 12),
-                  const Text('No active debts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  const Text('No debts recorded', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 4),
-                  Text('Link a person when adding expenses', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                  Text('Tag a person when adding expenses', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
                 ],
               ),
             );
@@ -56,16 +62,16 @@ class PersonalDebtsScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 24),
-              if (lentTxns.isNotEmpty) ...[
+              if (lentList.isNotEmpty) ...[
                 _SectionHeader(title: 'Money You Lent', subtitle: 'People who owe you', color: Colors.green, icon: Icons.call_made),
                 const SizedBox(height: 10),
-                ..._sortedBySettled(lentTxns).map((t) => _DebtTile(txn: t, isLent: true)),
+                ..._sortedBySettled(lentList).map((e) => _DebtTile(expense: e, isLent: true, projectId: projectId)),
                 const SizedBox(height: 24),
               ],
-              if (borrowedTxns.isNotEmpty) ...[
+              if (borrowedList.isNotEmpty) ...[
                 _SectionHeader(title: 'Money You Borrowed', subtitle: 'People you owe', color: Colors.red, icon: Icons.call_received),
                 const SizedBox(height: 10),
-                ..._sortedBySettled(borrowedTxns).map((t) => _DebtTile(txn: t, isLent: false)),
+                ..._sortedBySettled(borrowedList).map((e) => _DebtTile(expense: e, isLent: false, projectId: projectId)),
               ],
             ],
           );
@@ -139,18 +145,19 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _DebtTile extends ConsumerWidget {
-  final PersonalTransactionModel txn;
+  final ProjectExpenseModel expense;
   final bool isLent;
-  const _DebtTile({required this.txn, required this.isLent});
+  final String projectId;
+  const _DebtTile({required this.expense, required this.isLent, required this.projectId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final color = isLent ? Colors.green : Colors.red;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final personName = txn.personName ?? 'Unknown';
-    final settled = txn.isSettled;
-    final hasPartial = txn.settledAmount > 0 && !settled;
-    final remaining = txn.remainingAmount;
+    final personName = expense.personName ?? 'Unknown';
+    final settled = expense.isSettled;
+    final hasPartial = expense.settledAmount > 0 && !settled;
+    final remaining = expense.remainingAmount;
 
     return Opacity(
       opacity: settled ? 0.5 : 1.0,
@@ -193,8 +200,8 @@ class _DebtTile extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(txn.title, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text('${txn.category} • ${DateFormat('dd MMM').format(txn.date)}', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
+                        Text(expense.title, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('${expense.category} • ${DateFormat('dd MMM').format(expense.date)}', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
                       ],
                     ),
                   ),
@@ -202,11 +209,11 @@ class _DebtTile extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (hasPartial) ...[
-                        Text('₹${txn.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4), decoration: TextDecoration.lineThrough)),
+                        Text('₹${expense.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4), decoration: TextDecoration.lineThrough)),
                         Text('₹${remaining.toStringAsFixed(0)} left', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
                       ] else
                         Text(
-                          '₹${txn.amount.toStringAsFixed(0)}',
+                          '₹${expense.amount.toStringAsFixed(0)}',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: settled ? Colors.grey : color, decoration: settled ? TextDecoration.lineThrough : null),
                         ),
                       const SizedBox(height: 6),
@@ -232,9 +239,8 @@ class _DebtTile extends ConsumerWidget {
                 ],
               ),
             ),
-            // Partial settlement history
-            if (txn.partialSettlements.isNotEmpty)
-              _PartialHistory(settlements: txn.partialSettlements, color: settled ? Colors.grey : color),
+            if (expense.partialSettlements.isNotEmpty)
+              _PartialHistory(settlements: expense.partialSettlements, color: settled ? Colors.grey : color),
           ],
         ),
       ),
@@ -246,22 +252,20 @@ class _DebtTile extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       builder: (_) => _SettleSheet(
-        personName: txn.personName ?? 'Unknown',
-        totalAmount: txn.amount,
-        remainingAmount: txn.remainingAmount,
+        personName: expense.personName ?? 'Unknown',
+        totalAmount: expense.amount,
+        remainingAmount: expense.remainingAmount,
         isLent: isLent,
         onPartial: (amount, note) async {
-          final userId = ref.read(authStateProvider).valueOrNull?.uid;
-          if (userId == null) return;
-          await ref.read(personalExpenseServiceProvider).partialSettleTransaction(userId, txn.id, amount, note);
+          final uid = ref.read(currentUserIdProvider);
+          await ref.read(projectExpenseServiceProvider).partialSettleExpense(uid, projectId, expense.id, amount, note);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('₹${amount.toStringAsFixed(0)} recorded!')));
           }
         },
         onFull: () async {
-          final userId = ref.read(authStateProvider).valueOrNull?.uid;
-          if (userId == null) return;
-          await ref.read(personalExpenseServiceProvider).settleTransaction(userId, txn.id);
+          final uid = ref.read(currentUserIdProvider);
+          await ref.read(projectExpenseServiceProvider).settleExpense(uid, projectId, expense.id);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isLent ? 'Marked as settled!' : 'Payment recorded!')));
           }
@@ -389,7 +393,6 @@ class _SettleSheetState extends State<_SettleSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle
             Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
             Text('Settle with ${widget.personName}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),

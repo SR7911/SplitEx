@@ -402,7 +402,7 @@ class _ProjectReportsSheetState extends ConsumerState<_ProjectReportsSheet> {
                                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis),
-                                    Text('${e.category} · ${DateFormat('dd MMM').format(e.date)}',
+                                    Text('${e.category} · ${DateFormat('dd MMM yyyy').format(e.date)}',
                                         style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.5))),
                                   ],
                                 ),
@@ -524,8 +524,16 @@ class _MonthlyBarChart extends StatelessWidget {
                 final i = value.toInt();
                 if (i < 0 || i >= entries.length) return const SizedBox();
                 final parts = entries[i].key.split('-');
-                final label = DateFormat('MMM').format(
-                    DateTime(int.parse(parts[0]), int.parse(parts[1])));
+                final year = int.parse(parts[0]);
+                final month = int.parse(parts[1]);
+                final dt = DateTime(year, month);
+                final sameMonthInOtherYear = entries.any((e) {
+                  final p = e.key.split('-');
+                  return int.parse(p[1]) == month && int.parse(p[0]) != year;
+                });
+                final label = sameMonthInOtherYear
+                    ? DateFormat("MMM''yy").format(dt)
+                    : DateFormat('MMM').format(dt);
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),

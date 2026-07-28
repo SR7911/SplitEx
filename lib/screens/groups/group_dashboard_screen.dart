@@ -812,72 +812,365 @@ class _ExpenseTile extends StatelessWidget {
 
 // ─── Expenses Tab ─────────────────────────────────────────────────────────────
 
-class _ExpensesTab extends ConsumerWidget {
+enum _GroupSortOption { timeDesc, timeAsc, amountDesc, amountAsc }
+
+class _ExpensesTab extends ConsumerStatefulWidget {
   final String groupId;
   final bool isArchived;
   final List<String> memberIds;
   const _ExpensesTab({required this.groupId, required this.isArchived, required this.memberIds});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final expensesAsync = ref.watch(groupExpensesProvider(groupId));
+  ConsumerState<_ExpensesTab> createState() => _ExpensesTabState();
+}
+
+class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
+  String? _filterCategory;
+  DateTime? _filterDateFrom;
+  DateTime? _filterDateTo;
+  _GroupSortOption _sortOption = _GroupSortOption.timeDesc;
+
+  bool get _hasActiveFilters =>
+      _filterCategory != null || _filterDateFrom != null || _filterDateTo != null;
+
+  void _clearFilters() => setState(() {
+        _filterCategory = null;
+        _filterDateFrom = null;
+        _filterDateTo = null;
+      });
+
+  List<GroupExpenseModel> _applyFiltersAndSort(List<GroupExpenseModel> expenses) {
+    var filtered = expenses.where((e) {
+      if (_filterCategory != null && e.category != _filterCategory) return false;
+      if (_filterDateFrom != null && e.date.isBefore(_filterDateFrom!)) return false;
+      if (_filterDateTo != null && e.date.isAfter(_filterDateTo!.add(const Duration(days: 1)))) return false;
+      return true;
+    }).toList();
+    switch (_sortOption) {
+      case _GroupSortOption.timeDesc: filtered.sort((a, b) => b.date.compareTo(a.date));
+      case _GroupSortOption.timeAsc: filtered.sort((a, b) => a.date.compareTo(b.date));
+      case _GroupSortOption.amountDesc: filtered.sort((a, b) => b.amount.compareTo(a.amount));
+      case _GroupSortOption.amountAsc: filtered.sort((a, b) => a.amount.compareTo(b.amount));
+    }
+    return filtered;
+  }
+
+  void _showFilterSheet(List<String> categories) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _GroupFilterBottomSheet(
+        categories: categories,
+        filterCategory: _filterCategory,
+        filterDateFrom: _filterDateFrom,
+        filterDateTo: _filterDateTo,
+        sortOption: _sortOption,
+        onApply: (category, from, to, sort) {
+          setState(() {
+            _filterCategory = category;
+            _filterDateFrom = from;
+            _filterDateTo = to;
+            _sortOption = sort;
+          });
+          Navigator.pop(ctx);
+        },
+        onClear: () {
+          _clearFilters();
+          Navigator.pop(ctx);
+        },
+      ),
+    );
+  }
+
+  Widget _sortChip(String label, _GroupSortOption option) {
+    final selected = _sortOption == option;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => setState(() => _sortOption = option),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final expensesAsync = ref.watch(groupExpensesProvider(widget.groupId));
 
     return expensesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (expenses) {
-        if (expenses.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
-                const SizedBox(height: 12),
-                const Text('No expenses yet', style: TextStyle(color: Colors.grey)),
-              ],
-            ),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-          itemCount: expenses.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (_, i) {
-            final e = expenses[i];
-            return Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              child: ListTile(
-                onTap: isArchived
-                    ? null
-                    : () => showViewGroupExpenseSheet(
-                          context,
-                          groupId: groupId,
-                          memberIds: memberIds,
-                          expense: e,
-                        ),
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                  child: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.primary, size: 20),
+        final categories = expenses.map((e) => e.category).toSet().toList()..sort();
+        final filtered = _applyFiltersAndSort(expenses);
+
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                title: Text(e.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  '${e.category} • ${DateFormat('dd MMM yyyy').format(e.date)} • ${e.splitAmong.length} people',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                child: Row(
                   children: [
-                    Text('₹${e.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text('÷${e.splitAmong.length}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _sortChip('Newest', _GroupSortOption.timeDesc),
+                            const SizedBox(width: 6),
+                            _sortChip('Oldest', _GroupSortOption.timeAsc),
+                            const SizedBox(width: 6),
+                            _sortChip('Amount ↑', _GroupSortOption.amountAsc),
+                            const SizedBox(width: 6),
+                            _sortChip('Amount ↓', _GroupSortOption.amountDesc),
+                            if (_hasActiveFilters) ...[
+                              const SizedBox(width: 8),
+                              Chip(
+                                label: const Text('Clear', style: TextStyle(fontSize: 11)),
+                                deleteIcon: const Icon(Icons.close, size: 14),
+                                onDeleted: _clearFilters,
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _showFilterSheet(categories),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _hasActiveFilters
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.tune,
+                          size: 20,
+                          color: _hasActiveFilters ? Colors.white : Theme.of(context).iconTheme.color,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade300),
+                          const SizedBox(height: 12),
+                          Text(_hasActiveFilters ? 'No expenses match filters' : 'No expenses yet',
+                              style: const TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final e = filtered[i];
+                        return Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          child: ListTile(
+                            onTap: widget.isArchived
+                                ? null
+                                : () => showViewGroupExpenseSheet(
+                                      context,
+                                      groupId: widget.groupId,
+                                      memberIds: widget.memberIds,
+                                      expense: e,
+                                    ),
+                            leading: CircleAvatar(
+                              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              child: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.primary, size: 20),
+                            ),
+                            title: Text(e.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              '${e.category} • ${DateFormat('dd MMM yyyy').format(e.date)} • ${e.splitAmong.length} people',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('₹${e.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text('÷${e.splitAmong.length}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                  ],
+                                ),
+                                if (!widget.isArchived)
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+                                    padding: EdgeInsets.zero,
+                                    onSelected: (v) async {
+                                      if (v == 'edit') {
+                                        showEditGroupExpenseSheet(context, groupId: widget.groupId, memberIds: widget.memberIds, expense: e);
+                                      } else if (v == 'delete') {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (ctx) => AlertDialog(
+                                            title: const Text('Delete Expense?'),
+                                            content: Text('Delete "${e.title}"?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                              FilledButton(
+                                                onPressed: () => Navigator.pop(ctx, true),
+                                                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                                child: const Text('Delete'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (confirm == true && context.mounted) {
+                                          await ref.read(groupExpenseServiceProvider).deleteExpense(widget.groupId, e.id);
+                                        }
+                                      }
+                                    },
+                                    itemBuilder: (_) => [
+                                      const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text('Edit')])),
+                                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _GroupFilterBottomSheet extends StatefulWidget {
+  final List<String> categories;
+  final String? filterCategory;
+  final DateTime? filterDateFrom;
+  final DateTime? filterDateTo;
+  final _GroupSortOption sortOption;
+  final void Function(String?, DateTime?, DateTime?, _GroupSortOption) onApply;
+  final VoidCallback onClear;
+
+  const _GroupFilterBottomSheet({
+    required this.categories,
+    required this.filterCategory,
+    required this.filterDateFrom,
+    required this.filterDateTo,
+    required this.sortOption,
+    required this.onApply,
+    required this.onClear,
+  });
+
+  @override
+  State<_GroupFilterBottomSheet> createState() => _GroupFilterBottomSheetState();
+}
+
+class _GroupFilterBottomSheetState extends State<_GroupFilterBottomSheet> {
+  late String? _category;
+  late DateTime? _from;
+  late DateTime? _to;
+  late _GroupSortOption _sort;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.filterCategory;
+    _from = widget.filterDateFrom;
+    _to = widget.filterDateTo;
+    _sort = widget.sortOption;
+  }
+
+  Future<void> _pickDate(bool isFrom) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: (isFrom ? _from : _to) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => isFrom ? _from = picked : _to = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Filters', style: Theme.of(context).textTheme.titleMedium),
+              TextButton(onPressed: widget.onClear, child: const Text('Reset')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (widget.categories.isNotEmpty) ...[
+            Text('Category', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8, runSpacing: 4,
+              children: [
+                ChoiceChip(label: const Text('All'), selected: _category == null, onSelected: (_) => setState(() => _category = null)),
+                ...widget.categories.map((c) => ChoiceChip(label: Text(c), selected: _category == c, onSelected: (_) => setState(() => _category = c))),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          Text('Date range', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton(onPressed: () => _pickDate(true), child: Text(_from != null ? DateFormat('dd MMM').format(_from!) : 'From'))),
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+              Expanded(child: OutlinedButton(onPressed: () => _pickDate(false), child: Text(_to != null ? DateFormat('dd MMM').format(_to!) : 'To'))),
+              if (_from != null || _to != null)
+                IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() { _from = null; _to = null; })),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text('Sort by', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(label: const Text('Newest'), selected: _sort == _GroupSortOption.timeDesc, onSelected: (_) => setState(() => _sort = _GroupSortOption.timeDesc)),
+              ChoiceChip(label: const Text('Oldest'), selected: _sort == _GroupSortOption.timeAsc, onSelected: (_) => setState(() => _sort = _GroupSortOption.timeAsc)),
+              ChoiceChip(label: const Text('Amount ↑'), selected: _sort == _GroupSortOption.amountAsc, onSelected: (_) => setState(() => _sort = _GroupSortOption.amountAsc)),
+              ChoiceChip(label: const Text('Amount ↓'), selected: _sort == _GroupSortOption.amountDesc, onSelected: (_) => setState(() => _sort = _GroupSortOption.amountDesc)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => widget.onApply(_category, _from, _to, _sort),
+              child: const Text('Apply'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

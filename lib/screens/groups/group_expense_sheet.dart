@@ -63,17 +63,39 @@ void showViewGroupExpenseSheet(
   );
 }
 
+void showEditGroupExpenseSheet(
+  BuildContext context, {
+  required String groupId,
+  required List<String> memberIds,
+  required GroupExpenseModel expense,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _GroupExpenseSheet(
+      groupId: groupId,
+      memberIds: memberIds,
+      expense: expense,
+      startInEditMode: true,
+    ),
+  );
+}
+
 // ─── Sheet ────────────────────────────────────────────────────────────────────
 
 class _GroupExpenseSheet extends ConsumerStatefulWidget {
   final String groupId;
   final List<String> memberIds;
   final GroupExpenseModel? expense;
+  final bool startInEditMode;
 
   const _GroupExpenseSheet({
     required this.groupId,
     required this.memberIds,
     required this.expense,
+    this.startInEditMode = false,
   });
 
   @override
@@ -109,7 +131,7 @@ class _GroupExpenseSheetState extends ConsumerState<_GroupExpenseSheet> {
     _splitType = e?.splitType ?? GroupSplitType.equal;
     _selectedMembers = e != null ? List<String>.from(e.splitAmong) : [];
     _paidBy = e?.paidBy ?? '';
-    if (_isAdd) _editing = true;
+    if (_isAdd || widget.startInEditMode) _editing = true;
   }
 
   @override

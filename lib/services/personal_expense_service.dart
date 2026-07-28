@@ -60,21 +60,68 @@ class PersonalExpenseService {
     final doc = await _txnCol(userId).doc(txnId).get();
     await _tracker.trackReads(1);
     final data = doc.data() as Map<String, dynamic>?;
+    if (data == null) return;
 
-    await _txnCol(userId).doc(txnId).update({'isSettled': true});
+    final totalAmount = (data['amount'] ?? 0).toDouble();
+    final now = DateTime.now();
+    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final existing = List<Map<String, dynamic>>.from(data['partialSettlements'] ?? []);
+    existing.add({'amount': totalAmount, 'date': now.toIso8601String(), 'note': 'Full settlement'});
+
+    await _txnCol(userId).doc(txnId).update({
+      'isSettled': true,
+      'settledAmount': totalAmount,
+      'partialSettlements': existing,
+    });
     await _tracker.trackWrites(1);
 
-    // If lent, add an income entry to return the amount to totals
-    if (data != null && data['debtType'] == 'lent') {
-      final now = DateTime.now();
-      final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    if (data['debtType'] == 'lent') {
       await _txnCol(userId).add({
         'title': 'Settlement: ${data['personName'] ?? 'Unknown'} repaid',
-        'amount': data['amount'],
+        'amount': totalAmount,
         'type': 'income',
         'category': data['category'] ?? 'Other',
         'date': Timestamp.fromDate(now),
         'notes': 'Auto-generated on settling "${data['title']}"',
+        'userId': userId,
+        'month': month,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isSettled': false,
+      });
+      await _tracker.trackWrites(1);
+    }
+  }
+
+  Future<void> partialSettleTransaction(String userId, String txnId, double partialAmount, String? note) async {
+    final doc = await _txnCol(userId).doc(txnId).get();
+    await _tracker.trackReads(1);
+    final data = doc.data() as Map<String, dynamic>?;
+    if (data == null) return;
+
+    final totalAmount = (data['amount'] ?? 0).toDouble();
+    final currentSettled = (data['settledAmount'] ?? 0).toDouble();
+    final newSettled = currentSettled + partialAmount;
+    final isNowFullySettled = newSettled >= totalAmount;
+    final now = DateTime.now();
+    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final existing = List<Map<String, dynamic>>.from(data['partialSettlements'] ?? []);
+    existing.add({'amount': partialAmount, 'date': now.toIso8601String(), 'note': note ?? ''});
+
+    await _txnCol(userId).doc(txnId).update({
+      'settledAmount': newSettled,
+      'isSettled': isNowFullySettled,
+      'partialSettlements': existing,
+    });
+    await _tracker.trackWrites(1);
+
+    if (data['debtType'] == 'lent') {
+      await _txnCol(userId).add({
+        'title': 'Partial Settlement: ${data['personName'] ?? 'Unknown'} repaid ₹${partialAmount.toStringAsFixed(0)}',
+        'amount': partialAmount,
+        'type': 'income',
+        'category': data['category'] ?? 'Other',
+        'date': Timestamp.fromDate(now),
+        'notes': note ?? 'Partial settlement for "${data['title']}"',
         'userId': userId,
         'month': month,
         'createdAt': FieldValue.serverTimestamp(),

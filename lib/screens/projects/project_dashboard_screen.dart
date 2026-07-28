@@ -99,7 +99,10 @@ class _DashboardBody extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
         if (debtSummary.lent > 0 || debtSummary.borrowed > 0) ...[
-          _DebtCard(debtSummary: debtSummary, personDebts: personDebts),
+          GestureDetector(
+            onTap: () => context.push('/projects/${project.id}/debts'),
+            child: _DebtCard(debtSummary: debtSummary, personDebts: personDebts),
+          ),
           const SizedBox(height: 12),
         ],
         _DetailsCard(project: project),
@@ -405,6 +408,9 @@ class _QuickActions extends ConsumerWidget {
         const SizedBox(width: 10),
         action(Icons.bar_chart_rounded, 'Reports', Colors.purple,
             () => showProjectReportsSheet(context, projectId)),
+        const SizedBox(width: 10),
+        action(Icons.handshake_outlined, 'Debts', Colors.orange,
+            () => context.push('/projects/$projectId/debts')),
         const SizedBox(width: 10),
         action(Icons.receipt_long_outlined, 'All Expenses', Colors.teal,
             () => context.push('/projects/$projectId/expenses')),

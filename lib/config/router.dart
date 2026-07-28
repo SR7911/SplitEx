@@ -32,6 +32,7 @@ import 'package:split_ex/screens/groups/group_dashboard_screen.dart';
 import 'package:split_ex/screens/projects/projects_list_screen.dart';
 import 'package:split_ex/screens/projects/create_project_screen.dart';
 import 'package:split_ex/screens/projects/project_dashboard_screen.dart';
+import 'package:split_ex/screens/projects/project_debts_screen.dart';
 import 'package:split_ex/screens/projects/project_expenses_screen.dart';
 
 /// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
@@ -252,9 +253,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: '/projects/:projectId/debts',
+        builder: (context, state) => ProjectDebtsScreen(
+          projectId: state.pathParameters['projectId']!,
+        ),
+      ),
+      GoRoute(
         path: '/projects/:projectId/expenses',
         builder: (context, state) => ProjectExpensesScreen(
           projectId: state.pathParameters['projectId']!,
+          initialDebtFilter: state.extra as String? ?? 'all',
         ),
       ),
     ],

@@ -16,9 +16,40 @@ class PersonalTransactionsScreen extends ConsumerStatefulWidget {
   ConsumerState<PersonalTransactionsScreen> createState() => _PersonalTransactionsScreenState();
 }
 
+enum _PersonalSortOption { timeDesc, timeAsc, amountDesc, amountAsc }
+
 class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransactionsScreen> {
   String _search = '';
   TransactionType? _filter;
+  String? _categoryFilter;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+  _PersonalSortOption _sortOption = _PersonalSortOption.timeDesc;
+
+  bool get _hasAdvancedFilters =>
+      _categoryFilter != null || _dateFrom != null || _dateTo != null || _sortOption != _PersonalSortOption.timeDesc;
+
+  void _showFilterSheet(BuildContext context, List<String> categories) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _PersonalFilterBottomSheet(
+        categories: categories,
+        categoryFilter: _categoryFilter,
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+        sortOption: _sortOption,
+        onApply: (cat, from, to, sort) {
+          setState(() { _categoryFilter = cat; _dateFrom = from; _dateTo = to; _sortOption = sort; });
+          Navigator.pop(ctx);
+        },
+        onClear: () {
+          setState(() { _categoryFilter = null; _dateFrom = null; _dateTo = null; _sortOption = _PersonalSortOption.timeDesc; });
+          Navigator.pop(ctx);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,8 +93,18 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
           var filtered = txns.where((t) {
             if (_filter != null && t.type != _filter) return false;
             if (_search.isNotEmpty && !t.title.toLowerCase().contains(_search.toLowerCase())) return false;
+            if (_categoryFilter != null && t.category != _categoryFilter) return false;
+            if (_dateFrom != null && t.date.isBefore(_dateFrom!)) return false;
+            if (_dateTo != null && t.date.isAfter(_dateTo!.add(const Duration(days: 1)))) return false;
             return true;
           }).toList();
+          switch (_sortOption) {
+            case _PersonalSortOption.timeDesc: filtered.sort((a, b) => b.date.compareTo(a.date));
+            case _PersonalSortOption.timeAsc: filtered.sort((a, b) => a.date.compareTo(b.date));
+            case _PersonalSortOption.amountDesc: filtered.sort((a, b) => b.amount.compareTo(a.amount));
+            case _PersonalSortOption.amountAsc: filtered.sort((a, b) => a.amount.compareTo(b.amount));
+          }
+          final categories = txns.map((t) => t.category).toSet().toList()..sort();
 
           return Column(
             children: [
@@ -84,7 +125,7 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
               ),
               const SizedBox(height: 12),
 
-              // Filter chips — full width, evenly spaced
+              // Filter chips + filter icon
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -94,6 +135,24 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
                     Expanded(child: _FilterChip(label: 'Expenses', icon: Icons.arrow_upward, selected: _filter == TransactionType.expense, onTap: () => setState(() => _filter = TransactionType.expense))),
                     const SizedBox(width: 8),
                     Expanded(child: _FilterChip(label: 'Income', icon: Icons.arrow_downward, selected: _filter == TransactionType.income, onTap: () => setState(() => _filter = TransactionType.income))),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _showFilterSheet(context, categories),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _hasAdvancedFilters
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.tune,
+                          size: 18,
+                          color: _hasAdvancedFilters ? Colors.white : Theme.of(context).iconTheme.color,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -281,6 +340,119 @@ class _TxnCard extends StatelessWidget {
               ),
             ),
             Text('$sign₹${txn.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PersonalFilterBottomSheet extends StatefulWidget {
+  final List<String> categories;
+  final String? categoryFilter;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+  final _PersonalSortOption sortOption;
+  final void Function(String?, DateTime?, DateTime?, _PersonalSortOption) onApply;
+  final VoidCallback onClear;
+
+  const _PersonalFilterBottomSheet({
+    required this.categories,
+    required this.categoryFilter,
+    required this.dateFrom,
+    required this.dateTo,
+    required this.sortOption,
+    required this.onApply,
+    required this.onClear,
+  });
+
+  @override
+  State<_PersonalFilterBottomSheet> createState() => _PersonalFilterBottomSheetState();
+}
+
+class _PersonalFilterBottomSheetState extends State<_PersonalFilterBottomSheet> {
+  late String? _category;
+  late DateTime? _from;
+  late DateTime? _to;
+  late _PersonalSortOption _sort;
+
+  @override
+  void initState() {
+    super.initState();
+    _category = widget.categoryFilter;
+    _from = widget.dateFrom;
+    _to = widget.dateTo;
+    _sort = widget.sortOption;
+  }
+
+  Future<void> _pickDate(bool isFrom) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: (isFrom ? _from : _to) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => isFrom ? _from = picked : _to = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Filters & Sort', style: Theme.of(context).textTheme.titleMedium),
+                TextButton(onPressed: widget.onClear, child: const Text('Reset')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Category', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8, runSpacing: 4,
+              children: [
+                ChoiceChip(label: const Text('All'), selected: _category == null, onSelected: (_) => setState(() => _category = null)),
+                ...widget.categories.map((c) => ChoiceChip(label: Text(c), selected: _category == c, onSelected: (_) => setState(() => _category = c))),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text('Date range', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: OutlinedButton(onPressed: () => _pickDate(true), child: Text(_from != null ? DateFormat('dd MMM').format(_from!) : 'From'))),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+                Expanded(child: OutlinedButton(onPressed: () => _pickDate(false), child: Text(_to != null ? DateFormat('dd MMM').format(_to!) : 'To'))),
+                if (_from != null || _to != null)
+                  IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() { _from = null; _to = null; })),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text('Sort by', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(label: const Text('Newest'), selected: _sort == _PersonalSortOption.timeDesc, onSelected: (_) => setState(() => _sort = _PersonalSortOption.timeDesc)),
+                ChoiceChip(label: const Text('Oldest'), selected: _sort == _PersonalSortOption.timeAsc, onSelected: (_) => setState(() => _sort = _PersonalSortOption.timeAsc)),
+                ChoiceChip(label: const Text('Amount ↑'), selected: _sort == _PersonalSortOption.amountAsc, onSelected: (_) => setState(() => _sort = _PersonalSortOption.amountAsc)),
+                ChoiceChip(label: const Text('Amount ↓'), selected: _sort == _PersonalSortOption.amountDesc, onSelected: (_) => setState(() => _sort = _PersonalSortOption.amountDesc)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => widget.onApply(_category, _from, _to, _sort),
+                child: const Text('Apply'),
+              ),
+            ),
           ],
         ),
       ),

@@ -8,16 +8,48 @@ import 'package:split_ex/screens/projects/add_project_expense_sheet.dart';
 
 class ProjectExpensesScreen extends ConsumerStatefulWidget {
   final String projectId;
-  const ProjectExpensesScreen({super.key, required this.projectId});
+  final String initialDebtFilter;
+  const ProjectExpensesScreen({super.key, required this.projectId, this.initialDebtFilter = 'all'});
 
   @override
   ConsumerState<ProjectExpensesScreen> createState() => _ProjectExpensesScreenState();
 }
 
+enum _ProjectSortOption { timeDesc, timeAsc, amountDesc, amountAsc }
+
 class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
   String _search = '';
   String? _categoryFilter;
-  String _debtFilter = 'all'; // all, lent, borrowed, none
+  late String _debtFilter;
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+  _ProjectSortOption _sortOption = _ProjectSortOption.timeDesc;
+
+  @override
+  void initState() {
+    super.initState();
+    _debtFilter = widget.initialDebtFilter;
+  }
+
+  void _showFilterSheet(BuildContext context, List<String> categories) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _ProjectFilterBottomSheet(
+        dateFrom: _dateFrom,
+        dateTo: _dateTo,
+        sortOption: _sortOption,
+        onApply: (from, to, sort) {
+          setState(() { _dateFrom = from; _dateTo = to; _sortOption = sort; });
+          Navigator.pop(ctx);
+        },
+        onClear: () {
+          setState(() { _dateFrom = null; _dateTo = null; _sortOption = _ProjectSortOption.timeDesc; });
+          Navigator.pop(ctx);
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,8 +81,16 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
             if (_debtFilter == 'lent' && e.debtType?.name != 'lent') return false;
             if (_debtFilter == 'borrowed' && e.debtType?.name != 'borrowed') return false;
             if (_debtFilter == 'none' && e.hasDebt) return false;
+            if (_dateFrom != null && e.date.isBefore(_dateFrom!)) return false;
+            if (_dateTo != null && e.date.isAfter(_dateTo!.add(const Duration(days: 1)))) return false;
             return true;
           }).toList();
+          switch (_sortOption) {
+            case _ProjectSortOption.timeDesc: filtered.sort((a, b) => b.date.compareTo(a.date));
+            case _ProjectSortOption.timeAsc: filtered.sort((a, b) => a.date.compareTo(b.date));
+            case _ProjectSortOption.amountDesc: filtered.sort((a, b) => b.amount.compareTo(a.amount));
+            case _ProjectSortOption.amountAsc: filtered.sort((a, b) => a.amount.compareTo(b.amount));
+          }
 
           return Column(
             children: [
@@ -69,34 +109,62 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Debt filter chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    _FilterChip(label: 'All', selected: _debtFilter == 'all', onTap: () => setState(() => _debtFilter = 'all')),
-                    const SizedBox(width: 8),
-                    _FilterChip(label: 'Lent', selected: _debtFilter == 'lent', color: Colors.green, onTap: () => setState(() => _debtFilter = 'lent')),
-                    const SizedBox(width: 8),
-                    _FilterChip(label: 'Borrowed', selected: _debtFilter == 'borrowed', color: Colors.red, onTap: () => setState(() => _debtFilter = 'borrowed')),
-                    const SizedBox(width: 8),
-                    _FilterChip(label: 'No Debt', selected: _debtFilter == 'none', onTap: () => setState(() => _debtFilter = 'none')),
-                    if (categories.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      SizedBox(height: 32, child: VerticalDivider(width: 1, thickness: 1, indent: 4, endIndent: 4)),
-                      const SizedBox(width: 8),
-                      ...categories.map((c) => Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _FilterChip(
-                              label: c,
-                              selected: _categoryFilter == c,
-                              onTap: () => setState(() => _categoryFilter = _categoryFilter == c ? null : c),
-                            ),
-                          )),
-                    ],
-                  ],
-                ),
+              // Debt filter chips + filter icon
+              Row(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          _FilterChip(label: 'All', selected: _debtFilter == 'all', onTap: () => setState(() => _debtFilter = 'all')),
+                          const SizedBox(width: 8),
+                          _FilterChip(label: 'Lent', selected: _debtFilter == 'lent', color: Colors.green, onTap: () => setState(() => _debtFilter = 'lent')),
+                          const SizedBox(width: 8),
+                          _FilterChip(label: 'Borrowed', selected: _debtFilter == 'borrowed', color: Colors.red, onTap: () => setState(() => _debtFilter = 'borrowed')),
+                          const SizedBox(width: 8),
+                          _FilterChip(label: 'No Debt', selected: _debtFilter == 'none', onTap: () => setState(() => _debtFilter = 'none')),
+                          if (categories.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            SizedBox(height: 32, child: VerticalDivider(width: 1, thickness: 1, indent: 4, endIndent: 4)),
+                            const SizedBox(width: 8),
+                            ...categories.map((c) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _FilterChip(
+                                    label: c,
+                                    selected: _categoryFilter == c,
+                                    onTap: () => setState(() => _categoryFilter = _categoryFilter == c ? null : c),
+                                  ),
+                                )),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: GestureDetector(
+                      onTap: () => _showFilterSheet(context, categories),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: (_dateFrom != null || _dateTo != null || _sortOption != _ProjectSortOption.timeDesc)
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.tune,
+                          size: 20,
+                          color: (_dateFrom != null || _dateTo != null || _sortOption != _ProjectSortOption.timeDesc)
+                              ? Colors.white
+                              : Theme.of(context).iconTheme.color,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               Padding(
@@ -251,6 +319,101 @@ class _FilterChip extends StatelessWidget {
             color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProjectFilterBottomSheet extends StatefulWidget {
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+  final _ProjectSortOption sortOption;
+  final void Function(DateTime?, DateTime?, _ProjectSortOption) onApply;
+  final VoidCallback onClear;
+
+  const _ProjectFilterBottomSheet({
+    required this.dateFrom,
+    required this.dateTo,
+    required this.sortOption,
+    required this.onApply,
+    required this.onClear,
+  });
+
+  @override
+  State<_ProjectFilterBottomSheet> createState() => _ProjectFilterBottomSheetState();
+}
+
+class _ProjectFilterBottomSheetState extends State<_ProjectFilterBottomSheet> {
+  late DateTime? _from;
+  late DateTime? _to;
+  late _ProjectSortOption _sort;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.dateFrom;
+    _to = widget.dateTo;
+    _sort = widget.sortOption;
+  }
+
+  Future<void> _pickDate(bool isFrom) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: (isFrom ? _from : _to) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => isFrom ? _from = picked : _to = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Filters & Sort', style: Theme.of(context).textTheme.titleMedium),
+              TextButton(onPressed: widget.onClear, child: const Text('Reset')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text('Date range', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: OutlinedButton(onPressed: () => _pickDate(true), child: Text(_from != null ? DateFormat('dd MMM').format(_from!) : 'From'))),
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('—')),
+              Expanded(child: OutlinedButton(onPressed: () => _pickDate(false), child: Text(_to != null ? DateFormat('dd MMM').format(_to!) : 'To'))),
+              if (_from != null || _to != null)
+                IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() { _from = null; _to = null; })),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text('Sort by', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(label: const Text('Newest'), selected: _sort == _ProjectSortOption.timeDesc, onSelected: (_) => setState(() => _sort = _ProjectSortOption.timeDesc)),
+              ChoiceChip(label: const Text('Oldest'), selected: _sort == _ProjectSortOption.timeAsc, onSelected: (_) => setState(() => _sort = _ProjectSortOption.timeAsc)),
+              ChoiceChip(label: const Text('Amount ↑'), selected: _sort == _ProjectSortOption.amountAsc, onSelected: (_) => setState(() => _sort = _ProjectSortOption.amountAsc)),
+              ChoiceChip(label: const Text('Amount ↓'), selected: _sort == _ProjectSortOption.amountDesc, onSelected: (_) => setState(() => _sort = _ProjectSortOption.amountDesc)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => widget.onApply(_from, _to, _sort),
+              child: const Text('Apply'),
+            ),
+          ),
+        ],
       ),
     );
   }

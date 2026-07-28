@@ -89,6 +89,8 @@ class ProjectExpenseModel {
   final ProjectDebtType? debtType;
   final String? personName;
   final bool isSettled;
+  final double settledAmount;
+  final List<Map<String, dynamic>> partialSettlements;
 
   const ProjectExpenseModel({
     required this.id,
@@ -105,9 +107,12 @@ class ProjectExpenseModel {
     this.debtType,
     this.personName,
     this.isSettled = false,
+    this.settledAmount = 0,
+    this.partialSettlements = const [],
   });
 
   bool get hasDebt => debtType != null;
+  double get remainingAmount => amount - settledAmount;
 
   factory ProjectExpenseModel.fromMap(Map<String, dynamic> map, String id) {
     return ProjectExpenseModel(
@@ -130,6 +135,8 @@ class ProjectExpenseModel {
           : null,
       personName: map['personName'],
       isSettled: map['isSettled'] ?? false,
+      settledAmount: (map['settledAmount'] ?? 0).toDouble(),
+      partialSettlements: List<Map<String, dynamic>>.from(map['partialSettlements'] ?? []),
     );
   }
 
@@ -147,6 +154,8 @@ class ProjectExpenseModel {
         'debtType': debtType?.name,
         'personName': personName,
         'isSettled': isSettled,
+        'settledAmount': settledAmount,
+        'partialSettlements': partialSettlements,
       };
 
   ProjectExpenseModel copyWith({
@@ -160,6 +169,8 @@ class ProjectExpenseModel {
     ProjectDebtType? debtType,
     String? personName,
     bool? isSettled,
+    double? settledAmount,
+    List<Map<String, dynamic>>? partialSettlements,
     bool clearDebt = false,
   }) =>
       ProjectExpenseModel(
@@ -177,5 +188,7 @@ class ProjectExpenseModel {
         debtType: clearDebt ? null : (debtType ?? this.debtType),
         personName: clearDebt ? null : (personName ?? this.personName),
         isSettled: isSettled ?? this.isSettled,
+        settledAmount: settledAmount ?? this.settledAmount,
+        partialSettlements: partialSettlements ?? this.partialSettlements,
       );
 }
