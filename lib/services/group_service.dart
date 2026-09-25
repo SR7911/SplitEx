@@ -113,7 +113,20 @@ class GroupExpenseService {
     return _expensesRef(groupId)
         .orderBy('date', descending: true)
         .snapshots()
-        .map((s) => s.docs.map((d) => GroupExpenseModel.fromMap(d.data(), d.id)).toList());
+        .map((s) => s.docs.map((d) => GroupExpenseModel.fromMap(d.data(), d.id)).toList())
+        .handleError((e) {
+      // Firestore index missing — fall back to unordered stream
+      if (e.toString().contains('index') || e.toString().contains('FAILED_PRECONDITION')) {
+        return _expensesRef(groupId)
+            .snapshots()
+            .map((s) {
+              final list = s.docs.map((d) => GroupExpenseModel.fromMap(d.data(), d.id)).toList();
+              list.sort((a, b) => b.date.compareTo(a.date));
+              return list;
+            });
+      }
+      throw e;
+    });
   }
 }
 

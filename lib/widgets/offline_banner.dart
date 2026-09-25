@@ -45,7 +45,7 @@ class _OfflineIndicatorState extends ConsumerState<OfflineIndicator>
         child: child,
       ),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        margin: const EdgeInsets.only(right: 6),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: Colors.orange.shade700,

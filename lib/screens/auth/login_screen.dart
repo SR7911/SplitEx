@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/auth_provider.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,6 +16,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -83,86 +85,165 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'SplitEx',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                const SizedBox(height: AppSpacing.xxxl + AppSpacing.xl),
+
+                // Logo + title
+                Column(
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppSpacing.xl),
                       ),
-                  textAlign: TextAlign.center,
+                      child: Icon(Icons.splitscreen_rounded, size: 36, color: cs.primary),
+                    ),
+                    const SizedBox(height: AppSpacing.base),
+                    Text('SplitEx', style: AppTextStyles.pageTitle(context)),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Split expenses, track finances',
+                      style: AppTextStyles.bodySmall(context),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Split expenses with your roommates',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 48),
+
+                const SizedBox(height: AppSpacing.xxxl + AppSpacing.sm),
+
+                // Email field
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Enter email';
-                    if (!value.contains('@')) return 'Enter valid email';
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter email';
+                    if (!v.contains('@')) return 'Enter valid email';
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
+
+                // Password field
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _isLoading ? null : _signInWithEmail(),
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outlined),
+                    prefixIcon: const Icon(Icons.lock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Enter password';
-                    if (value.length < 6) return 'Min 6 characters';
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter password';
+                    if (v.length < 6) return 'Min 6 characters';
                     return null;
                   },
                 ),
+
+                // Forgot password
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: _isLoading ? null : _forgotPassword,
-                    child: const Text('Forgot Password?'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                    ),
+                    child: Text(
+                      'Forgot Password?',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: cs.primary,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _signInWithEmail,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Sign In'),
+
+                const SizedBox(height: AppSpacing.md),
+
+                // Sign in button
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : FilledButton(
+                        onPressed: _signInWithEmail,
+                        child: const Text('Sign In'),
+                      ),
+
+                const SizedBox(height: AppSpacing.base),
+
+                // Divider
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: AppColors.divider(context))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      child: Text('or', style: AppTextStyles.caption(context)),
+                    ),
+                    Expanded(child: Divider(color: AppColors.divider(context))),
+                  ],
                 ),
-                const SizedBox(height: 16),
+
+                const SizedBox(height: AppSpacing.base),
+
+                // Google sign in
                 OutlinedButton.icon(
                   onPressed: _isLoading ? null : _signInWithGoogle,
-                  icon: const Icon(Icons.g_mobiledata, size: 28),
+                  icon: const Icon(Icons.g_mobiledata, size: 24),
                   label: const Text('Continue with Google'),
                 ),
-                const SizedBox(height: 24),
-                TextButton(
-                  onPressed: () => context.push('/register'),
-                  child: const Text("Don't have an account? Register"),
+
+                const SizedBox(height: AppSpacing.xxl),
+
+                // Register link
+                Center(
+                  child: GestureDetector(
+                    onTap: () => context.push('/register'),
+                    child: RichText(
+                      text: TextSpan(
+                        text: "Don't have an account? ",
+                        style: AppTextStyles.bodySmall(context),
+                        children: [
+                          TextSpan(
+                            text: 'Register',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
+
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           ),

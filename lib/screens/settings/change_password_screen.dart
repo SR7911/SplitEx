@@ -1,5 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart';
+﻿import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -62,78 +63,78 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     if (!isEmailUser) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Change Password')),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Password change is only available for email/password accounts.\n\nYou signed in with Google.',
-              textAlign: TextAlign.center,
-            ),
+        appBar: const AppHeader(showBack: true, title: 'Change Password', showNotification: false),
+        body: const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Password change is only available for email/password accounts.\n\nYou signed in with Google.',
+            textAlign: TextAlign.center,
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Change Password')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              TextFormField(
-                controller: _currentController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Current Password',
-                  prefixIcon: Icon(Icons.lock_outline),
+      appBar: const AppHeader(showBack: true, title: 'Change Password', showNotification: false),
+      body: GradientBody(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _currentController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Current Password',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Enter current password' : null,
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? 'Enter current password' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _newController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'New Password',
-                  prefixIcon: Icon(Icons.lock),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _newController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'New Password',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter new password';
+                    if (v.length < 6) return 'Min 6 characters';
+                    return null;
+                  },
                 ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Enter new password';
-                  if (v.length < 6) return 'Min 6 characters';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _confirmController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm New Password',
-                  prefixIcon: Icon(Icons.lock),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _confirmController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm New Password',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                  validator: (v) {
+                    if (v != _newController.text) return 'Passwords do not match';
+                    return null;
+                  },
                 ),
-                validator: (v) {
-                  if (v != _newController.text) return 'Passwords do not match';
-                  return null;
-                },
-              ),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isLoading ? null : _changePassword,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Change Password'),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _changePassword,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Change Password'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

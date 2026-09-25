@@ -39,7 +39,7 @@ final projectDebtSummaryProvider = Provider.family<({double lent, double borrowe
   final expenses = ref.watch(projectExpensesProvider(projectId)).valueOrNull ?? [];
   double lent = 0, borrowed = 0;
   for (final e in expenses.where((e) => e.hasDebt && !e.isSettled)) {
-    if (e.debtType!.name == 'lent') lent += e.amount;
+    if (e.debtType == ProjectDebtType.lent) lent += e.amount;
     else borrowed += e.amount;
   }
   return (lent: lent, borrowed: borrowed);

@@ -7,6 +7,7 @@ import 'package:split_ex/providers/project_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/screens/projects/add_project_expense_sheet.dart';
 import 'package:split_ex/screens/projects/project_reports_screen.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class ProjectDashboardScreen extends ConsumerWidget {
   final String projectId;
@@ -23,8 +24,10 @@ class ProjectDashboardScreen extends ConsumerWidget {
       data: (project) {
         if (project == null) return const Scaffold(body: Center(child: Text('Project not found')));
         return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           appBar: AppBar(
             title: Text(project.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            flexibleSpace: const _AppBarGradient(),
             actions: [
               IconButton(
                 icon: const Icon(Icons.bar_chart_rounded),
@@ -50,12 +53,38 @@ class ProjectDashboardScreen extends ConsumerWidget {
                   onPressed: () => showAddProjectExpenseSheet(context, projectId: projectId),
                   child: const Icon(Icons.add),
                 ),
-          body: _DashboardBody(project: project),
+          body: GradientBody(child: _DashboardBody(project: project)),
         );
       },
     );
   }
 }
+
+// ─── Shared gradient for AppBar flexibleSpace ────────────────────────────────
+
+class _AppBarGradient extends StatelessWidget {
+  const _AppBarGradient();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            cs.primary.withValues(alpha: isDark ? 0.75 : 0.65),
+            cs.primary.withValues(alpha: 0.18),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Dashboard Body ─────────────────────────────────────────────────────────────
 
 class _DashboardBody extends ConsumerWidget {
   final ProjectModel project;
@@ -150,6 +179,7 @@ class _BudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final gaugeColor = isOver
         ? const Color(0xFFEF4444)
         : progress > 0.8
@@ -164,123 +194,217 @@ class _BudgetCard extends StatelessWidget {
 
     final daysLeft = project.targetEndDate?.difference(DateTime.now()).inDays;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
+    final gradientColors = isOver
+        ? (isDark
+            ? [const Color(0xFF7F1D1D), const Color(0xFF831843)]
+            : [const Color(0xFFDC2626), const Color(0xFFDB2777)])
+        : progress > 0.8
+            ? (isDark
+                ? [const Color(0xFF78350F), const Color(0xFF7C2D12)]
+                : [const Color(0xFFD97706), const Color(0xFFEA580C)])
+            : (isDark
+                ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
+                : [const Color(0xFF059669), const Color(0xFF0D9488)]);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: cs.primary.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.first.withValues(alpha: isDark ? 0.35 : 0.45),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            top: -24, right: -24,
+            child: Container(
+              width: 100, height: 100,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.07)),
+            ),
+          ),
+          Positioned(
+            bottom: -30, left: -20,
+            child: Container(
+              width: 90, height: 90,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.05)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(_typeIcon(project.projectType), color: cs.primary, size: 20),
+                // Header row
+                Row(
+                  children: [
+                    Container(
+                      width: 42, height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(_typeIcon(project.projectType), color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            project.name,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            project.projectType,
+                            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 12, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(statusLabel, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+
+                const SizedBox(height: 20),
+
+                // Budget figures
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Total Spent', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                          const SizedBox(height: 4),
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: totalSpent),
+                            duration: const Duration(milliseconds: 700),
+                            builder: (_, v, __) => Text(
+                              _fmt(v),
+                              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1, height: 48,
+                      color: Colors.white.withOpacity(0.2),
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(isOver ? 'Over by' : 'Remaining', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                          const SizedBox(height: 4),
+                          Text(
+                            _fmt(remaining.abs()),
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: isOver ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Progress bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Budget used', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                        Text(
+                          '${(progress * 100).toStringAsFixed(0)}% of ${_fmt(project.estimatedBudget)}',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.85)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: progress),
+                        duration: const Duration(milliseconds: 800),
+                        curve: Curves.easeOutCubic,
+                        builder: (_, v, __) => LinearProgressIndicator(
+                          value: v,
+                          minHeight: 7,
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          valueColor: AlwaysStoppedAnimation(
+                            isOver ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Meta pills
+                if (project.targetEndDate != null || isOver) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
                     children: [
-                      Text(
-                        project.name,
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      _MetaPill(
+                        icon: Icons.calendar_today_outlined,
+                        label: DateFormat('dd MMM yy').format(project.startDate),
                       ),
-                      Text(
-                        project.projectType,
-                        style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.5)),
-                      ),
+                      if (daysLeft != null)
+                        _MetaPill(
+                          icon: daysLeft < 0 ? Icons.flag_rounded : Icons.hourglass_bottom_rounded,
+                          label: daysLeft < 0 ? 'Ended ${-daysLeft}d ago' : '$daysLeft days left',
+                          highlight: daysLeft >= 0 && daysLeft <= 7,
+                        ),
+                      if (isOver)
+                        _MetaPill(
+                          icon: Icons.warning_amber_rounded,
+                          label: 'Over budget',
+                          highlight: true,
+                          highlightColor: const Color(0xFFFCA5A5),
+                        ),
                     ],
                   ),
-                ),
-                _StatusPill(color: statusColor, icon: statusIcon, label: statusLabel),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // Progress bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Budget used', style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.55))),
-                Text(
-                  '${(progress * 100).toStringAsFixed(0)}%',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: gaugeColor),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: progress),
-                duration: const Duration(milliseconds: 800),
-                curve: Curves.easeOutCubic,
-                builder: (_, v, __) => LinearProgressIndicator(
-                  value: v,
-                  minHeight: 8,
-                  backgroundColor: cs.onSurface.withOpacity(0.08),
-                  valueColor: AlwaysStoppedAnimation(gaugeColor),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Budget stats
-            Row(
-              children: [
-                _BudgetStat(label: 'Budget', value: _fmt(project.estimatedBudget), color: cs.onSurface.withOpacity(0.7)),
-                _BudgetStat(label: 'Spent', value: _fmt(totalSpent), color: gaugeColor),
-                _BudgetStat(
-                  label: isOver ? 'Over by' : 'Remaining',
-                  value: _fmt(remaining.abs()),
-                  color: isOver ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                ),
-              ],
-            ),
-
-            // Meta pills
-            if (project.targetEndDate != null || isOver) ...[
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                children: [
-                  _MetaPill(
-                    icon: Icons.calendar_today_outlined,
-                    label: DateFormat('dd MMM yy').format(project.startDate),
-                  ),
-                  if (daysLeft != null)
-                    _MetaPill(
-                      icon: daysLeft < 0 ? Icons.flag_rounded : Icons.hourglass_bottom_rounded,
-                      label: daysLeft < 0 ? 'Ended ${-daysLeft}d ago' : '$daysLeft days left',
-                      highlight: daysLeft >= 0 && daysLeft <= 7,
-                    ),
-                  if (isOver)
-                    _MetaPill(
-                      icon: Icons.warning_amber_rounded,
-                      label: 'Over budget',
-                      highlight: true,
-                      highlightColor: const Color(0xFFEF4444),
-                    ),
                 ],
-              ),
-            ],
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -343,14 +467,15 @@ class _MetaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final base = Theme.of(context).colorScheme.onSurface;
-    final color = highlight ? (highlightColor ?? const Color(0xFFF59E0B)) : base.withOpacity(0.45);
+    final color = highlight
+        ? (highlightColor ?? const Color(0xFFF59E0B))
+        : Colors.white.withOpacity(0.75);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: Colors.white.withOpacity(0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -374,6 +499,7 @@ class _QuickActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     Widget action(IconData icon, String label, Color color, VoidCallback onTap) => Expanded(
           child: InkWell(
@@ -382,9 +508,9 @@ class _QuickActions extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.08),
+                color: isDark ? color.withOpacity(0.18) : color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withOpacity(0.15)),
+                border: Border.all(color: color.withOpacity(isDark ? 0.25 : 0.2)),
               ),
               child: Column(
                 children: [
@@ -403,7 +529,11 @@ class _QuickActions extends ConsumerWidget {
           Icons.add_circle_outline,
           'Add Expense',
           isCompleted ? cs.onSurface.withOpacity(0.3) : cs.primary,
-          isCompleted ? () {} : () => showAddProjectExpenseSheet(context, projectId: projectId),
+          isCompleted
+              ? () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Project is completed. Reopen it to add expenses.')),
+                  )
+              : () => showAddProjectExpenseSheet(context, projectId: projectId),
         ),
         const SizedBox(width: 10),
         action(Icons.bar_chart_rounded, 'Reports', Colors.purple,

@@ -1,10 +1,11 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:split_ex/providers/auth_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -85,52 +86,54 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profile')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: _isLoading ? null : _pickAndUploadPhoto,
-                child: CircleAvatar(
-                  radius: 48,
-                  backgroundImage:
-                      _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
-                  child: _avatarUrl == null
-                      ? const Icon(Icons.camera_alt, size: 32)
-                      : null,
+      appBar: const AppHeader(showBack: true, title: 'Edit Profile', showNotification: false),
+      body: GradientBody(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _isLoading ? null : _pickAndUploadPhoto,
+                  child: CircleAvatar(
+                    radius: 48,
+                    backgroundImage:
+                        _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                    child: _avatarUrl == null
+                        ? const Icon(Icons.camera_alt, size: 32)
+                        : null,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text('Tap to change photo',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-              const SizedBox(height: 32),
-              TextFormField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Display Name',
-                  prefixIcon: Icon(Icons.person_outlined),
+                const SizedBox(height: 8),
+                Text('Tap to change photo',
+                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+                const SizedBox(height: 32),
+                TextFormField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Display Name',
+                    prefixIcon: Icon(Icons.person_outlined),
+                  ),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Enter your name' : null,
                 ),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Enter your name' : null,
-              ),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isLoading ? null : _save,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Save'),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isLoading ? null : _save,
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Save'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

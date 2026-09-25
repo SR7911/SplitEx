@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/group_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
   const CreateGroupScreen({super.key});
@@ -64,52 +66,54 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Group')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            TextFormField(
-              controller: _nameController,
-              decoration: _inputDecoration('Group Name', Icons.groups_rounded),
-              validator: (v) => v == null || v.trim().isEmpty ? 'Enter group name' : null,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _descController,
-              decoration: _inputDecoration('Description (optional)', Icons.description_outlined),
-              maxLines: 2,
-              textInputAction: TextInputAction.done,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _DateTile(label: 'Start Date', date: _startDate, onTap: () => _pickDate(isStart: true))),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DateTile(
-                    label: 'End Date (opt.)',
-                    date: _endDate,
-                    onTap: () => _pickDate(isStart: false),
-                    onClear: _endDate != null ? () => setState(() => _endDate = null) : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 32),
-            FilledButton(
-              onPressed: _isLoading ? null : _create,
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      appBar: const AppHeader(showBack: true, title: 'Create Group', showNotification: false),
+      body: GradientBody(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: _inputDecoration('Group Name', Icons.groups_rounded),
+                validator: (v) => v == null || v.trim().isEmpty ? 'Enter group name' : null,
+                textInputAction: TextInputAction.next,
               ),
-              child: _isLoading
-                  ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Create Group', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descController,
+                decoration: _inputDecoration('Description (optional)', Icons.description_outlined),
+                maxLines: 2,
+                textInputAction: TextInputAction.done,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _DateTile(label: 'Start Date', date: _startDate, onTap: () => _pickDate(isStart: true))),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DateTile(
+                      label: 'End Date (opt.)',
+                      date: _endDate,
+                      onTap: () => _pickDate(isStart: false),
+                      onClear: _endDate != null ? () => setState(() => _endDate = null) : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              FilledButton(
+                onPressed: _isLoading ? null : _create,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Create Group', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
         ),
       ),
     );

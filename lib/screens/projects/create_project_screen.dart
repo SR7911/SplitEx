@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/project_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 const _projectTypes = [
   'House Construction', 'Renovation', 'Wedding', 'Business Setup',
@@ -62,10 +64,11 @@ class _CreateProjectScreenState extends ConsumerState<CreateProjectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Project')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
+      appBar: const AppHeader(showBack: true, title: 'Create Project', showNotification: false),
+      body: GradientBody(
+        child: Form(
+          key: _formKey,
+          child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
             _field(_nameController, 'Project Name', Icons.folder_outlined,
@@ -132,6 +135,7 @@ class _CreateProjectScreenState extends ConsumerState<CreateProjectScreen> {
           ],
         ),
       ),
+      )
     );
   }
 

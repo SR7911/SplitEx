@@ -111,45 +111,74 @@ class _BalanceSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isPositive = balance > 0.01;
     final isNegative = balance < -0.01;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final color = isPositive
-        ? Colors.green
+        ? const Color(0xFF10B981)
         : isNegative
-            ? Colors.red
-            : Colors.grey;
-    final label = isPositive
-        ? 'You are owed'
+            ? const Color(0xFFEF4444)
+            : cs.primary;
+    final label = isPositive ? 'You are owed' : isNegative ? 'You owe' : 'All settled up!';
+    final icon = isPositive
+        ? Icons.arrow_downward_rounded
         : isNegative
-            ? 'You owe'
-            : 'All settled up!';
+            ? Icons.arrow_upward_rounded
+            : Icons.check_circle_rounded;
     final displayAmount = balance.abs();
 
-    return Card(
-      elevation: 3,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(
-              isPositive
-                  ? Icons.arrow_downward
-                  : isNegative
-                      ? Icons.arrow_upward
-                      : Icons.check_circle,
-              color: color,
-              size: 40,
-            ),
-            const SizedBox(height: 8),
-            Text(label, style: Theme.of(context).textTheme.titleMedium),
-            if (isPositive || isNegative)
-              Text(
-                '\u20B9${displayAmount.toStringAsFixed(2)}',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineMedium
-                    ?.copyWith(color: color, fontWeight: FontWeight.bold),
-              ),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isDark
+              ? [color.withOpacity(0.35), color.withOpacity(0.2)]
+              : [color.withOpacity(0.15), color.withOpacity(0.06)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: color.withOpacity(isDark ? 0.25 : 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 26),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.65), fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 4),
+                if (isPositive || isNegative)
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: displayAmount),
+                    duration: const Duration(milliseconds: 600),
+                    builder: (_, v, __) => Text(
+                      '₹${v.toStringAsFixed(2)}',
+                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: color),
+                    ),
+                  )
+                else
+                  Text(
+                    'Great job! 🎉',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: color),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

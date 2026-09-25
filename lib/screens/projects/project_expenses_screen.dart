@@ -5,6 +5,7 @@ import 'package:split_ex/models/project_model.dart';
 import 'package:split_ex/providers/project_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/screens/projects/add_project_expense_sheet.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class ProjectExpensesScreen extends ConsumerStatefulWidget {
   final String projectId;
@@ -59,9 +60,10 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
     final project = projectAsync.valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(project != null ? '${project.name} • Expenses' : 'Expenses',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+      appBar: AppHeader(
+        showBack: true,
+        title: project != null ? '${project.name} • Expenses' : 'Expenses',
+        showNotification: false,
       ),
       floatingActionButton: project?.status != ProjectStatus.completed
           ? FloatingActionButton(
@@ -69,7 +71,7 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      body: expensesAsync.when(
+      body: GradientBody(child: expensesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (expenses) {
@@ -78,8 +80,8 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
           var filtered = expenses.where((e) {
             if (_search.isNotEmpty && !e.title.toLowerCase().contains(_search.toLowerCase())) return false;
             if (_categoryFilter != null && e.category != _categoryFilter) return false;
-            if (_debtFilter == 'lent' && e.debtType?.name != 'lent') return false;
-            if (_debtFilter == 'borrowed' && e.debtType?.name != 'borrowed') return false;
+            if (_debtFilter == 'lent' && e.debtType != ProjectDebtType.lent) return false;
+            if (_debtFilter == 'borrowed' && e.debtType != ProjectDebtType.borrowed) return false;
             if (_debtFilter == 'none' && e.hasDebt) return false;
             if (_dateFrom != null && e.date.isBefore(_dateFrom!)) return false;
             if (_dateTo != null && e.date.isAfter(_dateTo!.add(const Duration(days: 1)))) return false;
@@ -206,7 +208,7 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
             ],
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -220,7 +222,7 @@ class _ExpenseCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUserIdProvider);
-    final debtColor = expense.debtType?.name == 'lent' ? Colors.green : Colors.red;
+    final debtColor = expense.debtType == ProjectDebtType.lent ? Colors.green : Colors.red;
 
     return GestureDetector(
       onTap: () => _showDetail(context, ref, uid),
@@ -238,7 +240,7 @@ class _ExpenseCard extends ConsumerWidget {
               radius: 20,
               backgroundColor: expense.hasDebt ? debtColor.withOpacity(0.1) : Theme.of(context).colorScheme.primary.withOpacity(0.1),
               child: Icon(
-                expense.hasDebt ? (expense.debtType?.name == 'lent' ? Icons.call_made : Icons.call_received) : Icons.receipt_long,
+                expense.hasDebt ? (expense.debtType == ProjectDebtType.lent ? Icons.call_made : Icons.call_received) : Icons.receipt_long,
                 size: 18,
                 color: expense.hasDebt ? debtColor : Theme.of(context).colorScheme.primary,
               ),
@@ -262,7 +264,7 @@ class _ExpenseCard extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(color: debtColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
                           child: Text(
-                            expense.isSettled ? 'Settled' : (expense.debtType?.name == 'lent' ? 'Lent' : 'Borrowed'),
+                            expense.isSettled ? 'Settled' : (expense.debtType == ProjectDebtType.lent ? 'Lent' : 'Borrowed'),
                             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: expense.isSettled ? Colors.grey : debtColor),
                           ),
                         ),

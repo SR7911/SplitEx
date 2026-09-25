@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/models/settlement_model.dart';
@@ -10,6 +10,8 @@ import 'package:split_ex/services/balance_service.dart';
 import 'package:split_ex/services/user_service.dart';
 import 'package:split_ex/services/notification_helper.dart'; // add this
 import 'package:split_ex/providers/notification_provider.dart'; // add if needed
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class SettlementScreen extends ConsumerWidget {
   final String roomId;
@@ -33,8 +35,13 @@ class SettlementScreen extends ConsumerWidget {
         : (nameMap[debt.from] ?? debt.from);
 
     return Scaffold(
-      appBar: AppBar(title: Text(isDebtor ? 'Settle Up' : 'Payment Request')),
-      body: Padding(
+      appBar: AppHeader(
+        showBack: true,
+        title: isDebtor ? 'Settle Up' : 'Payment Request',
+        showNotification: false,
+      ),
+      body: GradientBody(
+        child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -48,7 +55,7 @@ class SettlementScreen extends ConsumerWidget {
                     Icon(
                       isDebtor ? Icons.payment : Icons.request_page,
                       size: 48,
-                      color: isDebtor ? Colors.orange : Colors.blue,
+                      color: isDebtor ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -60,7 +67,7 @@ class SettlementScreen extends ConsumerWidget {
                       '₹${debt.amount.toStringAsFixed(2)}',
                       style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: isDebtor ? Colors.red : Colors.green,
+                            color: isDebtor ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
                           ),
                     ),
                   ],
@@ -89,11 +96,7 @@ class SettlementScreen extends ConsumerWidget {
                 onPressed: () => _sendReminder(context, ref),
                 icon: const Icon(Icons.notifications_active),
                 label: const Text('Send Reminder'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                  side: BorderSide(color: Colors.orange),
-                  foregroundColor: Colors.orange,
-                ),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
               ),
               const SizedBox(height: 12),
               TextButton.icon(
@@ -104,13 +107,13 @@ class SettlementScreen extends ConsumerWidget {
             ],
 
             const SizedBox(height: 24),
-            Text('Settlement History',
-                style: Theme.of(context).textTheme.titleMedium),
+            AppSectionHeader(title: 'Settlement History'),
             const SizedBox(height: 8),
             Expanded(child: _SettlementHistory(roomId: roomId, nameMap: nameMap)),
           ],
         ),
       ),
+      )
     );
   }
 
@@ -384,7 +387,11 @@ class _SettlementHistory extends ConsumerWidget {
               child: ListTile(
                 leading: Icon(
                   isPending ? Icons.hourglass_top : (isCancelled ? Icons.cancel : Icons.check_circle),
-                  color: isPending ? Colors.orange : (isCancelled ? Colors.red : Colors.green),
+                  color: isPending
+                      ? Theme.of(context).colorScheme.tertiary
+                      : isCancelled
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
                 ),
                 title: Text('$from → $to'),
                 subtitle: Text(
@@ -438,33 +445,15 @@ class _SettlementHistory extends ConsumerWidget {
                             }
                           }
                         },
-                        icon: const Icon(Icons.cancel, size: 18, color: Colors.red),
-                        label: const Text('Cancel', style: TextStyle(color: Colors.red)),
+                        icon: Icon(Icons.cancel, size: 18, color: Theme.of(context).colorScheme.error),
+                        label: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                       ),
                     if (isConfirmed)
-                      const Text(
-                        'Done ✓',
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('Done ✓', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                     if (isCancelled)
-                      const Text(
-                        'Cancelled',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('Cancelled', style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
                     if (isPending && !canConfirm && !canCancel)
-                      const Text(
-                        'Pending',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text('Pending', style: TextStyle(color: Theme.of(context).colorScheme.tertiary, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),

@@ -193,6 +193,52 @@ class PersonalExpenseService {
     await _tracker.trackWrites(1);
   }
 
+  /// Snapshots the current state into editHistory, then applies the new values.
+  Future<void> updateRecurring(
+    String userId,
+    RecurringTransaction current, {
+    String? title,
+    double? amount,
+    String? category,
+    RecurringFrequency? frequency,
+    int? dayOfMonth,
+    DateTime? endDate,
+    bool clearEndDate = false,
+  }) async {
+    // Build snapshot of current state before overwriting
+    final snapshot = RecurringEditSnapshot(
+      title: current.title,
+      amount: current.amount,
+      category: current.category,
+      frequency: current.frequency,
+      dayOfMonth: current.dayOfMonth,
+      endDate: current.endDate,
+      editedAt: DateTime.now(),
+    );
+
+    final updatedHistory = [snapshot, ...current.editHistory]
+        .map((e) => e.toMap())
+        .toList();
+
+    final updateMap = <String, dynamic>{
+      'editHistory': updatedHistory,
+      if (title != null) 'title': title,
+      if (amount != null) 'amount': amount,
+      if (category != null) 'category': category,
+      if (frequency != null) 'frequency': frequency.name,
+      if (dayOfMonth != null) 'dayOfMonth': dayOfMonth,
+    };
+
+    if (clearEndDate) {
+      updateMap['endDate'] = FieldValue.delete();
+    } else if (endDate != null) {
+      updateMap['endDate'] = Timestamp.fromDate(endDate);
+    }
+
+    await _recurringCol(userId).doc(current.id).update(updateMap);
+    await _tracker.trackWrites(1);
+  }
+
   Future<void> toggleRecurring(String userId, String id, bool active) async {
     await _recurringCol(userId).doc(id).update({'active': active});
     await _tracker.trackWrites(1);

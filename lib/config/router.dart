@@ -34,6 +34,9 @@ import 'package:split_ex/screens/projects/create_project_screen.dart';
 import 'package:split_ex/screens/projects/project_dashboard_screen.dart';
 import 'package:split_ex/screens/projects/project_debts_screen.dart';
 import 'package:split_ex/screens/projects/project_expenses_screen.dart';
+import 'package:split_ex/screens/personal/loan_list_screen.dart';
+import 'package:split_ex/screens/personal/loan_detail_screen.dart';
+import 'package:split_ex/screens/personal/add_loan_sheet.dart';
 
 /// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
 class RouterNotifier extends ChangeNotifier {
@@ -201,6 +204,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/personal/debts',
         builder: (context, state) => const PersonalDebtsScreen(),
+      ),
+      // ─── Loan Routes ───
+      GoRoute(
+        path: '/personal/loans',
+        builder: (context, state) => const LoanListScreen(),
+      ),
+      GoRoute(
+        path: '/personal/loans/:loanId',
+        builder: (context, state) => LoanDetailScreen(
+          loanId: state.pathParameters['loanId']!,
+        ),
       ),
       GoRoute(
         path: '/settings',

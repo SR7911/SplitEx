@@ -4,7 +4,28 @@ import 'package:split_ex/providers/dashboard_provider.dart';
 import 'package:split_ex/screens/settlement/settlement_screen.dart';
 import 'package:split_ex/services/balance_service.dart';
 
-// screens/room/pair_settlement_timeline.dart
+const _kGreen  = Color(0xFF22C55E);
+const _kRed    = Color(0xFFEF4444);
+const _kAmber  = Color(0xFFF59E0B);
+const _kBlue   = Color(0xFF3B82F6);
+const _kPalette = [Color(0xFF3B82F6), Color(0xFF22C55E), Color(0xFFF59E0B), Color(0xFF6366F1), Color(0xFF14B8A6), Color(0xFF8B5CF6), Color(0xFFEF4444)];
+
+BoxDecoration _cardDeco(BuildContext context) {
+  final cs     = Theme.of(context).colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return BoxDecoration(
+    color: isDark ? cs.surfaceContainerHigh : cs.surface,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+        blurRadius: 12,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
+}
 
 class PairSettlementTimeline extends StatefulWidget {
   final String memberA;
@@ -75,15 +96,13 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
     }
     allTransactions.sort((x, y) => y.transaction.date.compareTo(x.transaction.date));
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 0,
+      decoration: _cardDeco(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: pair names + net summary
-          
+          // Header
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -91,40 +110,73 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
+                  // Avatar pair
+                  SizedBox(
+                    width: 52, height: 32,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 32, height: 32,
+                          decoration: BoxDecoration(
+                            color: _kBlue.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(child: Text(nameA.isNotEmpty ? nameA[0].toUpperCase() : '?', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kBlue))),
+                        ),
+                        Positioned(
+                          left: 20,
+                          child: Container(
+                            width: 32, height: 32,
+                            decoration: BoxDecoration(
+                              color: _kAmber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                            ),
+                            child: Center(child: Text(nameB.isNotEmpty ? nameB[0].toUpperCase() : '?', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kAmber))),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       '$nameA ⇄ $nameB',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: net > 0
-                          ? (isDark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade50)
-                          : (isDark ? Colors.red.shade900.withOpacity(0.3) : Colors.red.shade50),
+                      color: net.abs() < 0.01
+                          ? _kGreen.withValues(alpha: isDark ? 0.15 : 0.1)
+                          : (net > 0
+                              ? _kGreen.withValues(alpha: isDark ? 0.15 : 0.1)
+                              : _kRed.withValues(alpha: isDark ? 0.15 : 0.1)),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       net.abs() < 0.01
-                          ? 'Settled'
-                          : (net > 0 ? '$nameB owes ₹${net.toStringAsFixed(0)}' : '$nameA owes ₹${(-net).toStringAsFixed(0)}'),
+                          ? 'Settled ✓'
+                          : (net > 0
+                              ? '$nameB owes ₹${net.toStringAsFixed(0)}'
+                              : '$nameA owes ₹${(-net).toStringAsFixed(0)}'),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: net > 0 ? Colors.green.shade800 : Colors.red.shade800,
+                        fontSize: 12,
+                        color: net.abs() < 0.01 ? _kGreen : (net > 0 ? _kGreen : _kRed),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                  const SizedBox(width: 6),
+                  Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18,
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                 ],
               ),
             ),
           ),
           if (_expanded) ...[
-            const Divider(height: 1),
-            // Timeline list
+            Divider(height: 1, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -133,19 +185,20 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                 data: allTransactions[index],
                 nameMap: widget.nameMap,
                 userId: widget.userId,
+                isLast: index == allTransactions.length - 1,
               ),
             ),
-            const Divider(height: 24),
-            // Net summary and settle button
+            // Net summary + action buttons
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: Row(
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Net balance', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text('Net balance', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45))),
+                        const SizedBox(height: 2),
                         Text(
                           net.abs() < 0.01
                               ? 'All settled'
@@ -153,60 +206,66 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                                   ? '$nameB owes $nameA ₹${net.toStringAsFixed(0)}'
                                   : '$nameA owes $nameB ₹${(-net).toStringAsFixed(0)}'),
                           style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: net > 0 ? Colors.green.shade700 : Colors.red.shade700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: net.abs() < 0.01 ? _kGreen : (net > 0 ? _kGreen : _kRed),
                           ),
                         ),
                       ],
                     ),
                   ),
                   if (showSettleButton)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        final debt = net > 0
-                            ? Debt(from: b, to: a, amount: net)  // B owes A
-                            : Debt(from: a, to: b, amount: -net); // A owes B
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SettlementScreen(
-                              roomId: widget.roomId,
-                              debt: debt,
-                              nameMap: widget.nameMap,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.payment, size: 18),
-                      label: const Text('Settle Up'),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                      ),
-                    ),
-                  if (showViewButton)
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        // Same debt but creditor views it
+                    GestureDetector(
+                      onTap: () {
                         final debt = net > 0
                             ? Debt(from: b, to: a, amount: net)
                             : Debt(from: a, to: b, amount: -net);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SettlementScreen(
-                              roomId: widget.roomId,
-                              debt: debt,
-                              nameMap: widget.nameMap,
-                            ),
-                          ),
-                        );
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => SettlementScreen(roomId: widget.roomId, debt: debt, nameMap: widget.nameMap),
+                        ));
                       },
-                      icon: const Icon(Icons.visibility, size: 18),
-                      label: const Text('View Settlement'),
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _kGreen.withValues(alpha: isDark ? 0.15 : 0.1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _kGreen.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.payment_rounded, size: 16, color: _kGreen),
+                            const SizedBox(width: 6),
+                            const Text('Settle Up', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kGreen)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (showViewButton)
+                    GestureDetector(
+                      onTap: () {
+                        final debt = net > 0
+                            ? Debt(from: b, to: a, amount: net)
+                            : Debt(from: a, to: b, amount: -net);
+                        Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => SettlementScreen(roomId: widget.roomId, debt: debt, nameMap: widget.nameMap),
+                        ));
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: _kBlue.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.visibility_rounded, size: 16, color: _kBlue),
+                            const SizedBox(width: 6),
+                            const Text('View', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kBlue)),
+                          ],
+                        ),
                       ),
                     ),
                 ],
@@ -237,8 +296,9 @@ class _TimelineTile extends StatelessWidget {
   final _TimelineTransaction data;
   final Map<String, String> nameMap;
   final String userId;
+  final bool isLast;
 
-  const _TimelineTile({required this.data, required this.nameMap, required this.userId});
+  const _TimelineTile({required this.data, required this.nameMap, required this.userId, required this.isLast});
 
   @override
   Widget build(BuildContext context) {
@@ -250,125 +310,83 @@ class _TimelineTile extends StatelessWidget {
     final isBill = txn.isBill == true;
     final isUserPayer = payerId == userId;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     final debtorId = otherId;
     final creditorId = payerId;
     final amountOwed = data.amountOwedByOther;
 
     final debtorDisplay = (debtorId == userId) ? 'You' : (nameMap[debtorId] ?? debtorId);
-    final pillText = '$debtorDisplay owes ${amountOwed.toStringAsFixed(0)}';
+    final pillText = '$debtorDisplay owes ₹${amountOwed.toStringAsFixed(0)}';
 
-    // Pill colors
-    Color pillBg;
-    Color pillTextColor;
+    final Color pillColor;
     if (debtorId == userId) {
-      pillBg = isDark ? Colors.red.shade900.withOpacity(0.3) : Colors.red.shade100;
-      pillTextColor = isDark ? Colors.red.shade300 : Colors.red.shade800;
+      pillColor = _kRed;
     } else if (creditorId == userId) {
-      pillBg = isDark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade100;
-      pillTextColor = isDark ? Colors.green.shade300 : Colors.green.shade800;
+      pillColor = _kGreen;
     } else {
-      pillBg = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
-      pillTextColor = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
+      pillColor = _kAmber;
     }
 
-    // Amount color based on whether user is involved
-    final amountColor = (debtorId == userId || creditorId == userId)
-        ? (debtorId == userId
-            ? (isDark ? Colors.red.shade300 : Colors.red.shade700)
-            : (isDark ? Colors.green.shade300 : Colors.green.shade700))
-        : Theme.of(context).colorScheme.onSurface.withOpacity(0.87);
-
-    final tileColor = isBill ? (isDark ? Colors.blue.shade900.withOpacity(0.2) : Colors.blue.shade50) : null;
+    final iconColor = isBill ? _kBlue : (isUserPayer ? _kGreen : _kAmber);
 
     return InkWell(
       onTap: () => _showDetailDialog(context, txn, payerName, otherName),
       child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: tileColor,
-          border: Border(bottom: BorderSide(color: isDark ? Colors.white.withOpacity(0.06) : Colors.grey.shade100)),
+          border: isLast ? null : Border(bottom: BorderSide(color: cs.outline.withValues(alpha: 0.07))),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Icon circle
             Container(
-              width: 40,
-              height: 40,
+              width: 38, height: 38,
               decoration: BoxDecoration(
-                color: isUserPayer
-                    ? (isDark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade50)
-                    : (isDark ? Colors.orange.shade900.withOpacity(0.3) : Colors.orange.shade50),
-                shape: BoxShape.circle,
+                color: iconColor.withValues(alpha: isDark ? 0.12 : 0.08),
+                borderRadius: BorderRadius.circular(11),
               ),
               child: Icon(
-                isBill ? Icons.receipt_long : Icons.payment,
-                size: 20,
-                color: isUserPayer
-                    ? (isDark ? Colors.green.shade300 : Colors.green.shade700)
-                    : (isDark ? Colors.orange.shade300 : Colors.orange.shade700),
+                isBill ? Icons.receipt_long_rounded : Icons.payment_rounded,
+                size: 18,
+                color: iconColor,
               ),
             ),
             const SizedBox(width: 12),
-            // Details column
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     txn.title,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: cs.onSurface),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  // Amount line: highlighted with color
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '₹${txn.totalAmount.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: amountColor,
-                            fontSize: 13,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ' • $payerName • ${_formatDate(txn.date)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '₹${txn.totalAmount.toStringAsFixed(0)} • $payerName • ${_formatDate(txn.date)}',
+                    style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  // Split type as plain text (no background)
+                  const SizedBox(height: 2),
                   Text(
                     _splitText(txn),
-                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.35)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            // Pill
+            const SizedBox(width: 10),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: pillBg,
+                color: pillColor.withValues(alpha: isDark ? 0.15 : 0.08),
                 borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: pillColor.withValues(alpha: 0.2)),
               ),
               child: Text(
                 pillText,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: pillTextColor,
-                ),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: pillColor),
               ),
             ),
           ],
@@ -431,7 +449,7 @@ class _TimelineTile extends StatelessWidget {
         builder: (context) => Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
             Text(
               value,
               style: highlight

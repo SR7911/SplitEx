@@ -23,7 +23,34 @@ import 'package:split_ex/screens/room/pair_settlement_card.dart';
 import 'package:split_ex/screens/settlement/settlement_screen.dart';
 import 'package:split_ex/services/balance_service.dart';
 import 'package:split_ex/services/receipt_generator.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
+// -- Shared design tokens --
+const _kGreen  = Color(0xFF22C55E);
+const _kRed    = Color(0xFFEF4444);
+const _kAmber  = Color(0xFFF59E0B);
+const _kIndigo = Color(0xFF6366F1);
+const _kBlue   = Color(0xFF3B82F6);
+const _kTeal   = Color(0xFF14B8A6);
+const _kPurple = Color(0xFF8B5CF6);
+const _kPalette = [_kBlue, _kGreen, _kAmber, _kIndigo, _kTeal, _kPurple, _kRed];
+
+BoxDecoration _cardDeco(BuildContext context) {
+  final cs     = Theme.of(context).colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return BoxDecoration(
+    color: isDark ? cs.surfaceContainerHigh : cs.surface,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
+        blurRadius: 12,
+        offset: const Offset(0, 3),
+      ),
+    ],
+  );
+}
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
   final DateTime selectedMonthInHome;
@@ -138,48 +165,29 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
     final room = ref.watch(currentRoomProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(room?.name ?? 'Room'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: 'Analytics',
-            onPressed: () => _showAnalyticsSheet(context),
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long),
-            tooltip: 'Generate Receipt',
-            onPressed: () => _generateReceipt(context, ref),
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Activity Log',
-            onPressed: () => context.push('/room/${widget.roomId}/activity'),
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Expenses'),
-            Tab(text: 'Bills'),
-            Tab(text: 'Settlements'),
+      appBar: _GradientTabAppBar(
+        title: room?.name ?? 'Room',
+        tabController: _tabController,
+        onAnalytics: () => _showAnalyticsSheet(context),
+        onReceipt: () => _generateReceipt(context, ref),
+        onActivity: () => context.push('/room/${widget.roomId}/activity'),
+      ),
+      body: GradientBody(
+        child: Column(
+          children: [
+            _MonthSelector(month: _selectedMonth, onPrev: _prevMonth, onNext: _nextMonth),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _ExpensesTab(roomId: widget.roomId, month: _monthKey),
+                  _BillsTab(roomId: widget.roomId, month: _monthKey),
+                  _SettlementsTab(roomId: widget.roomId, month: _monthKey),
+                ],
+              ),
+            ),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          _MonthSelector(month: _selectedMonth, onPrev: _prevMonth, onNext: _nextMonth),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _ExpensesTab(roomId: widget.roomId, month: _monthKey),
-                _BillsTab(roomId: widget.roomId, month: _monthKey),
-                _SettlementsTab(roomId: widget.roomId, month: _monthKey),
-              ],
-            ),
-          ),
-        ],
       ),
       floatingActionButton: _tabController.index == 2
           ? null
@@ -193,6 +201,63 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
               },
               child: const Icon(Icons.add),
             ),
+    );
+  }
+}
+
+// ========== GRADIENT TAB APP BAR ==========
+class _GradientTabAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final TabController tabController;
+  final VoidCallback onAnalytics;
+  final VoidCallback onReceipt;
+  final VoidCallback onActivity;
+
+  const _GradientTabAppBar({
+    required this.title,
+    required this.tabController,
+    required this.onAnalytics,
+    required this.onReceipt,
+    required this.onActivity,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + kTextTabBarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0.0, 1.0],
+          colors: [
+            cs.primary.withValues(alpha: isDark ? 0.55 : 0.45),
+            cs.primary.withValues(alpha: 0.18),
+          ],
+        ),
+      ),
+      child: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(title),
+        actions: [
+          IconButton(icon: const Icon(Icons.bar_chart), tooltip: 'Analytics', onPressed: onAnalytics),
+          IconButton(icon: const Icon(Icons.receipt_long), tooltip: 'Generate Receipt', onPressed: onReceipt),
+          IconButton(icon: const Icon(Icons.history), tooltip: 'Activity Log', onPressed: onActivity),
+        ],
+        bottom: TabBar(
+          controller: tabController,
+          tabs: const [
+            Tab(text: 'Expenses'),
+            Tab(text: 'Bills'),
+            Tab(text: 'Settlements'),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -454,7 +519,6 @@ class _AnalyticsSheet extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Row(
                         children: [
-                          // Avatar with initial
                           CircleAvatar(
                             radius: 16,
                             backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
@@ -509,56 +573,88 @@ class _MonthSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCurrentMonth = month.year == DateTime.now().year && month.month == DateTime.now().month;
+    final cs     = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Previous button with subtle circle background
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100,
+    const onCard     = Colors.white;
+    final onCardMuted = Colors.white.withValues(alpha: 0.65);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: isDark
+                ? [cs.primary.withValues(alpha: 0.55), cs.primary.withValues(alpha: 0.35)]
+                : [cs.primary.withValues(alpha: 0.85), cs.primary.withValues(alpha: 0.65)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          child: IconButton(
-            icon: const Icon(Icons.chevron_left, size: 20),
-            onPressed: onPrev,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          ),
-        ),
-        
-        // Month text with divider lines on sides (optional)
-        Row(
-          children: [
-            Container(width: 24, height: 1, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
-            const SizedBox(width: 12),
-            Text(
-              DateFormat('MMMM yyyy').format(month),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: cs.primary.withValues(alpha: 0.22),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            const SizedBox(width: 12),
-            Container(width: 24, height: 1, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
           ],
         ),
-        
-        // Next button (disabled if current month)
-        Container(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.chevron_right, size: 20),
-            onPressed: isCurrentMonth ? null : onNext,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            color: isCurrentMonth ? Colors.grey.shade400 : null,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _NavBtn(onTap: onPrev, icon: Icons.chevron_left),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  DateFormat('MMMM yyyy').format(month),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: onCard),
+                ),
+                if (isCurrentMonth) ...[  
+                  const SizedBox(height: 3),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text(
+                      'Current Month',
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: onCard, letterSpacing: 0.4),
+                    ),
+                  ),
+                ] else ...[  
+                  const SizedBox(height: 2),
+                  Text(DateFormat('yyyy').format(month), style: TextStyle(fontSize: 10, color: onCardMuted)),
+                ],
+              ],
+            ),
+            _NavBtn(onTap: isCurrentMonth ? null : onNext, icon: Icons.chevron_right),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _NavBtn extends StatelessWidget {
+  final VoidCallback? onTap;
+  final IconData icon;
+  const _NavBtn({required this.onTap, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34, height: 34,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: enabled ? 0.18 : 0.07),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 20, color: Colors.white.withValues(alpha: enabled ? 0.9 : 0.3)),
+      ),
     );
   }
 }
@@ -919,14 +1015,15 @@ class _ExpenseTile extends ConsumerWidget {
     final tile = Card(
       child: ListTile(
         leading: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                child: Center(
-                  child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-                ),
-              ),
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary)),
+        ),
         title: Text(expense.title),
-        subtitle: Text('${expense.category} \u2022 ${DateFormat('dd MMM').format(expense.date)} \u2022 $paidByName'),
+        subtitle: Text('${expense.category} • ${DateFormat('dd MMM').format(expense.date)} • $paidByName'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -936,7 +1033,7 @@ class _ExpenseTile extends ConsumerWidget {
                 tooltip: 'View Receipt',
                 onPressed: () => _showReceipt(context, expense.receiptUrl!),
               ),
-            Text('\u20b9${expense.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('₹${expense.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         onTap: canEdit ? () => showViewExpenseSheet(context, roomId: roomId, expense: expense) : null,
@@ -1066,20 +1163,21 @@ class _BillsTab extends ConsumerWidget {
             final paidBy = nameMap[bill.paidBy] ?? bill.paidBy;
             final icon = switch (bill.type) { BillType.rent => Icons.home, BillType.electricity => Icons.bolt, BillType.water => Icons.water_drop };
             final card = Card(
-                child: ListTile(
-                  leading: Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                    child: Center(
-                      child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
-                    ),
+              child: ListTile(
+                leading: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  title: Text(bill.typeName),
-                  subtitle: Text('Paid by $paidBy \u2022 ${DateFormat('dd MMM').format(bill.date)}'),
-                  trailing: Text('\u20b9${bill.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
+                  child: Center(child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary)),
                 ),
-              );
+                title: Text(bill.typeName),
+                subtitle: Text('Paid by $paidBy • ${DateFormat('dd MMM').format(bill.date)}'),
+                trailing: Text('₹${bill.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
+              ),
+            );
 
             if (!isAdmin) return card;
 

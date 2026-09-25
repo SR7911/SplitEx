@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/services/user_service.dart';
 import 'package:split_ex/screens/settlement/upi_id_dialog.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class JoinRoomScreen extends ConsumerStatefulWidget {
   const JoinRoomScreen({super.key});
@@ -102,8 +103,9 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Join Room')),
-      body: Padding(
+      appBar: const AppHeader(showBack: true, title: 'Join Room', showNotification: false),
+      body: GradientBody(
+        child: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -113,7 +115,7 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
             children: [
               Text(
                 'Enter the invite code shared by your roommate',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
@@ -127,10 +129,14 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
                   fontWeight: FontWeight.bold,
                 ),
                 maxLength: 6,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'XXXXXX',
                   counterText: '',
-                  prefixIcon: Icon(Icons.vpn_key_outlined),
+                  prefixIcon: const Icon(Icons.vpn_key_outlined),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().length != 6) {
@@ -140,20 +146,18 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
+              FilledButton(
                 onPressed: _isLoading ? null : _joinRoom,
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
                 child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Join Room'),
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Join Room', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
         ),
       ),
+      )
     );
   }
 }

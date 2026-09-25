@@ -65,7 +65,7 @@ class AppTheme {
 
   static ThemeData lightTheme(AppPalette palette) {
     final primary = _palettes[palette]!.light;
-    const bg = Color(0xFFF8F9FE);
+    const bg = Color(0xFFF5F6FA);
     const fontFamily = 'Gilmer';
 
     return ThemeData(
@@ -73,21 +73,26 @@ class AppTheme {
       brightness: Brightness.light,
       fontFamily: fontFamily,
       textTheme: const TextTheme(
-        displayLarge: TextStyle(fontWeight: FontWeight.w700),
-        displayMedium: TextStyle(fontWeight: FontWeight.w700),
-        displaySmall: TextStyle(fontWeight: FontWeight.w700),
-        headlineLarge: TextStyle(fontWeight: FontWeight.w700),
+        // Display — hero numbers, large titles
+        displayLarge:  TextStyle(fontWeight: FontWeight.w800, letterSpacing: -1.5),
+        displayMedium: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -1.0),
+        displaySmall:  TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.5),
+        // Headlines — screen titles
+        headlineLarge:  TextStyle(fontWeight: FontWeight.w700),
         headlineMedium: TextStyle(fontWeight: FontWeight.w700),
-        headlineSmall: TextStyle(fontWeight: FontWeight.w700),
-        titleLarge: TextStyle(fontWeight: FontWeight.w700),
-        titleMedium: TextStyle(fontWeight: FontWeight.w700),
-        titleSmall: TextStyle(fontWeight: FontWeight.w700),
-        bodyLarge: TextStyle(fontWeight: FontWeight.w700),
-        bodyMedium: TextStyle(fontWeight: FontWeight.w500),
-        bodySmall: TextStyle(fontWeight: FontWeight.w400),
-        labelLarge: TextStyle(fontWeight: FontWeight.w500),
-        labelMedium: TextStyle(fontWeight: FontWeight.w400),
-        labelSmall: TextStyle(fontWeight: FontWeight.w400),
+        headlineSmall:  TextStyle(fontWeight: FontWeight.w600),
+        // Titles — section headers, card titles
+        titleLarge:  TextStyle(fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(fontWeight: FontWeight.w600),
+        titleSmall:  TextStyle(fontWeight: FontWeight.w500),
+        // Body — readable content
+        bodyLarge:  TextStyle(fontWeight: FontWeight.w400),
+        bodyMedium: TextStyle(fontWeight: FontWeight.w400),
+        bodySmall:  TextStyle(fontWeight: FontWeight.w400),
+        // Labels — chips, badges, captions
+        labelLarge:  TextStyle(fontWeight: FontWeight.w600),
+        labelMedium: TextStyle(fontWeight: FontWeight.w500),
+        labelSmall:  TextStyle(fontWeight: FontWeight.w400),
       ),
       colorScheme: ColorScheme.fromSeed(
         seedColor: primary,
@@ -100,20 +105,21 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
-        scrolledUnderElevation: 1,
-        backgroundColor: primary,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: primary,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: const Color(0xFF1A1A2E),
+        iconTheme: const IconThemeData(color: Color(0xFF1A1A2E)),
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
         ),
         titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           fontFamily: fontFamily,
-          color: Colors.white,
+          color: Color(0xFF1A1A2E),
         ),
       ),
       cardTheme: CardThemeData(
@@ -122,7 +128,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade200),
+          side: BorderSide(color: Colors.grey.shade100),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -177,7 +183,7 @@ class AppTheme {
         shape: const CircleBorder(),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: primary.withOpacity(0.1),
+        backgroundColor: primary.withValues(alpha: 0.1),
         labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         side: BorderSide.none,
@@ -189,9 +195,10 @@ class AppTheme {
         subtitleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400, fontSize: 13, color: Color(0xFF6B7280)),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white70,
-        indicatorColor: Colors.white,
+        labelColor: primary,
+        unselectedLabelColor: const Color(0xFF1A1A2E),
+        indicatorColor: primary,
+        dividerColor: Colors.transparent,
         labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, fontFamily: fontFamily),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, fontFamily: fontFamily),
         indicatorSize: TabBarIndicatorSize.label,
@@ -208,9 +215,9 @@ class AppTheme {
 
   static ThemeData darkTheme(AppPalette palette) {
     final primary = _palettes[palette]!.dark;
-    const bg = Color(0xFF000000);
-    const surface = Color(0xFF111111);
-    const cardColor = Color(0xFF1C1C1C);
+    const bg = Color(0xFF0D0D0D);
+    const surface = Color(0xFF161616);
+    const cardColor = Color(0xFF1E1E1E);
     const fontFamily = 'Gilmer';
 
     return ThemeData(
@@ -218,21 +225,21 @@ class AppTheme {
       brightness: Brightness.dark,
       fontFamily: fontFamily,
       textTheme: const TextTheme(
-        displayLarge: TextStyle(fontWeight: FontWeight.w700),
-        displayMedium: TextStyle(fontWeight: FontWeight.w700),
-        displaySmall: TextStyle(fontWeight: FontWeight.w700),
-        headlineLarge: TextStyle(fontWeight: FontWeight.w700),
+        displayLarge:  TextStyle(fontWeight: FontWeight.w800, letterSpacing: -1.5),
+        displayMedium: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -1.0),
+        displaySmall:  TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.5),
+        headlineLarge:  TextStyle(fontWeight: FontWeight.w700),
         headlineMedium: TextStyle(fontWeight: FontWeight.w700),
-        headlineSmall: TextStyle(fontWeight: FontWeight.w700),
-        titleLarge: TextStyle(fontWeight: FontWeight.w700),
-        titleMedium: TextStyle(fontWeight: FontWeight.w700),
-        titleSmall: TextStyle(fontWeight: FontWeight.w700),
-        bodyLarge: TextStyle(fontWeight: FontWeight.w700),
-        bodyMedium: TextStyle(fontWeight: FontWeight.w500),
-        bodySmall: TextStyle(fontWeight: FontWeight.w400),
-        labelLarge: TextStyle(fontWeight: FontWeight.w500),
-        labelMedium: TextStyle(fontWeight: FontWeight.w400),
-        labelSmall: TextStyle(fontWeight: FontWeight.w400),
+        headlineSmall:  TextStyle(fontWeight: FontWeight.w600),
+        titleLarge:  TextStyle(fontWeight: FontWeight.w600),
+        titleMedium: TextStyle(fontWeight: FontWeight.w600),
+        titleSmall:  TextStyle(fontWeight: FontWeight.w500),
+        bodyLarge:  TextStyle(fontWeight: FontWeight.w400),
+        bodyMedium: TextStyle(fontWeight: FontWeight.w400),
+        bodySmall:  TextStyle(fontWeight: FontWeight.w400),
+        labelLarge:  TextStyle(fontWeight: FontWeight.w600),
+        labelMedium: TextStyle(fontWeight: FontWeight.w500),
+        labelSmall:  TextStyle(fontWeight: FontWeight.w400),
       ),
       colorScheme: ColorScheme.fromSeed(
         seedColor: primary,
@@ -246,21 +253,21 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
-        scrolledUnderElevation: 1,
-        backgroundColor: primary,
-        foregroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.black),
+        scrolledUnderElevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         surfaceTintColor: Colors.transparent,
-        systemOverlayStyle: SystemUiOverlayStyle(
-          statusBarColor: primary,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
         ),
         titleTextStyle: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           fontFamily: fontFamily,
-          color: Colors.black,
+          color: Colors.white,
         ),
       ),
       cardTheme: CardThemeData(
@@ -269,7 +276,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withOpacity(0.08)),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -277,11 +284,11 @@ class AppTheme {
         fillColor: cardColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -324,27 +331,28 @@ class AppTheme {
         shape: const CircleBorder(),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: primary.withOpacity(0.15),
+        backgroundColor: primary.withValues(alpha: 0.15),
         labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: primary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         side: BorderSide.none,
       ),
-      dividerTheme: DividerThemeData(color: Colors.white.withOpacity(0.08), thickness: 1),
+      dividerTheme: DividerThemeData(color: Colors.white.withValues(alpha: 0.07), thickness: 1),
       listTileTheme: const ListTileThemeData(
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         titleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
         subtitleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400, fontSize: 13, color: Colors.white70),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: Colors.black,
-        unselectedLabelColor: Colors.black54,
-        indicatorColor: Colors.black,
+        labelColor: primary,
+        unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+        indicatorColor: primary,
+        dividerColor: Colors.transparent,
         labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, fontFamily: fontFamily),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, fontFamily: fontFamily),
         indicatorSize: TabBarIndicatorSize.label,
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Color(0xFF1C1C1C),
+        backgroundColor: Color(0xFF1E1E1E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -357,30 +365,30 @@ class AppTheme {
   static ThemeData deepDarkTheme(AppPalette palette) {
     final base = darkTheme(palette);
     const bg = Color(0xFF000000);
-    const surface = Color(0xFF000000);
-    const cardColor = Color(0xFF0A0A0A);
+    const surface = Color(0xFF080808);
+    const cardColor = Color(0xFF0F0F0F);
 
     return base.copyWith(
       scaffoldBackgroundColor: bg,
       colorScheme: base.colorScheme.copyWith(surface: surface),
       cardTheme: base.cardTheme.copyWith(color: cardColor),
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: base.appBarTheme.titleTextStyle?.copyWith(color: Colors.white),
         systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Color(0xFF000000),
+          statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
           statusBarBrightness: Brightness.dark,
         ),
       ),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(fillColor: cardColor),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Color(0xFF0A0A0A),
+        backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       ),
-      dialogTheme: const DialogThemeData(backgroundColor: Color(0xFF0A0A0A)),
+      dialogTheme: const DialogThemeData(backgroundColor: cardColor),
     );
   }
 }

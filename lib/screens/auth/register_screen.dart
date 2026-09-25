@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/auth_provider.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -16,6 +17,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -33,7 +35,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             _emailController.text.trim(),
             _passwordController.text,
           );
-      // Store name temporarily in Firebase Auth displayName
       await credential.user?.updateDisplayName(_nameController.text.trim());
     } on Exception catch (e) {
       if (mounted) {
@@ -48,73 +49,142 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const SizedBox(height: AppSpacing.xxl),
+
+                // Back + title
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => context.pop(),
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(AppSpacing.md),
+                        ),
+                        child: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 18,
+                          color: cs.onSurface.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: AppSpacing.xl),
+
+                Text('Create Account', style: AppTextStyles.pageTitle(context)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Fill in your details to get started',
+                  style: AppTextStyles.bodySmall(context),
+                ),
+
+                const SizedBox(height: AppSpacing.xxl),
+
+                // Name
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'Full Name',
                     prefixIcon: Icon(Icons.person_outlined),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Enter your name';
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter your name';
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
+
+                // Email
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     prefixIcon: Icon(Icons.email_outlined),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Enter email';
-                    if (!value.contains('@')) return 'Enter valid email';
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter email';
+                    if (!v.contains('@')) return 'Enter valid email';
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
+
+                // Password
                 TextFormField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
+                  obscureText: _obscurePassword,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => _isLoading ? null : _register(),
+                  decoration: InputDecoration(
                     labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock_outlined),
+                    prefixIcon: const Icon(Icons.lock_outlined),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Enter password';
-                    if (value.length < 6) return 'Min 6 characters';
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter password';
+                    if (v.length < 6) return 'Min 6 characters';
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _register,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Register'),
+
+                const SizedBox(height: AppSpacing.xl),
+
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : FilledButton(
+                        onPressed: _register,
+                        child: const Text('Create Account'),
+                      ),
+
+                const SizedBox(height: AppSpacing.xxl),
+
+                Center(
+                  child: GestureDetector(
+                    onTap: () => context.pop(),
+                    child: RichText(
+                      text: TextSpan(
+                        text: 'Already have an account? ',
+                        style: AppTextStyles.bodySmall(context),
+                        children: [
+                          TextSpan(
+                            text: 'Sign In',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: cs.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => context.pop(),
-                  child: const Text('Already have an account? Sign In'),
-                ),
+
+                const SizedBox(height: AppSpacing.xl),
               ],
             ),
           ),

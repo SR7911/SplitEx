@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:split_ex/config/theme.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/theme_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -11,93 +13,123 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(userProfileProvider).valueOrNull;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        children: [
-          // Account & Security
-          _SectionHeader('Account & Security'),
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: const Text('Edit Profile'),
-            subtitle: Text(profile?.name ?? ''),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/settings/edit-profile'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.lock_outline),
-            title: const Text('Change Password'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/settings/change-password'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete_forever, color: Colors.red),
-            title: const Text('Delete Account',
-                style: TextStyle(color: Colors.red)),
-            onTap: () => _confirmDeleteAccount(context, ref),
-          ),
-
-          const Divider(),
-
-          // Preferences
-          _SectionHeader('Preferences'),
-          const _ThemeTile(),
-          const _PaletteTile(),
-          ListTile(
-            leading: const Icon(Icons.currency_exchange),
-            title: const Text('Default Currency'),
-            subtitle: const Text('₹ INR'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showCurrencyPicker(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('Notification Preferences'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/settings/notifications'),
-          ),
-
-          const Divider(),
-
-          // Legal
-          _SectionHeader('Legal'),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Terms of Service'),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () => _openUrl(context, 'https://splitex.app/terms'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy Policy'),
-            trailing: const Icon(Icons.open_in_new, size: 18),
-            onTap: () => _openUrl(context, 'https://splitex.app/privacy'),
-          ),
-
-          const Divider(),
-
-          // Session
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title:
-                const Text('Log Out', style: TextStyle(color: Colors.red)),
-            onTap: () async {
-              await ref.read(authServiceProvider).signOut();
-              if (context.mounted) context.go('/login');
-            },
-          ),
-
-          // App version
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Version 1.0.0',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+      appBar: const AppHeader(showBack: true, title: 'Settings', showNotification: false),
+      body: GradientBody(
+        child: ListView(
+          children: [
+            // Profile card
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.base, AppSpacing.base, AppSpacing.base, 0),
+              child: Card(
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.base,
+                    vertical: AppSpacing.sm,
+                  ),
+                  leading: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: cs.primary.withValues(alpha: 0.12),
+                    child: Text(
+                      (profile?.name.isNotEmpty == true) ? profile!.name[0].toUpperCase() : 'U',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: cs.primary),
+                    ),
+                  ),
+                  title: Text(profile?.name ?? 'User', style: AppTextStyles.sectionHeader(context)),
+                  subtitle: Text(profile?.email ?? '', style: AppTextStyles.caption(context)),
+                  trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurface.withValues(alpha: 0.3)),
+                  onTap: () => context.push('/settings/edit-profile'),
+                ),
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: AppSpacing.xl),
+
+            // Account & Security
+            _SectionHeader('Account & Security'),
+            _SettingsTile(
+              icon: Icons.person_outline,
+              label: 'Edit Profile',
+              onTap: () => context.push('/settings/edit-profile'),
+            ),
+            _SettingsTile(
+              icon: Icons.lock_outline,
+              label: 'Change Password',
+              onTap: () => context.push('/settings/change-password'),
+            ),
+            _SettingsTile(
+              icon: Icons.delete_forever_outlined,
+              label: 'Delete Account',
+              color: cs.error,
+              onTap: () => _confirmDeleteAccount(context, ref),
+            ),
+
+            const SizedBox(height: AppSpacing.xl),
+
+            // Preferences
+            _SectionHeader('Preferences'),
+            const _ThemeTile(),
+            const _PaletteTile(),
+            const _BodyGradientTile(),
+            _SettingsTile(
+              icon: Icons.currency_exchange_outlined,
+              label: 'Default Currency',
+              subtitle: '₹ INR',
+              onTap: () => _showCurrencyPicker(context),
+            ),
+            _SettingsTile(
+              icon: Icons.notifications_outlined,
+              label: 'Notification Preferences',
+              onTap: () => context.push('/settings/notifications'),
+            ),
+
+            const SizedBox(height: AppSpacing.xl),
+
+            // Legal
+            _SectionHeader('Legal'),
+            _SettingsTile(
+              icon: Icons.description_outlined,
+              label: 'Terms of Service',
+              trailing: const Icon(Icons.open_in_new, size: 16),
+              onTap: () => _openUrl(context, 'https://splitex.app/terms'),
+            ),
+            _SettingsTile(
+              icon: Icons.privacy_tip_outlined,
+              label: 'Privacy Policy',
+              trailing: const Icon(Icons.open_in_new, size: 16),
+              onTap: () => _openUrl(context, 'https://splitex.app/privacy'),
+            ),
+
+            const SizedBox(height: AppSpacing.xl),
+
+            // Sign out
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await ref.read(authServiceProvider).signOut();
+                  if (context.mounted) context.go('/login');
+                },
+                icon: Icon(Icons.logout_rounded, color: cs.error),
+                label: Text('Log Out', style: TextStyle(color: cs.error)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: cs.error.withValues(alpha: 0.4)),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Text(
+                'Version 1.0.0',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption(context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -158,15 +190,49 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xs),
       child: Text(
-        title,
+        title.toUpperCase(),
         style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+          letterSpacing: 0.8,
         ),
       ),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final Color? color;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  const _SettingsTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.color,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final effectiveColor = color ?? cs.onSurface;
+    return ListTile(
+      leading: Icon(icon, size: 20, color: effectiveColor.withValues(alpha: 0.7)),
+      title: Text(
+        label,
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: effectiveColor),
+      ),
+      subtitle: subtitle != null ? Text(subtitle!, style: AppTextStyles.caption(context)) : null,
+      trailing: trailing ?? Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+      onTap: onTap,
     );
   }
 }
@@ -232,6 +298,32 @@ class _ThemeTile extends ConsumerWidget {
             },
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+class _BodyGradientTile extends ConsumerWidget {
+  const _BodyGradientTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final enabled = ref.watch(bodyGradientProvider);
+    final cs = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Icon(
+        Icons.gradient_rounded,
+        size: 20,
+        color: cs.onSurface.withValues(alpha: 0.7),
+      ),
+      title: const Text('Screen Body Gradient'),
+      subtitle: Text(
+        enabled ? 'Gradient fade below app bar' : 'Plain background',
+        style: AppTextStyles.caption(context),
+      ),
+      trailing: Switch(
+        value: enabled,
+        onChanged: (v) => ref.read(bodyGradientProvider.notifier).toggle(v),
       ),
     );
   }

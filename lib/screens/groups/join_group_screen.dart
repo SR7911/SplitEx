@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/group_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class JoinGroupScreen extends ConsumerStatefulWidget {
   const JoinGroupScreen({super.key});
@@ -43,8 +45,9 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Join Group')),
-      body: Padding(
+      appBar: const AppHeader(showBack: true, title: 'Join Group', showNotification: false),
+      body: GradientBody(
+        child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,6 +101,7 @@ class _JoinGroupScreenState extends ConsumerState<JoinGroupScreen> {
           ],
         ),
       ),
+      )
     );
   }
 }

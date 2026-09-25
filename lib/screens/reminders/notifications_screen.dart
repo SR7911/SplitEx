@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/models/notification_model.dart';
 import 'package:split_ex/providers/notification_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -14,23 +16,23 @@ class NotificationsScreen extends ConsumerWidget {
     final userId = ref.watch(currentUserIdProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        actions: [
-          TextButton(
-            onPressed: () => ref
-                .read(notificationServiceProvider)
-                .markAllAsRead(userId),
-            child: const Text('Mark all read'),
-          ),
-        ],
+      appBar: const AppHeader(showBack: true, title: 'Notifications', showNotification: false),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => ref.read(notificationServiceProvider).markAllAsRead(userId),
+        icon: const Icon(Icons.done_all),
+        label: const Text('Mark all read'),
       ),
-      body: notificationsAsync.when(
+      body: GradientBody(
+        child: notificationsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (notifications) {
           if (notifications.isEmpty) {
-            return const Center(child: Text('No notifications yet'));
+            return const AppEmptyState(
+              icon: Icons.notifications_none_rounded,
+              title: 'No notifications',
+              subtitle: 'You are all caught up',
+            );
           }
           return ListView.builder(
             itemCount: notifications.length,
@@ -40,6 +42,7 @@ class NotificationsScreen extends ConsumerWidget {
             },
           );
         },
+      ),
       ),
     );
   }
@@ -67,7 +70,7 @@ class _NotificationTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
-      leading: Icon(_icon, color: notification.isRead ? Colors.grey : Theme.of(context).colorScheme.primary),
+      leading: Icon(_icon, color: notification.isRead ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4) : Theme.of(context).colorScheme.primary),
       title: Text(
         notification.title,
         style: TextStyle(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/config/constants.dart';
@@ -166,7 +166,7 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                     height: 5,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -193,11 +193,11 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   decoration: InputDecoration(
                     labelText: 'Title',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                     hintText: 'e.g. Groceries, Electricity',
-                    hintStyle: TextStyle(fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                    hintStyle: TextStyle(fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
@@ -213,9 +213,9 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   decoration: InputDecoration(
                     labelText: 'Amount (₹)',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
@@ -239,9 +239,9 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                         decoration: InputDecoration(
                           labelText: 'Category',
                           labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                          prefixIcon: Icon(Icons.category, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                          prefixIcon: Icon(Icons.category, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                           filled: true,
-                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -260,13 +260,13 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                            Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                             const SizedBox(width: 8),
                             Text(
                               DateFormat('dd MMM yyyy').format(_date),
@@ -283,7 +283,7 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                 // Receipt picker
                 Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ReceiptPicker(
@@ -302,7 +302,7 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.splitscreen_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                          Icon(Icons.splitscreen_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                           const SizedBox(width: 8),
                           Text(
                             'Split method',
@@ -346,7 +346,7 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   const SizedBox(height: 20),
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.all(12),
@@ -355,7 +355,7 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.people_alt_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                            Icon(Icons.people_alt_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                             const SizedBox(width: 8),
                             Text(
                               _splitType == SplitType.oneToOne
@@ -435,8 +435,8 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                 }
               });
             },
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-            selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
             checkmarkColor: Theme.of(context).colorScheme.primary,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           );

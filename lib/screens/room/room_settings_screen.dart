@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class RoomSettingsScreen extends ConsumerWidget {
   final String roomId;
@@ -14,8 +16,8 @@ class RoomSettingsScreen extends ConsumerWidget {
     final userId = ref.read(currentUserIdProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Room Settings')),
-      body: roomAsync.when(
+      appBar: const AppHeader(showBack: true, title: 'Room Settings', showNotification: false),
+      body: GradientBody(child: roomAsync.when(
         data: (room) {
           if (room == null) {
             return const Center(child: Text('Room not found'));
@@ -33,30 +35,25 @@ class RoomSettingsScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Invite Code',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
+                      Text('Invite Code', style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                        letterSpacing: 1,
+                      )),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           Text(
                             room.inviteCode,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 4,
-                                ),
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 4,
+                            ),
                           ),
                           const Spacer(),
                           IconButton(
-                            icon: const Icon(Icons.copy),
+                            icon: const Icon(Icons.copy_rounded),
                             onPressed: () {
-                              Clipboard.setData(
-                                ClipboardData(text: room.inviteCode),
-                              );
+                              Clipboard.setData(ClipboardData(text: room.inviteCode));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Code copied!')),
                               );
@@ -69,10 +66,7 @@ class RoomSettingsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                'Members (${room.memberIds.length})',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              AppSectionHeader(title: 'Members (${room.memberIds.length})'),
               const SizedBox(height: 8),
               membersAsync.when(
                 data: (members) => Column(
@@ -80,29 +74,25 @@ class RoomSettingsScreen extends ConsumerWidget {
                     final memberIsAdmin = room.isAdmin(member.uid);
                     return ListTile(
                       leading: CircleAvatar(
+                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                         child: Text(
-                          member.name.isNotEmpty
-                              ? member.name[0].toUpperCase()
-                              : '?',
+                          member.name.isNotEmpty ? member.name[0].toUpperCase() : '?',
+                          style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer, fontWeight: FontWeight.w600),
                         ),
                       ),
                       title: Text(member.name),
                       subtitle: Text(member.email),
                       trailing: memberIsAdmin
-                          ? const Chip(label: Text('Admin'))
+                          ? Chip(
+                              label: const Text('Admin'),
+                              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                              labelStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer, fontSize: 12),
+                              padding: EdgeInsets.zero,
+                            )
                           : isAdmin
                               ? IconButton(
-                                  icon: const Icon(
-                                    Icons.remove_circle_outline,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () => _confirmRemove(
-                                    context,
-                                    ref,
-                                    roomId,
-                                    member.uid,
-                                    member.name,
-                                  ),
+                                  icon: Icon(Icons.remove_circle_outline, color: Theme.of(context).colorScheme.error),
+                                  onPressed: () => _confirmRemove(context, ref, roomId, member.uid, member.name),
                                 )
                               : null,
                     );
@@ -115,18 +105,15 @@ class RoomSettingsScreen extends ConsumerWidget {
               if (!isAdmin)
                 OutlinedButton.icon(
                   onPressed: () => _confirmLeave(context, ref, roomId, userId),
-                  icon: const Icon(Icons.exit_to_app, color: Colors.red),
-                  label: const Text(
-                    'Leave Room',
-                    style: TextStyle(color: Colors.red),
-                  ),
+                  icon: Icon(Icons.exit_to_app, color: Theme.of(context).colorScheme.error),
+                  label: Text('Leave Room', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
             ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
-      ),
+      )),
     );
   }
 

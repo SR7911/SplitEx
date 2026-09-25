@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/services/storage_management_service.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class StorageManagementScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -154,7 +155,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
         title: const Text('Firebase Admin'),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loadStats)],
       ),
-      body: _loading
+      body: GradientBody(child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _stats == null
               ? const Center(child: Text('Failed to load'))
@@ -360,6 +361,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
                     const SizedBox(height: 32),
                   ],
                 ),
+              ),
     );
   }
 

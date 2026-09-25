@@ -9,6 +9,7 @@ import 'package:split_ex/providers/settlement_provider.dart';
 import 'package:split_ex/services/balance_service.dart';
 import 'package:split_ex/services/notification_helper.dart';
 import 'package:split_ex/services/user_service.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class GroupSettlementScreen extends ConsumerWidget {
   final String groupId;
@@ -30,55 +31,59 @@ class GroupSettlementScreen extends ConsumerWidget {
     final otherName = isDebtor ? (nameMap[debt.to] ?? debt.to) : (nameMap[debt.from] ?? debt.from);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isDebtor ? 'Settle Up' : 'Payment Request'),
+      appBar: AppHeader(
+        showBack: true,
+        title: isDebtor ? 'Settle Up' : 'Payment Request',
+        showNotification: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _AmountCard(debt: debt, isDebtor: isDebtor, otherName: otherName),
-            const SizedBox(height: 24),
-            if (isDebtor) ...[
-              FilledButton.icon(
-                onPressed: () => _launchUpi(context, ref, otherName),
-                icon: const Icon(Icons.account_balance_wallet),
-                label: const Text('Pay via UPI'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => _markAsPaid(context, ref),
-                icon: const Icon(Icons.check),
-                label: const Text('Mark as Paid (Cash/Bank)'),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
-              ),
-            ] else if (isCreditor) ...[
-              OutlinedButton.icon(
-                onPressed: () => _sendReminder(context, ref),
-                icon: const Icon(Icons.notifications_active),
-                label: const Text('Send Reminder'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.all(16),
-                  side: const BorderSide(color: Colors.orange),
-                  foregroundColor: Colors.orange,
+      body: GradientBody(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _AmountCard(debt: debt, isDebtor: isDebtor, otherName: otherName),
+              const SizedBox(height: 24),
+              if (isDebtor) ...[
+                FilledButton.icon(
+                  onPressed: () => _launchUpi(context, ref, otherName),
+                  icon: const Icon(Icons.account_balance_wallet),
+                  label: const Text('Pay via UPI'),
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Back'),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _markAsPaid(context, ref),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Mark as Paid (Cash/Bank)'),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
+                ),
+              ] else if (isCreditor) ...[
+                OutlinedButton.icon(
+                  onPressed: () => _sendReminder(context, ref),
+                  icon: const Icon(Icons.notifications_active),
+                  label: const Text('Send Reminder'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    side: const BorderSide(color: Colors.orange),
+                    foregroundColor: Colors.orange,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Back'),
+                ),
+              ],
+              const SizedBox(height: 24),
+              Text('Settlement History', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _GroupSettlementHistory(groupId: groupId, nameMap: nameMap),
               ),
             ],
-            const SizedBox(height: 24),
-            Text('Settlement History', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _GroupSettlementHistory(groupId: groupId, nameMap: nameMap),
-            ),
-          ],
+          ),
         ),
       ),
     );

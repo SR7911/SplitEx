@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:split_ex/config/theme.dart';
 
 const _themeKey = 'theme_mode';
 const _paletteKey = 'app_palette';
+const _bodyGradientKey = 'body_gradient_enabled';
 
 final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, AppThemeMode>((ref) {
   return ThemeModeNotifier();
@@ -12,6 +12,10 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, AppThemeMode>
 
 final appPaletteProvider = StateNotifierProvider<AppPaletteNotifier, AppPalette>((ref) {
   return AppPaletteNotifier();
+});
+
+final bodyGradientProvider = StateNotifierProvider<BodyGradientNotifier, bool>((ref) {
+  return BodyGradientNotifier();
 });
 
 class ThemeModeNotifier extends StateNotifier<AppThemeMode> {
@@ -55,5 +59,22 @@ class AppPaletteNotifier extends StateNotifier<AppPalette> {
     state = palette;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_paletteKey, palette.name);
+  }
+}
+
+class BodyGradientNotifier extends StateNotifier<bool> {
+  BodyGradientNotifier() : super(true) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getBool(_bodyGradientKey) ?? true;
+  }
+
+  Future<void> toggle(bool value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_bodyGradientKey, value);
   }
 }

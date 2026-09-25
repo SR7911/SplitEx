@@ -7,6 +7,7 @@ import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
 import 'package:split_ex/screens/personal/add_personal_transaction_screen.dart';
 import 'package:split_ex/screens/personal/view_personal_transaction_sheet.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class PersonalTransactionsScreen extends ConsumerStatefulWidget {
   final String monthKey;
@@ -57,12 +58,13 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Transactions • ${_formatMonth(widget.monthKey)}')),
+      appBar: AppHeader(showBack: true, title: 'Transactions • ${_formatMonth(widget.monthKey)}', showNotification: false),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showAddPersonalTransactionSheet(context),
         child: const Icon(Icons.add),
       ),
-      body: txnsAsync.when(
+      body: GradientBody(
+        child: txnsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) {
           final msg = e.toString();
@@ -187,6 +189,7 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
             ],
           );
         },
+      ),
       ),
     );
   }

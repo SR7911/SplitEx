@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/models/activity_model.dart';
@@ -134,7 +134,7 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                     height: 5,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -161,7 +161,7 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.category, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                        Icon(Icons.category, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                         const SizedBox(width: 8),
                         Text(
                           'Bill type',
@@ -205,9 +205,9 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   decoration: InputDecoration(
                     labelText: 'Amount (₹)',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   ),
@@ -226,13 +226,13 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                        Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                         const SizedBox(width: 8),
                         Text(
                           DateFormat('dd MMM yyyy').format(_date),
@@ -247,7 +247,7 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                 // Receipt picker
                 Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ReceiptPicker(

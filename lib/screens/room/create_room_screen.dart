@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class CreateRoomScreen extends ConsumerStatefulWidget {
   const CreateRoomScreen({super.key});
@@ -47,13 +49,15 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Room')),
-      body: Center(
+      appBar: const AppHeader(showBack: true, title: 'Create Room', showNotification: false),
+      body: GradientBody(
+        child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: _inviteCode != null ? _buildSuccess() : _buildForm(),
         ),
       ),
+      )
     );
   }
 
@@ -64,13 +68,23 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Icon(Icons.home_rounded, size: 56, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 16),
+          Text('Create a Room', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700), textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text('Give your room a name to get started', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)), textAlign: TextAlign.center),
+          const SizedBox(height: 32),
           TextFormField(
             controller: _nameController,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Room Name',
-              prefixIcon: Icon(Icons.home_outlined),
+              prefixIcon: const Icon(Icons.home_outlined),
               hintText: 'e.g. Flat 302',
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) return 'Enter room name';
@@ -78,15 +92,12 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
             },
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
+          FilledButton(
             onPressed: _isLoading ? null : _createRoom,
+            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
             child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Create'),
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Create Room', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -97,23 +108,17 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.check_circle_rounded, size: 64, color: Colors.green),
+        Icon(Icons.check_circle_rounded, size: 64, color: Theme.of(context).colorScheme.primary),
         const SizedBox(height: 16),
-        Text(
-          'Room Created!',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
+        Text('Room Created!', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Text('Share this invite code with your roommates:', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)), textAlign: TextAlign.center),
         const SizedBox(height: 24),
-        Text(
-          'Share this invite code with your roommates:',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -121,10 +126,7 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
               Flexible(
                 child: Text(
                   _inviteCode!,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                      ),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 4, color: Theme.of(context).colorScheme.onPrimaryContainer),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -133,17 +135,16 @@ class _CreateRoomScreenState extends ConsumerState<CreateRoomScreen> {
                 icon: const Icon(Icons.copy_rounded),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: _inviteCode!));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Code copied!')),
-                  );
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Code copied!')));
                 },
               ),
             ],
           ),
         ),
         const SizedBox(height: 32),
-        ElevatedButton(
+        FilledButton(
           onPressed: () => context.go('/'),
+          style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 32), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
           child: const Text('Go to My Rooms'),
         ),
       ],

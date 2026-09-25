@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class PersonalDebtsScreen extends ConsumerWidget {
   const PersonalDebtsScreen({super.key});
@@ -19,8 +20,9 @@ class PersonalDebtsScreen extends ConsumerWidget {
     final debtsAsync = ref.watch(personalDebtsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Debts & Settlements')),
-      body: debtsAsync.when(
+      appBar: const AppHeader(showBack: true, title: 'Debts & Settlements', showNotification: false),
+      body: GradientBody(
+        child: debtsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (allDebts) {
@@ -70,6 +72,7 @@ class PersonalDebtsScreen extends ConsumerWidget {
             ],
           );
         },
+      ),
       ),
     );
   }

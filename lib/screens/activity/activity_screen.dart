@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/activity_model.dart';
 import 'package:split_ex/providers/activity_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class ActivityScreen extends ConsumerWidget {
   final String roomId;
@@ -14,14 +16,20 @@ class ActivityScreen extends ConsumerWidget {
     final activitiesAsync = ref.watch(activitiesStreamProvider(roomId));
     final roomAsync = ref.watch(roomStreamProvider(roomId));
 
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: AppBar(title: const Text('Activity Log')),
-      body: activitiesAsync.when(
+      appBar: const AppHeader(showBack: true, title: 'Activity Log', showNotification: false),
+      body: GradientBody(child: activitiesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (activities) {
           if (activities.isEmpty) {
-            return const Center(child: Text('No activity yet'));
+            return const AppEmptyState(
+              icon: Icons.history_rounded,
+              title: 'No activity yet',
+              subtitle: 'Actions in this room will appear here',
+            );
           }
 
           final members = roomAsync.valueOrNull?.memberIds ?? [];
@@ -54,7 +62,7 @@ class ActivityScreen extends ConsumerWidget {
             },
           );
         },
-      ),
+      )),
     );
   }
   static bool _isSameDay(DateTime a, DateTime b) {
@@ -78,19 +86,20 @@ class _DateSeparator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: [
-          Expanded(child: Divider(color: Colors.grey[400], thickness: 0.5)),
+          Expanded(child: Divider(color: cs.outlineVariant, thickness: 0.5)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               _label(),
-              style: TextStyle(fontSize: 12, color: Colors.grey[500], fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5), fontWeight: FontWeight.w500),
             ),
           ),
-          Expanded(child: Divider(color: Colors.grey[400], thickness: 0.5)),
+          Expanded(child: Divider(color: cs.outlineVariant, thickness: 0.5)),
         ],
       ),
     );
@@ -228,10 +237,10 @@ class _ActivityTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 16,
-                backgroundColor: _color.withOpacity(0.15),
+                backgroundColor: _color.withValues(alpha: 0.15),
                 child: Icon(_icon, size: 18, color: _color),
               ),
-              Container(width: 2, height: 40, color: Colors.grey[300]),
+              Container(width: 2, height: 40, color: Theme.of(context).colorScheme.outlineVariant),
             ],
           ),
           const SizedBox(width: 12),
@@ -248,10 +257,9 @@ class _ActivityTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     timeStr,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.grey),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
                   ),
                   if (hasDetails)
                     Text(

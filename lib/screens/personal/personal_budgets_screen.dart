@@ -4,6 +4,7 @@ import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
 import 'package:split_ex/screens/personal/add_personal_transaction_screen.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class PersonalBudgetsScreen extends ConsumerWidget {
   final String monthKey;
@@ -15,12 +16,13 @@ class PersonalBudgetsScreen extends ConsumerWidget {
     final spending = ref.watch(personalCategorySpendingProvider(monthKey));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Budgets')),
+      appBar: const AppHeader(showBack: true, title: 'Manage Budgets', showNotification: false),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddBudgetDialog(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: budgetsAsync.when(
+      body: GradientBody(
+        child: budgetsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (budgets) {
@@ -67,6 +69,7 @@ class PersonalBudgetsScreen extends ConsumerWidget {
             },
           );
         },
+      ),
       ),
     );
   }

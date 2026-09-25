@@ -7,6 +7,9 @@ class ProjectService {
   CollectionReference<Map<String, dynamic>> _projectsRef(String uid) =>
       _db.collection('users').doc(uid).collection('projects');
 
+  CollectionReference<Map<String, dynamic>> _expensesRef(String uid, String projectId) =>
+      _db.collection('users').doc(uid).collection('projects').doc(projectId).collection('expenses');
+
   Future<ProjectModel> createProject({
     required String uid,
     required String name,
@@ -41,7 +44,14 @@ class ProjectService {
   }
 
   Future<void> deleteProject(String uid, String projectId) async {
-    await _projectsRef(uid).doc(projectId).delete();
+    // Delete expenses sub-collection first (Firestore doesn't cascade)
+    final expensesSnap = await _expensesRef(uid, projectId).get();
+    final batch = _db.batch();
+    for (final doc in expensesSnap.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(_projectsRef(uid).doc(projectId));
+    await batch.commit();
   }
 
   Stream<List<ProjectModel>> getProjectsStream(String uid) {

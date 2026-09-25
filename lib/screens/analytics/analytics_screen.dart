@@ -1,9 +1,10 @@
-import 'package:fl_chart/fl_chart.dart';
+﻿import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/config/constants.dart';
 import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/expense_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class AnalyticsScreen extends ConsumerWidget {
   final String roomId;
@@ -14,8 +15,9 @@ class AnalyticsScreen extends ConsumerWidget {
     final expensesAsync = ref.watch(expensesStreamProvider(roomId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Analytics')),
-      body: expensesAsync.when(
+      appBar: const AppHeader(showBack: true, title: 'Analytics', showNotification: false),
+      body: GradientBody(
+        child: expensesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (expenses) {
@@ -47,6 +49,7 @@ class AnalyticsScreen extends ConsumerWidget {
             ],
           );
         },
+        ),
       ),
     );
   }

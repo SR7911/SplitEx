@@ -364,9 +364,9 @@ class _ProjectExpenseSheetState extends ConsumerState<_ProjectExpenseSheet> {
                       icon: _settling
                           ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.check_circle_outline),
-                      label: Text(widget.expense!.debtType?.name == 'lent' ? 'Mark as Received' : 'Mark as Repaid'),
+                      label: Text(widget.expense!.debtType == ProjectDebtType.lent ? 'Mark as Received' : 'Mark as Repaid'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: widget.expense!.debtType?.name == 'lent' ? Colors.green : Colors.red,
+                        backgroundColor: widget.expense!.debtType == ProjectDebtType.lent ? Colors.green : Colors.red,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                       ),
@@ -411,7 +411,7 @@ class _ViewDetails extends StatelessWidget {
     final e = expense;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = Theme.of(context).colorScheme.primary;
-    final debtColor = e.debtType?.name == 'lent' ? Colors.green : Colors.red;
+    final debtColor = e.debtType == ProjectDebtType.lent ? Colors.green : Colors.red;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -430,9 +430,9 @@ class _ViewDetails extends StatelessWidget {
           if (e.vendor != null) _DetailRow(icon: Icons.store_outlined, label: 'Vendor', value: e.vendor!),
           if (e.hasDebt) ...[
             _DetailRow(
-              icon: e.debtType?.name == 'lent' ? Icons.call_made : Icons.call_received,
+              icon: e.debtType == ProjectDebtType.lent ? Icons.call_made : Icons.call_received,
               label: 'Debt',
-              value: e.debtType?.name == 'lent' ? 'You Lent' : 'You Borrowed',
+              value: e.debtType == ProjectDebtType.lent ? 'You Lent' : 'You Borrowed',
               valueColor: debtColor,
             ),
             if (e.personName != null) _DetailRow(icon: Icons.person, label: 'Person', value: e.personName!),

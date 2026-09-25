@@ -138,6 +138,8 @@ class RecurringTransaction {
   final String userId;
   final DateTime? lastRunDate;
   final DateTime? endDate;
+  /// Snapshot of fields before each edit — newest first.
+  final List<RecurringEditSnapshot> editHistory;
 
   const RecurringTransaction({
     required this.id,
@@ -151,6 +153,7 @@ class RecurringTransaction {
     required this.userId,
     this.lastRunDate,
     this.endDate,
+    this.editHistory = const [],
   });
 
   factory RecurringTransaction.fromMap(Map<String, dynamic> map, String id) {
@@ -172,6 +175,9 @@ class RecurringTransaction {
       userId: map['userId'] ?? '',
       lastRunDate: (map['lastRunDate'] as Timestamp?)?.toDate(),
       endDate: (map['endDate'] as Timestamp?)?.toDate(),
+      editHistory: (map['editHistory'] as List<dynamic>? ?? [])
+          .map((e) => RecurringEditSnapshot.fromMap(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -187,6 +193,7 @@ class RecurringTransaction {
       'userId': userId,
       if (lastRunDate != null) 'lastRunDate': Timestamp.fromDate(lastRunDate!),
       if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
+      'editHistory': editHistory.map((e) => e.toMap()).toList(),
     };
   }
 
@@ -196,4 +203,58 @@ class RecurringTransaction {
     final end = DateTime(endDate!.year, endDate!.month, endDate!.day);
     return !end.isAfter(today);
   }
+}
+
+/// Immutable snapshot of a RecurringTransaction's editable fields before an edit.
+class RecurringEditSnapshot {
+  final String title;
+  final double amount;
+  final String category;
+  final RecurringFrequency frequency;
+  final int dayOfMonth;
+  final DateTime? endDate;
+  final DateTime editedAt;
+
+  const RecurringEditSnapshot({
+    required this.title,
+    required this.amount,
+    required this.category,
+    required this.frequency,
+    required this.dayOfMonth,
+    this.endDate,
+    required this.editedAt,
+  });
+
+  factory RecurringEditSnapshot.fromMap(Map<String, dynamic> map) {
+    return RecurringEditSnapshot(
+      title: map['title'] ?? '',
+      amount: (map['amount'] ?? 0).toDouble(),
+      category: map['category'] ?? 'Other',
+      frequency: RecurringFrequency.values.firstWhere(
+        (e) => e.name == map['frequency'],
+        orElse: () => RecurringFrequency.monthly,
+      ),
+      dayOfMonth: map['dayOfMonth'] ?? 1,
+      endDate: map['endDate'] != null
+          ? (map['endDate'] is Timestamp
+              ? (map['endDate'] as Timestamp).toDate()
+              : DateTime.tryParse(map['endDate'].toString()))
+          : null,
+      editedAt: map['editedAt'] != null
+          ? (map['editedAt'] is Timestamp
+              ? (map['editedAt'] as Timestamp).toDate()
+              : DateTime.tryParse(map['editedAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'title': title,
+        'amount': amount,
+        'category': category,
+        'frequency': frequency.name,
+        'dayOfMonth': dayOfMonth,
+        if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
+        'editedAt': Timestamp.fromDate(editedAt),
+      };
 }

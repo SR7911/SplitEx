@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -160,7 +160,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
                   height: 5,
                   margin: const EdgeInsets.only(bottom: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -173,7 +173,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(billIcon, size: 22, color: Theme.of(context).colorScheme.primary),
@@ -202,7 +202,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
                     ),
                 ],
               ),
-              const Divider(height: 24, thickness: 1, color: Colors.grey),
+              const Divider(height: 24, thickness: 0.5),
 
               // Bill type segmented button (full width)
               SizedBox(
@@ -239,9 +239,9 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
                 decoration: InputDecoration(
                   labelText: 'Amount (₹)',
                   labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                  prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                  prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                   filled: true,
-                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                 ),
@@ -255,20 +255,20 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(_editing ? 0.6 : 0.4)),
+                      Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: _editing ? 0.6 : 0.4)),
                       const SizedBox(width: 8),
                       Text(
                         DateFormat('dd MMM yyyy').format(_date),
                         style: TextStyle(
                           fontWeight: FontWeight.normal,
                           fontSize: 14,
-                          color: _editing ? null : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                          color: _editing ? null : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -281,7 +281,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
@@ -303,7 +303,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    side: BorderSide(color: Colors.grey.shade300),
+                    side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                 ),
               ],
@@ -349,7 +349,7 @@ class _InfoRow extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
         ),

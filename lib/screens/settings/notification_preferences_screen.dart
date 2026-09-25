@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class NotificationPreferencesScreen extends StatefulWidget {
   const NotificationPreferencesScreen({super.key});
@@ -38,8 +39,8 @@ class _NotificationPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notification Preferences')),
-      body: ListView(
+      appBar: const AppHeader(showBack: true, title: 'Notification Preferences', showNotification: false),
+      body: GradientBody(child: ListView(
         children: [
           SwitchListTile(
             secondary: const Icon(Icons.receipt_long),
@@ -72,7 +73,7 @@ class _NotificationPreferencesScreenState
             },
           ),
         ],
-      ),
+      )),
     );
   }
 }

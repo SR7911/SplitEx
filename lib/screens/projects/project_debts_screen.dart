@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/project_model.dart';
 import 'package:split_ex/providers/project_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
+import 'package:split_ex/widgets/app_header.dart';
 
 class ProjectDebtsScreen extends ConsumerWidget {
   final String projectId;
@@ -22,10 +23,12 @@ class ProjectDebtsScreen extends ConsumerWidget {
     final projectName = projectAsync.valueOrNull?.name ?? 'Project';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('$projectName • Debts', style: const TextStyle(fontWeight: FontWeight.bold)),
+      appBar: AppHeader(
+        showBack: true,
+        title: '$projectName • Debts',
+        showNotification: false,
       ),
-      body: expensesAsync.when(
+      body: GradientBody(child: expensesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (allExpenses) {
@@ -76,7 +79,7 @@ class ProjectDebtsScreen extends ConsumerWidget {
             ],
           );
         },
-      ),
+      )),
     );
   }
 }
