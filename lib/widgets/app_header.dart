@@ -70,6 +70,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
   final bool showHamburger;
   final bool showBack;
   final bool showNotification;
+  final Widget? trailing;
 
   const AppHeader({
     super.key,
@@ -78,6 +79,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
     this.showHamburger = false,
     this.showBack = false,
     this.showNotification = true,
+    this.trailing,
   });
 
   @override
@@ -175,7 +177,9 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                 ),
 
                 // Right action
-                if (showNotification)
+                if (trailing != null)
+                  trailing!
+                else if (showNotification)
                   Stack(
                     clipBehavior: Clip.none,
                     children: [

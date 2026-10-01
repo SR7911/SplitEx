@@ -19,6 +19,7 @@ class LoanModel {
   final String? notes;
   final String? recurringId; // linked personal_recurring doc id
   final DateTime createdAt;
+  final double? customEmi; // user-overridden EMI amount
 
   // ── One-time charges (deducted from disbursal, not part of EMI) ──────────
   final double processingFee;   // flat or % of principal
@@ -41,6 +42,7 @@ class LoanModel {
     this.notes,
     this.recurringId,
     required this.createdAt,
+    this.customEmi,
     this.processingFee = 0,
     this.insuranceFee = 0,
     this.otherCharges = 0,
@@ -65,6 +67,7 @@ class LoanModel {
   /// Standard EMI using reducing-balance formula.
   /// For 0% interest, EMI = principal / tenure.
   double get baseEmi {
+    if (customEmi != null && customEmi! > 0) return customEmi!;
     if (annualInterestRate == 0) return principal / tenureMonths;
     final r = annualInterestRate / (12 * 100);
     final n = tenureMonths;
@@ -103,6 +106,7 @@ class LoanModel {
       notes: map['notes'],
       recurringId: map['recurringId'],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      customEmi: (map['customEmi'] as num?)?.toDouble(),
       processingFee: (map['processingFee'] ?? 0).toDouble(),
       insuranceFee: (map['insuranceFee'] ?? 0).toDouble(),
       otherCharges: (map['otherCharges'] ?? 0).toDouble(),
@@ -124,6 +128,7 @@ class LoanModel {
         if (notes != null) 'notes': notes,
         if (recurringId != null) 'recurringId': recurringId,
         'createdAt': FieldValue.serverTimestamp(),
+        if (customEmi != null && customEmi! > 0) 'customEmi': customEmi,
         if (processingFee > 0) 'processingFee': processingFee,
         if (insuranceFee > 0) 'insuranceFee': insuranceFee,
         if (otherCharges > 0) 'otherCharges': otherCharges,
@@ -138,6 +143,7 @@ class LoanModel {
     int? tenureMonths,
     int? emiDueDay,
     String? notes,
+    double? customEmi,
     double? processingFee,
     double? insuranceFee,
     double? otherCharges,
@@ -158,6 +164,7 @@ class LoanModel {
         notes: notes ?? this.notes,
         recurringId: recurringId ?? this.recurringId,
         createdAt: createdAt,
+        customEmi: customEmi ?? this.customEmi,
         processingFee: processingFee ?? this.processingFee,
         insuranceFee: insuranceFee ?? this.insuranceFee,
         otherCharges: otherCharges ?? this.otherCharges,

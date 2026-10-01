@@ -263,6 +263,8 @@ class _GradientTabAppBar extends StatelessWidget implements PreferredSizeWidget 
 }
 
 // ========== ANALYTICS BOTTOM SHEET ==========
+String _fmt(double v) => '₹${NumberFormat('#,##0', 'en_IN').format(v.round())}';
+
 class _AnalyticsSheet extends ConsumerWidget {
   final String roomId;
   final String monthKey;
@@ -270,294 +272,322 @@ class _AnalyticsSheet extends ConsumerWidget {
 
   const _AnalyticsSheet({required this.roomId, required this.monthKey, required this.scrollController});
 
-  static const _colors = [
-    Colors.blue, Colors.green, Colors.orange, Colors.purple,
-    Colors.red, Colors.teal, Colors.amber, Colors.pink,
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expenses = ref.watch(monthExpensesProvider(MonthRoomKey(roomId: roomId, month: monthKey))).valueOrNull ?? [];
     final bills = ref.watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: monthKey))).valueOrNull ?? [];
-    final total = expenses.fold<double>(0, (s, e) => s + e.amount);
+    final expTotal = expenses.fold<double>(0, (s, e) => s + e.amount);
+    final billTotal = bills.fold<double>(0, (s, e) => s + e.amount);
+    final total = expTotal + billTotal;
 
     if (expenses.isEmpty && bills.isEmpty) {
       return Center(
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.analytics_outlined, size: 64, color: Colors.grey.shade400),
-              const SizedBox(height: 16),
-              Text('No data this month', style: TextStyle(color: Colors.grey.shade600)),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.analytics_outlined, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text('No data this month', style: TextStyle(color: Colors.grey.shade500)),
+          ],
         ),
       );
     }
 
-    // Category totals
     final catTotals = <String, double>{};
-    for (final e in expenses) {
-      catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
-    }
-    for (final e in bills) {
-      catTotals[e.type.toString()] = (catTotals[e.type.toString()] ?? 0) + e.amount;
-    }
+    for (final e in expenses) catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
+    for (final e in bills) catTotals[e.typeName] = (catTotals[e.typeName] ?? 0) + e.amount;
     final catEntries = catTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-    // Daily totals
     final dailyTotals = <int, double>{};
-    for (final e in expenses) {
-      dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
-    }
-    for (final e in bills) {
-      dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
-    }
+    for (final e in expenses) dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
+    for (final e in bills) dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
     final days = dailyTotals.keys.toList()..sort();
     final maxY = dailyTotals.values.fold<double>(0, (a, b) => a > b ? a : b);
 
-    // Member totals
     final memberTotals = <String, double>{};
-    for (final e in expenses) {
-      memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
-    }
-    for (final e in bills) {
-      memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
-    }
+    for (final e in expenses) memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
+    for (final e in bills) memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
+    final membersSorted = memberTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
     final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
     final membersAsync = ref.watch(roomMembersProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
-        nameMap[m.uid] = m.name;
-      }
+      for (final m in membersAsync.value!) nameMap[m.uid] = m.name;
     }
+
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ListView(
       controller: scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
       children: [
         // Drag handle
         Center(
           child: Container(
-            width: 40,
-            height: 4,
+            width: 40, height: 4,
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade400,
-              borderRadius: BorderRadius.circular(2),
-            ),
+            decoration: BoxDecoration(color: cs.outline.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
           ),
         ),
-        // Header: title + total
+        // Title
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            const Text('Analytics', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: total),
-              duration: const Duration(milliseconds: 600),
-              builder: (context, value, _) => Text(
-                '₹${value.toStringAsFixed(0)}',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
-              ),
-            ),
+            Container(width: 3, height: 18, decoration: BoxDecoration(color: _kIndigo, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 8),
+            Text('Analytics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            const Spacer(),
+            Text(monthKey, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.45))),
           ],
         ),
-        const SizedBox(height: 4),
-        Text('Total spent this month', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-        const SizedBox(height: 24),
-
-        // --- Categories Section (Pie + Legend) ---
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          color: Theme.of(context).colorScheme.surface,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Categories', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Pie chart (larger)
-                    SizedBox(
-                      width: 110,
-                      height: 110,
-                      child: PieChart(
-                        PieChartData(
-                          sectionsSpace: 2,
-                          centerSpaceRadius: 0,
-                          sections: catEntries.asMap().entries.map((e) => PieChartSectionData(
-                            value: e.value.value,
-                            color: _colors[e.key % _colors.length],
-                            title: '',
-                            radius: 50,
-                          )).toList(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Legend (scrollable if many)
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: catEntries.take(6).map((entry) {
-                          final index = catEntries.indexOf(entry);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    color: _colors[index % _colors.length],
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(entry.key, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                                ),
-                                Text('₹${entry.value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+        const SizedBox(height: 14),
+        // Stats banner
+        Container(
+          decoration: _cardDeco(context),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            children: [
+              _StatCell(label: 'Expenses', value: _fmt(expTotal), color: _kRed),
+              VerticalDivider(width: 1, thickness: 1, color: cs.outline.withValues(alpha: 0.12)),
+              _StatCell(label: 'Bills', value: _fmt(billTotal), color: _kAmber),
+              VerticalDivider(width: 1, thickness: 1, color: cs.outline.withValues(alpha: 0.12)),
+              _StatCell(label: 'Total', value: _fmt(total), color: _kIndigo),
+            ],
           ),
         ),
         const SizedBox(height: 16),
-
-        // --- Daily Spending (Bar Chart) ---
-        if (days.isNotEmpty)
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            color: Theme.of(context).colorScheme.surface,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Daily Spending', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 140,
-                    child: BarChart(
-                      BarChartData(
-                        alignment: BarChartAlignment.spaceAround,
-                        maxY: maxY * 1.2,
-                        titlesData: FlTitlesData(
-                          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, _) {
-                                final day = value.toInt();
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(day.toString(), style: const TextStyle(fontSize: 10)),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        gridData: const FlGridData(show: false),
-                        borderData: FlBorderData(show: false),
-                        barGroups: days.map((day) => BarChartGroupData(
-                          x: day,
-                          barRods: [
-                            BarChartRodData(
-                              toY: dailyTotals[day]!,
-                              width: 14,
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ],
-                        )).toList(),
-                      ),
-                    ),
-                  ),
-                ],
+        // Categories
+        _SectionHeader(label: 'Categories', color: _kBlue),
+        const SizedBox(height: 10),
+        Container(
+          decoration: _cardDeco(context),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 110, height: 110,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PieChart(PieChartData(
+                      sectionsSpace: 2,
+                      centerSpaceRadius: 32,
+                      sections: catEntries.asMap().entries.map((e) => PieChartSectionData(
+                        value: e.value.value,
+                        color: _kPalette[e.key % _kPalette.length],
+                        title: '',
+                        radius: 22,
+                      )).toList(),
+                    )),
+                    Text(_fmt(total), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                  ],
+                ),
               ),
-            ),
-          ),
-        const SizedBox(height: 16),
-
-        // --- By Member (Contributors) ---
-        if (memberTotals.isNotEmpty)
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            color: Theme.of(context).colorScheme.surface,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Who paid?', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                  const SizedBox(height: 12),
-                  ...memberTotals.entries.map((entry) {
-                    final name = nameMap[entry.key] ?? entry.key;
-                    final percentage = total > 0 ? entry.value / total : 0;
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: catEntries.take(6).map((entry) {
+                    final idx = catEntries.indexOf(entry);
+                    final pct = total > 0 ? (entry.value / total * 100).round() : 0;
                     return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                            child: Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : '?',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.primary),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                                const SizedBox(height: 4),
-                                LinearProgressIndicator(
-                                  value: percentage.toDouble(),
-                                  backgroundColor: Colors.grey.shade200,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  minHeight: 4,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '₹${entry.value.toStringAsFixed(0)}',
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          Container(width: 8, height: 8, decoration: BoxDecoration(color: _kPalette[idx % _kPalette.length], borderRadius: BorderRadius.circular(2))),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(entry.key, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(color: _kPalette[idx % _kPalette.length].withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
+                            child: Text('$pct%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kPalette[idx % _kPalette.length])),
                           ),
                         ],
                       ),
                     );
                   }).toList(),
-                ],
+                ),
               ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Category bars
+        ...catEntries.map((entry) {
+          final idx = catEntries.indexOf(entry);
+          final color = _kPalette[idx % _kPalette.length];
+          final pct = total > 0 ? entry.value / total : 0.0;
+          return Container(
+            margin: const EdgeInsets.only(top: 6),
+            decoration: _cardDeco(context),
+            child: Row(
+              children: [
+                Container(width: 3, decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)))),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: Text(entry.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                            Text(_fmt(entry.value), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: pct.toDouble(),
+                            minHeight: 4,
+                            backgroundColor: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),
+                            valueColor: AlwaysStoppedAnimation(color),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
+        // Daily spending
+        if (days.isNotEmpty) ...[
+          _SectionHeader(label: 'Daily Spending', color: _kTeal),
+          const SizedBox(height: 10),
+          Container(
+            decoration: _cardDeco(context),
+            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+            child: SizedBox(
+              height: 140,
+              child: BarChart(BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxY * 1.25,
+                titlesData: FlTitlesData(
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: AxisTitles(sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (v, _) => Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(v.toInt().toString(), style: const TextStyle(fontSize: 9)),
+                    ),
+                  )),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: days.map((day) => BarChartGroupData(
+                  x: day,
+                  barRods: [BarChartRodData(
+                    toY: dailyTotals[day]!,
+                    width: 10,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                    color: _kTeal,
+                  )],
+                )).toList(),
+              )),
             ),
           ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
+        // Who paid
+        if (membersSorted.isNotEmpty) ...[
+          _SectionHeader(label: 'Who Paid', color: _kPurple),
+          const SizedBox(height: 10),
+          ...membersSorted.map((entry) {
+            final name = nameMap[entry.key] ?? entry.key;
+            final pct = total > 0 ? entry.value / total : 0.0;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: _cardDeco(context),
+              child: Row(
+                children: [
+                  Container(width: 3, height: 60, decoration: BoxDecoration(color: _kPurple, borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)))),
+                  const SizedBox(width: 10),
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: _kPurple.withValues(alpha: 0.12),
+                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kPurple)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: pct,
+                            minHeight: 4,
+                            backgroundColor: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),
+                            valueColor: const AlwaysStoppedAnimation(_kPurple),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(_fmt(entry.value), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPurple)),
+                        Text('${(pct * 100).round()}%', style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _StatCell({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _SectionHeader({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(width: 3, height: 16, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface)),
       ],
     );
   }

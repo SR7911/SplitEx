@@ -46,34 +46,41 @@ A Flutter expense management app with two core modules:
   - Settle individual debts with confirmation
   - Settled items shown as disabled (not removed)
 
-### Loan & EMI Manager *(Planned — Not Yet Implemented)*
-- **Dashboard (Hero Card Layout)**
-  - Hero card per loan showing: lender name, principal, outstanding balance, next EMI date & amount, status badge (Active / Partially Settled / Settled / Foreclosed)
-  - Radial progress ring gauge: total settled vs remaining outstanding
-  - Amortization stacked bar chart: interest vs principal split per month
-  - Quick-action buttons: Log Payment, Partial Prepayment, Force Close (Foreclosure)
-- **Add / Edit Loan**
-  - Inputs: lender name, principal amount, annual interest rate (0% supported for retail EMIs), tenure (months or years), loan start date, monthly EMI due date
-  - System auto-calculates: EMI amount (standard amortization formula), loan end date, full amortization schedule
-  - Editing principal or rate triggers full schedule recalculation
-- **Amortization Ledger**
-  - Month-by-month breakdown: EMI paid, interest component, principal deducted, remaining balance
-  - Accessible via bottom sheet on the Reports page
-- **Payment Logging**
-  - Standard EMI: deducts fixed principal + interest for the month
-  - Partial prepayment: reduces remaining principal immediately, recalculates future EMIs (tenure fixed, EMI reduces)
-  - Force close / foreclosure: clears remaining principal + accrued interest to date, marks loan as Foreclosed
+### Loan & EMI Manager *(Implemented)*
+- **Loan List Screen** (`loans/loan_list_screen.dart`)
+  - Hero summary card: total outstanding, borrowed vs lent, monthly EMI
+  - Mini stat row: active count, outstanding, monthly EMI
+  - Per-loan cards with animated progress bar, status badge (Active / Settled / Foreclosed)
+  - Force close, delete recurring, delete loan via popup menu
+- **Add / Edit Loan** (`loans/add_loan_sheet.dart`)
+  - Loan type toggle: Borrowed / Lent
+  - Inputs: title, lender/borrower name, principal, annual rate (0% supported), tenure, EMI due day, start date
+  - Auto-calculates EMI (standard amortization formula) with live preview
+  - EMI override toggle for custom/actual EMI amounts
+  - Charges & Fees section: processing fee, insurance fee, other charges, 18% GST on processing fee
+  - Net disbursed amount shown after deductions
+  - Edit mode recalculates EMI and syncs linked recurring entry
+- **Loan Detail Screen** (`loans/loan_detail_screen.dart`)
+  - Hero card: remaining principal, progress bar, rate/tenure/end date chips
+  - Action buttons: Log EMI, Partial Prepayment / Record Repayment, Force Close
+  - Payment history with type badges (EMI / Partial / Foreclosure), principal + interest breakdown
+  - Amortization schedule tab (borrowed loans): month-by-month EMI, principal, interest, balance; paid months highlighted
+- **Payment Logging** (`services/loan_service.dart`)
+  - Standard EMI: computes interest/principal split from remaining balance
+  - Partial prepayment: reduces principal, recalculates future EMI, updates linked recurring amount
+  - Force close / foreclosure: pays remaining principal + accrued interest, marks Foreclosed
+  - Each payment auto-logs a personal expense transaction (category: Loan EMI)
 - **Recurring Integration**
-  - On loan creation → auto-creates a recurring transaction entry in Personal Finance (monthly, EMI amount, category: Loan EMI)
-  - On loan closure / foreclosure → auto-disables the linked recurring transaction
-  - Recurring entry reflects updated EMI amount after any partial prepayment
-- **Reports Page**
-  - List of all loans with status filters
-  - Tap any loan → bottom sheet with full amortization schedule, past EMI history (date + amount), next EMI date & amount
+  - Loan closure / foreclosure → auto-disables linked recurring transaction
+  - Partial prepayment → updates recurring amount to new recalculated EMI
+  - Loan document stores `recurringId` for two-way sync
 - **Firebase Data Store**
   - Collection: `users/{uid}/loans` — loan metadata + status
   - Sub-collection: `loans/{loanId}/payments` — individual payment log entries
   - Linked recurring transaction ID stored on the loan document for sync
+
+> **Not yet implemented from original BRD:** radial progress ring gauge, amortization stacked bar chart on dashboard
+> **Implemented:** dedicated reports screen with status filters (`loans/loan_reports_screen.dart`)
 
 ### General
 - Email/Password and Google Sign-In
@@ -107,15 +114,22 @@ lib/
 ├── providers/       # Riverpod state management
 ├── screens/
 │   ├── auth/        # Login, Register
-│   ├── home/        # Main dashboard
+│   ├── home/        # Main shell + room tab
+│   ├── dashboard/   # Personal finance dashboard
+│   ├── profile/     # Profile setup
 │   ├── room/        # Room CRUD, detail, settings
-│   ├── expense/     # Room expenses
-│   ├── bills/       # Fixed bills
-│   ├── personal/    # Personal finance (8 screens)
-│   ├── loans/       # Loan & EMI manager (planned)
+│   ├── expense/     # Room expense sheets
+│   ├── bills/       # Fixed bill sheets
+│   ├── groups/      # Group expense splitting (7 screens)
+│   ├── projects/    # Project-based expenses (7 screens)
+│   ├── settlement/  # Settlement flow + UPI dialog
+│   ├── personal/    # Personal finance (transactions, budgets, debts, recurring)
+│   ├── loans/       # Loan & EMI manager (list, detail, add/edit sheet)
 │   ├── analytics/   # Charts
 │   ├── activity/    # Audit log
-│   ├── settings/    # User preferences
+│   ├── reminders/   # Notifications screen
+│   ├── settings/    # User preferences (4 screens)
+│   ├── developer/   # Storage management (dev only)
 │   └── splash/      # Splash + update check
 ├── widgets/         # Reusable components
 └── utils/           # Pure utility functions
@@ -147,44 +161,11 @@ lib/
 
 ## Future Requirements
 
-### Loan & EMI Manager (Priority 1)
-See full BRD: `docs/LOAN_EMI_BRD.md`
-
-**Screens to build:**
-- `loans/loan_dashboard_screen.dart` — hero cards + radial ring + bar chart
-- `loans/add_edit_loan_screen.dart` — loan form with auto-calculation
-- `loans/loan_reports_screen.dart` — list view + bottom sheet amortization ledger
-- `loans/loan_detail_screen.dart` — payment history, next/past EMI details
-
-**Services / Providers to build:**
-- `services/loan_service.dart` — Firestore CRUD, amortization engine, partial payment recalc, force close
-- `providers/loan_provider.dart` — Riverpod state for loan list + selected loan
-
-**Integration points:**
-- `services/loan_service.dart` ↔ `services/recurring_service.dart` — auto-create/disable recurring on loan add/close
-- Loan document stores `linkedRecurringId` for two-way sync
-
-**Firebase collections:**
-```
-users/{uid}/loans/{loanId}
-  - lenderName, principal, annualRate, tenureMonths
-  - startDate, emiDueDay, endDate (auto)
-  - baseEmi (auto), remainingPrincipal, status
-  - linkedRecurringId
-
-users/{uid}/loans/{loanId}/payments/{paymentId}
-  - date, emiPaid, principalDeducted, interestPaid
-  - remainingAfter, type (standard | partial | foreclosure)
-```
-
-**Amortization formula:**
-```
-EMI = P × [r(1+r)^n] / [(1+r)^n - 1]   where r = annualRate/1200, n = tenureMonths
-Monthly Interest = remainingPrincipal × r
-Principal Deducted = EMI - Monthly Interest
-```
-
-**Status flags:** Active → Partially Settled → Settled / Foreclosed
+### Loan & EMI Manager — Remaining Items
+Core implementation is done. Remaining enhancements from the original BRD:
+- `loans/loan_dashboard_screen.dart` — radial progress ring gauge + amortization stacked bar chart
+- ~~`loans/loan_reports_screen.dart`~~ ✅ Done — status filter chips, per-loan summary cards, amortization schedule + payment history bottom sheet
+- Auto-create recurring entry on loan creation (currently manual)
 
 ---
 
@@ -205,8 +186,6 @@ Principal Deducted = EMI - Monthly Interest
 
 ## Resources
 
-### Known issues
-- Image upload issue
 - [Flutter Documentation](https://docs.flutter.dev/)
 - [Firebase for Flutter](https://firebase.google.com/docs/flutter/setup)
 - [Riverpod](https://riverpod.dev/)

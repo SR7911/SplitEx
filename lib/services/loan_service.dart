@@ -32,19 +32,10 @@ class LoanService {
     });
   }
 
-  /// Adds a loan and creates a linked recurring entry in personal_recurring.
-  /// The recurring entry uses [loanSourceId] tag so we can find and remove it later.
+  /// Adds a loan. Does NOT auto-create a recurring entry.
   Future<String> addLoan(String userId, LoanModel loan) async {
     final ref = await _loanCol(userId).add(loan.toMap());
     await _tracker.trackWrites(1);
-
-    // Create recurring EMI entry
-    final recurringId = await _createRecurring(userId, ref.id, loan);
-
-    // Link recurringId back to the loan doc
-    await ref.update({'recurringId': recurringId});
-    await _tracker.trackWrites(1);
-
     return ref.id;
   }
 
@@ -55,6 +46,7 @@ class LoanService {
     int? tenureMonths,
     int? emiDueDay,
     String? notes,
+    double? customEmi,
     double? processingFee,
     double? insuranceFee,
     double? otherCharges,
@@ -82,6 +74,7 @@ class LoanService {
     if (tenureMonths != null) updateMap['tenureMonths'] = tenureMonths;
     if (emiDueDay != null) updateMap['emiDueDay'] = emiDueDay;
     if (notes != null) updateMap['notes'] = notes;
+    if (customEmi != null) updateMap['customEmi'] = customEmi == 0 ? FieldValue.delete() : customEmi;
     if (processingFee != null) updateMap['processingFee'] = processingFee;
     if (insuranceFee != null) updateMap['insuranceFee'] = insuranceFee;
     if (otherCharges != null) updateMap['otherCharges'] = otherCharges;
@@ -103,6 +96,27 @@ class LoanService {
       });
       await _tracker.trackWrites(1);
     }
+  }
+
+  /// Deletes a loan and all its payment sub-documents.
+  Future<void> deleteLoan(String userId, String loanId) async {
+    final payments = await _paymentCol(userId, loanId).get();
+    for (final doc in payments.docs) {
+      await doc.reference.delete();
+    }
+    await _loanCol(userId).doc(loanId).delete();
+    await _tracker.trackWrites(1);
+  }
+
+  /// Deletes a recurring entry by id.
+  Future<void> deleteRecurring(String userId, String recurringId) async {
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('personal_recurring')
+        .doc(recurringId)
+        .delete();
+    await _tracker.trackWrites(1);
   }
 
   // ── Payments ──────────────────────────────────────────────────────────────
@@ -235,6 +249,77 @@ class LoanService {
     await _closeLoan(userId, loanId, loan, LoanStatus.foreclosed);
   }
 
+  // ── Missed EMI detection & bulk logging ─────────────────────────────────────
+
+  /// Returns the list of due dates that have no corresponding EMI payment logged.
+  /// Only considers EMI-type payments; partial/foreclosure are ignored.
+  List<DateTime> getMissedEmiDates(LoanModel loan, List<LoanPaymentModel> payments) {
+    if (loan.status != LoanStatus.active) return [];
+    final now = DateTime.now();
+    final emiPayments = payments.where((p) => p.type == PaymentType.emi).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+
+    final missed = <DateTime>[];
+    for (int i = 1; i <= loan.tenureMonths; i++) {
+      final due = _nthEmiDate(loan, i);
+      if (due.isAfter(now)) break;
+      // Check if an EMI payment exists within ±15 days of this due date
+      final hasPaid = emiPayments.any((p) => p.date.difference(due).inDays.abs() <= 15);
+      if (!hasPaid) missed.add(due);
+    }
+    return missed;
+  }
+
+  /// Logs all missed EMIs sequentially, each reducing the running principal.
+  Future<void> logMissedEmis(
+    String userId,
+    String loanId,
+    List<DateTime> missedDates,
+  ) async {
+    final doc = await _loanCol(userId).doc(loanId).get();
+    _tracker.trackReads(1);
+    final loan = LoanModel.fromMap(doc.data() as Map<String, dynamic>, loanId);
+
+    // Get current remaining principal
+    final paymentsSnap = await _paymentCol(userId, loanId)
+        .orderBy('date', descending: true)
+        .limit(1)
+        .get();
+    _tracker.trackReads(1);
+
+    double remaining = loan.principal;
+    if (paymentsSnap.docs.isNotEmpty) {
+      remaining = (paymentsSnap.docs.first['remainingPrincipalAfter'] as num?)?.toDouble() ?? remaining;
+    }
+
+    final monthlyRate = loan.annualInterestRate / (12 * 100);
+    for (final dueDate in missedDates) {
+      if (remaining < 1.0) break;
+      final interest = remaining * monthlyRate;
+      final emi = loan.baseEmi;
+      final principalPaid = (emi - interest).clamp(0.0, remaining);
+      remaining = (remaining - principalPaid).clamp(0.0, double.infinity);
+
+      final payment = LoanPaymentModel(
+        id: '',
+        amount: emi,
+        principalComponent: principalPaid,
+        interestComponent: interest,
+        remainingPrincipalAfter: remaining,
+        date: dueDate,
+        type: PaymentType.emi,
+        note: 'Backdated EMI',
+      );
+      await _paymentCol(userId, loanId).add(payment.toMap());
+      await _tracker.trackWrites(1);
+      await _addPersonalExpenseForPayment(userId, loan, emi, dueDate, 'EMI (Backdated)');
+    }
+
+    if (remaining < 1.0) {
+      await _closeLoan(userId, loanId, loan, LoanStatus.settled);
+    }
+  }
+
   // ── Amortization schedule (computed locally) ──────────────────────────────
 
   /// Builds the full amortization schedule from [loan] and already-logged [payments].
@@ -300,30 +385,6 @@ class LoanService {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
-
-  Future<String> _createRecurring(String userId, String loanId, LoanModel loan) async {
-    final endDate = loan.endDate;
-    final recurringMap = {
-      'title': '${loan.title} EMI',
-      'amount': loan.baseEmi,
-      'category': 'Loan EMI',
-      'type': 'expense',
-      'frequency': 'monthly',
-      'dayOfMonth': loan.emiDueDay,
-      'active': true,
-      'userId': userId,
-      'endDate': Timestamp.fromDate(endDate),
-      'loanSourceId': loanId, // tag for reverse lookup
-      'createdAt': FieldValue.serverTimestamp(),
-    };
-    final ref = await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('personal_recurring')
-        .add(recurringMap);
-    await _tracker.trackWrites(1);
-    return ref.id;
-  }
 
   Future<void> _closeLoan(String userId, String loanId, LoanModel loan, LoanStatus status) async {
     await _loanCol(userId).doc(loanId).update({'status': status.name});
