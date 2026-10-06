@@ -377,8 +377,9 @@ class LoanService {
   }
 
   DateTime _nthEmiDate(LoanModel loan, int n) {
-    final rawMonth = loan.startDate.month + n;
-    final y = loan.startDate.year + (rawMonth - 1) ~/ 12;
+    final ref = loan.effectiveEmiStart;
+    final rawMonth = ref.month + n - 1;
+    final y = ref.year + (rawMonth - 1) ~/ 12;
     final mo = ((rawMonth - 1) % 12) + 1;
     final maxDay = DateTime(y, mo + 1, 0).day;
     return DateTime(y, mo, loan.emiDueDay.clamp(1, maxDay));
@@ -410,6 +411,22 @@ class LoanService {
     String label,
   ) async {
     final month = DateFormat('yyyy-MM').format(date);
+    // Check for duplicate: same loanId + same date (within same day)
+    final existing = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('personal_transactions')
+        .where('loanSourceId', isEqualTo: loan.id)
+        .where('month', isEqualTo: month)
+        .get();
+    _tracker.trackReads(existing.docs.length);
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final alreadyLogged = existing.docs.any((d) {
+      final ts = (d['date'] as Timestamp?)?.toDate();
+      return ts != null && DateFormat('yyyy-MM-dd').format(ts) == dateStr;
+    });
+    if (alreadyLogged) return;
+
     await _personalService.addTransaction(
       userId,
       PersonalTransactionModel(
@@ -425,6 +442,19 @@ class LoanService {
         createdAt: DateTime.now(),
       ),
     );
+    // Tag with loanSourceId for dedup
+    final snap = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('personal_transactions')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .get();
+    _tracker.trackReads(1);
+    if (snap.docs.isNotEmpty) {
+      await snap.docs.first.reference.update({'loanSourceId': loan.id});
+      await _tracker.trackWrites(1);
+    }
   }
 
   /// Counts all payments (EMI + partial) to estimate months elapsed.

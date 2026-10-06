@@ -101,6 +101,8 @@ class _PersonalExpenseTabState extends ConsumerState<PersonalExpenseTab> {
             const SizedBox(height: 20),
             _QuickActionsRow(monthKey: _monthKey),
             const SizedBox(height: 20),
+            _WeeklyExpenseSummaryCard(monthKey: _monthKey),
+            const SizedBox(height: 20),
             ...bodySliver,
           ],
         ),
@@ -1097,7 +1099,7 @@ class _DebtsSummarySection extends ConsumerWidget {
         children: [
           _sectionHeader(
             context, 'Debts',
-            trailing: _viewAllChip(context, () => context.push('/personal/debts')),
+            trailing: _viewAllChip(context, () => context.push('/personal/debt-dashboard')),
           ),
           const SizedBox(height: 14),
           Row(
@@ -1237,6 +1239,158 @@ class _StatBox extends StatelessWidget {
   }
 }
 
+// -- _WeeklyExpenseSummaryCard -----------------------------------------------
+
+class _WeeklyExpenseSummaryCard extends ConsumerWidget {
+  final String monthKey;
+  const _WeeklyExpenseSummaryCard({required this.monthKey});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final txns   = ref.watch(personalTransactionsProvider(monthKey)).valueOrNull ?? [];
+    final cs     = Theme.of(context).colorScheme;
+
+    final parts = monthKey.split('-');
+    final year  = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final now   = DateTime.now();
+    final isCurrentMonth = now.year == year && now.month == month;
+
+    final weekRanges = [(1, 7), (8, 14), (15, 21), (22, daysInMonth)];
+    final weekExpenses = weekRanges.map((r) {
+      return txns.where((t) => t.isExpense && t.date.day >= r.$1 && t.date.day <= r.$2)
+          .fold<double>(0, (s, t) => s + t.amount);
+    }).toList();
+
+    final totalExpense = weekExpenses.fold<double>(0, (s, e) => s + e);
+    final maxExpense   = weekExpenses.isEmpty ? 1.0 : weekExpenses.reduce((a, b) => a > b ? a : b);
+    final avgWeekly    = totalExpense / 4;
+
+    // Current week index (0-based)
+    int currentWeekIdx = -1;
+    if (isCurrentMonth) {
+      for (int i = 0; i < weekRanges.length; i++) {
+        if (now.day >= weekRanges[i].$1 && now.day <= weekRanges[i].$2) {
+          currentWeekIdx = i;
+          break;
+        }
+      }
+    }
+
+    if (totalExpense == 0) return const SizedBox.shrink();
+
+    return Container(
+      decoration: _cardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(
+            context, 'Weekly Spending',
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('Avg ₹${_fmtCompact(avgWeekly)}/wk', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: cs.primary)),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: weekExpenses.asMap().entries.map((entry) {
+              final i       = entry.key;
+              final amount  = entry.value;
+              final ratio   = maxExpense > 0 ? amount / maxExpense : 0.0;
+              final isCurrent = i == currentWeekIdx;
+              final isHighest = amount == maxExpense && amount > 0;
+              final barColor  = isCurrent
+                  ? cs.primary
+                  : isHighest
+                      ? _kRed
+                      : cs.primary.withValues(alpha: 0.45);
+              final barHeight = 60.0 * ratio.clamp(0.05, 1.0);
+
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (amount > 0)
+                        Text(
+                          _fmtCompact(amount),
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: barColor),
+                        ),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                        child: Container(height: barHeight, color: barColor),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        'W${i + 1}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+                          color: isCurrent ? cs.primary : cs.onSurface.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      if (isCurrent)
+                        Container(
+                          width: 4, height: 4,
+                          margin: const EdgeInsets.only(top: 2),
+                          decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          // Trend insight
+          Builder(builder: (context) {
+            if (currentWeekIdx > 0) {
+              final prev = weekExpenses[currentWeekIdx - 1];
+              final curr = weekExpenses[currentWeekIdx];
+              if (prev > 0) {
+                final diff = ((curr - prev) / prev * 100).toInt();
+                final isUp = diff > 0;
+                return Row(
+                  children: [
+                    Icon(
+                      isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                      size: 14,
+                      color: isUp ? _kRed : _kGreen,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      isUp
+                          ? 'This week is ${diff.abs()}% more than last week'
+                          : 'This week is ${diff.abs()}% less than last week',
+                      style: TextStyle(fontSize: 11, color: isUp ? _kRed : _kGreen, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                );
+              }
+            }
+            return const SizedBox.shrink();
+          }),
+        ],
+      ),
+    );
+  }
+
+  String _fmtCompact(double v) {
+    if (v >= 100000) return '₹${(v / 100000).toStringAsFixed(1)}L';
+    if (v >= 1000) return '₹${(v / 1000).toStringAsFixed(1)}K';
+    return '₹${v.toStringAsFixed(0)}';
+  }
+}
+
 // -- _QuickActionsRow ------------------------------------------------------
 
 class _QuickActionsRow extends StatelessWidget {
@@ -1250,7 +1404,7 @@ class _QuickActionsRow extends StatelessWidget {
       _QuickActionCard(icon: Icons.receipt_long_rounded,          label: 'Txns',       color: _kBlue,   onTap: () => context.push('/personal/transactions', extra: monthKey)),
       _QuickActionCard(icon: Icons.pie_chart_outline_rounded,     label: 'Budgets',    color: _kIndigo, onTap: () => context.push('/personal/budgets')),
       _QuickActionCard(icon: Icons.bar_chart_rounded,             label: 'Reports',    color: _kAmber,  onTap: () => showPersonalReportsSheet(context, monthKey)),
-      _QuickActionCard(icon: Icons.handshake_outlined,            label: 'Debts',      color: _kTeal,   onTap: () => context.push('/personal/debts')),
+      _QuickActionCard(icon: Icons.handshake_outlined,            label: 'Debts',      color: _kTeal,   onTap: () => context.push('/personal/debt-dashboard')),
       _QuickActionCard(icon: Icons.autorenew_rounded,             label: 'Recurring',  color: _kPurple, onTap: () => context.push('/personal/recurring')),
       _QuickActionCard(icon: Icons.account_balance_rounded,        label: 'Loans',      color: _kRed,    onTap: () => context.push('/personal/loans')),
     ];

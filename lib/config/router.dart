@@ -18,6 +18,8 @@ import 'package:split_ex/screens/activity/activity_screen.dart';
 import 'package:split_ex/screens/developer/storage_management_screen.dart';
 import 'package:split_ex/screens/personal/personal_budgets_screen.dart';
 import 'package:split_ex/screens/personal/personal_debts_screen.dart';
+import 'package:split_ex/screens/personal/debt_dashboard_screen.dart';
+import 'package:split_ex/screens/personal/debt_list_screen.dart';
 import 'package:split_ex/screens/personal/personal_recurring_screen.dart';
 import 'package:split_ex/screens/personal/personal_transactions_screen.dart';
 import 'package:split_ex/screens/settings/settings_screen.dart';
@@ -192,6 +194,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/personal/transactions/category',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, String>? ?? {};
+          final monthKey = extra['monthKey'] ?? DateFormat('yyyy-MM').format(DateTime.now());
+          final category = extra['category'];
+          return PersonalTransactionsScreen(monthKey: monthKey, initialCategory: category);
+        },
+      ),
+      GoRoute(
         path: '/personal/budgets',
         builder: (context, state) {
           final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
@@ -205,6 +216,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/personal/debts',
         builder: (context, state) => const PersonalDebtsScreen(),
+      ),
+      GoRoute(
+        path: '/personal/debt-dashboard',
+        builder: (context, state) => const DebtDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/personal/debt-list',
+        builder: (context, state) => const DebtListScreen(),
       ),
       // ─── Loan Routes ───
       GoRoute(

@@ -96,6 +96,7 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
   Widget build(BuildContext context) {
     final loan          = widget.loan;
     final remaining     = ref.watch(loanRemainingPrincipalProvider(loan.id));
+    final emiProgress   = ref.watch(loanEmiProgressProvider(loan.id));
     final paymentsAsync = ref.watch(loanPaymentsProvider(loan.id));
     final schedule      = ref.watch(loanScheduleProvider(loan.id));
     final isActive      = loan.status == LoanStatus.active;
@@ -148,7 +149,7 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
           ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             children: [
-              _HeroCard(loan: loan, remaining: remaining, progress: progress, statusColor: statusColor),
+              _HeroCard(loan: loan, remaining: remaining, progress: progress, statusColor: statusColor, emiProgress: emiProgress),
               const SizedBox(height: 16),
               if (isActive) _ActionButtons(loan: loan, remaining: remaining),
               if (isActive) const SizedBox(height: 20),
@@ -190,7 +191,8 @@ class _HeroCard extends StatelessWidget {
   final double remaining;
   final double progress;
   final Color statusColor;
-  const _HeroCard({required this.loan, required this.remaining, required this.progress, required this.statusColor});
+  final LoanEmiProgress emiProgress;
+  const _HeroCard({required this.loan, required this.remaining, required this.progress, required this.statusColor, required this.emiProgress});
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +299,8 @@ class _HeroCard extends StatelessWidget {
                     ),
                     if (loan.loanType == LoanType.borrowed)
                       Text(
-                        'EMI ₹${loan.baseEmi.toStringAsFixed(0)} · Due day ${loan.emiDueDay}',
+                        'EMI ₹${loan.baseEmi.toStringAsFixed(0)} · ${emiProgress.paidCount}/${emiProgress.totalCount} paid'
+                        '${emiProgress.nextDueDate != null ? ' · Next: ${DateFormat('dd MMM').format(emiProgress.nextDueDate!)}' : ''}',
                         style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.75)),
                       )
                     else

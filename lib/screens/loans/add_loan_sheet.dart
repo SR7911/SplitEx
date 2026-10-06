@@ -38,6 +38,7 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
 
   LoanType _loanType = LoanType.borrowed;
   DateTime _startDate = DateTime.now();
+  DateTime? _emiStartDate; // null = auto (startDate + 1 month)
   int _emiDueDay = 1;
   bool _loading = false;
   bool _showCharges = false;
@@ -59,6 +60,7 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
       _notesCtrl.text = e.notes ?? '';
       _loanType = e.loanType;
       _startDate = e.startDate;
+      _emiStartDate = e.emiStartDate;
       _emiDueDay = e.emiDueDay;
       if (e.customEmi != null && e.customEmi! > 0) {
         _overrideEmi = true;
@@ -306,7 +308,10 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
                           lastDate: DateTime(2100),
                           helpText: 'Select Loan Start Date',
                         );
-                        if (picked != null) setState(() => _startDate = picked);
+                        if (picked != null) setState(() {
+                          _startDate = picked;
+                          _emiStartDate = null; // reset so auto recalculates
+                        });
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -320,11 +325,66 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
                             Icon(Icons.calendar_today_rounded, size: 18, color: cs.onSurface.withOpacity(0.45)),
                             const SizedBox(width: 12),
                             Text(
-                              'Start Date: ${DateFormat('dd MMM yyyy').format(_startDate)}',
+                              'Loan Start: ${DateFormat('dd MMM yyyy').format(_startDate)}',
                               style: TextStyle(fontSize: 14, color: cs.onSurface),
                             ),
                             const Spacer(),
                             Icon(Icons.edit_calendar_outlined, size: 16, color: cs.onSurface.withOpacity(0.35)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    // First EMI date
+                    InkWell(
+                      onTap: () async {
+                        final defaultEmi = DateTime(_startDate.year, _startDate.month + 1, _emiDueDay);
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _emiStartDate ?? defaultEmi,
+                          firstDate: _startDate,
+                          lastDate: DateTime(2100),
+                          helpText: 'Select First EMI Date',
+                        );
+                        if (picked != null) setState(() => _emiStartDate = picked);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: _emiStartDate != null
+                              ? Border.all(color: cs.primary.withOpacity(0.4))
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.event_repeat_rounded, size: 18,
+                                color: _emiStartDate != null ? cs.primary : cs.onSurface.withOpacity(0.45)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _emiStartDate != null
+                                        ? 'First EMI: ${DateFormat('dd MMM yyyy').format(_emiStartDate!)}'
+                                        : 'First EMI: ${DateFormat('dd MMM yyyy').format(DateTime(_startDate.year, _startDate.month + 1, _emiDueDay))} (auto)',
+                                    style: TextStyle(fontSize: 14, color: cs.onSurface),
+                                  ),
+                                  if (_emiStartDate == null)
+                                    Text('Tap to override', style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.4))),
+                                ],
+                              ),
+                            ),
+                            if (_emiStartDate != null)
+                              GestureDetector(
+                                onTap: () => setState(() => _emiStartDate = null),
+                                child: Icon(Icons.close_rounded, size: 16, color: cs.onSurface.withOpacity(0.4)),
+                              )
+                            else
+                              Icon(Icons.edit_calendar_outlined, size: 16, color: cs.onSurface.withOpacity(0.35)),
                           ],
                         ),
                       ),
@@ -721,21 +781,21 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
           insuranceFee: _insuranceFee,
           otherCharges: _otherCharges,
           gstOnFees: _gstAmount,
+          emiStartDate: _emiStartDate,
         );
         final loanId = await service.addLoan(userId, newLoan);
 
         // Check for missed EMIs immediately after adding
-        final missed = service.getMissedEmiDates(
-          LoanModel(
-            id: loanId, userId: userId,
-            title: newLoan.title, loanType: newLoan.loanType,
-            principal: principal, annualInterestRate: rate,
-            tenureMonths: tenure, startDate: _startDate,
-            emiDueDay: _emiDueDay, status: LoanStatus.active,
-            createdAt: DateTime.now(),
-          ),
-          [], // no payments yet
+        final loanForCheck = LoanModel(
+          id: loanId, userId: userId,
+          title: newLoan.title, loanType: newLoan.loanType,
+          principal: principal, annualInterestRate: rate,
+          tenureMonths: tenure, startDate: _startDate,
+          emiDueDay: _emiDueDay, status: LoanStatus.active,
+          createdAt: DateTime.now(),
+          emiStartDate: _emiStartDate,
         );
+        final missed = service.getMissedEmiDates(loanForCheck, []);
 
         if (missed.isNotEmpty && mounted) {
           await _showMissedEmiDialog(context, userId, loanId, missed, service);

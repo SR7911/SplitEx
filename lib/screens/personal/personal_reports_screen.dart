@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
@@ -153,20 +154,25 @@ class _PersonalReportsSheet extends ConsumerWidget {
                   children: entries.asMap().entries.map((e) {
                     final color = _colors[e.key % _colors.length];
                     final pct = totalExpense > 0 ? (e.value.value / totalExpense * 100).toInt() : 0;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: color.withOpacity(0.2)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                          const SizedBox(width: 6),
-                          Text('${e.value.key} $pct%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-                        ],
+                    return GestureDetector(
+                      onTap: () => context.push('/personal/transactions/category', extra: {'monthKey': monthKey, 'category': e.value.key}),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: color.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                            const SizedBox(width: 6),
+                            Text('${e.value.key} $pct%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right_rounded, size: 12, color: color),
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),
@@ -176,54 +182,68 @@ class _PersonalReportsSheet extends ConsumerWidget {
             const SizedBox(height: 20),
 
             // Category breakdown bars
-            _SectionHeader(label: 'Breakdown', cs: cs),
+            _SectionHeader(label: 'Spending Breakdown', cs: cs),
             const SizedBox(height: 12),
             _ReportCard(isDark: isDark, cs: cs, child: Column(
               children: entries.asMap().entries.map((e) {
                 final color = _colors[e.key % _colors.length];
                 final pct = totalExpense > 0 ? e.value.value / totalExpense : 0.0;
                 final isLast = e.key == entries.length - 1;
-                return Padding(
-                  padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-                  child: Row(
-                    children: [
-                      Container(width: 3, height: 36, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(e.value.key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface)),
-                                Text('₹${_fmt(e.value.value)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: pct,
-                                minHeight: 5,
-                                backgroundColor: cs.outline.withOpacity(0.1),
-                                valueColor: AlwaysStoppedAnimation<Color>(color),
+                return GestureDetector(
+                  onTap: () => context.push('/personal/transactions/category', extra: {'monthKey': monthKey, 'category': e.value.key}),
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+                    child: Row(
+                      children: [
+                        Container(width: 3, height: 36, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(e.value.key, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                                  Text('₹${_fmt(e.value.value)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+                                ],
                               ),
+                              const SizedBox(height: 5),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: LinearProgressIndicator(
+                                  value: pct,
+                                  minHeight: 5,
+                                  backgroundColor: cs.outline.withOpacity(0.1),
+                                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                              child: Text('${(pct * 100).toInt()}%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
                             ),
+                            const SizedBox(width: 4),
+                            Icon(Icons.chevron_right_rounded, size: 14, color: cs.onSurface.withOpacity(0.3)),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Text('${(pct * 100).toInt()}%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
             )),
+            const SizedBox(height: 20),
+
+            // Weekly analysis
+            _WeeklyAnalysisSection(monthKey: monthKey, transactions: txns, cs: cs, isDark: isDark),
             const SizedBox(height: 20),
 
             // Daily spending bar chart
@@ -239,6 +259,190 @@ class _PersonalReportsSheet extends ConsumerWidget {
     final dt = DateTime(int.parse(parts[0]), int.parse(parts[1]));
     return DateFormat('MMMM yyyy').format(dt);
   }
+}
+
+// ── Weekly Analysis Section ──────────────────────────────────────────────────
+
+class _WeeklyAnalysisSection extends StatelessWidget {
+  final String monthKey;
+  final List<PersonalTransactionModel> transactions;
+  final ColorScheme cs;
+  final bool isDark;
+  const _WeeklyAnalysisSection({required this.monthKey, required this.transactions, required this.cs, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = monthKey.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+
+    // Build weeks: week 1 = days 1-7, week 2 = 8-14, week 3 = 15-21, week 4 = 22-end
+    final weekRanges = [
+      (1, 7), (8, 14), (15, 21), (22, daysInMonth),
+    ];
+
+    final weekData = weekRanges.asMap().entries.map((entry) {
+      final i = entry.key;
+      final range = entry.value;
+      double expense = 0;
+      double income = 0;
+      int txnCount = 0;
+      for (final t in transactions) {
+        if (t.date.day >= range.$1 && t.date.day <= range.$2) {
+          if (t.isExpense) expense += t.amount;
+          else income += t.amount;
+          txnCount++;
+        }
+      }
+      return _WeekData(week: i + 1, start: range.$1, end: range.$2, expense: expense, income: income, txnCount: txnCount);
+    }).toList();
+
+    final totalExpense = weekData.fold<double>(0, (s, w) => s + w.expense);
+    final maxExpense = weekData.map((w) => w.expense).reduce((a, b) => a > b ? a : b);
+    final avgWeekly = totalExpense / 4;
+
+    // Find highest and lowest spending weeks
+    final sortedByExpense = [...weekData]..sort((a, b) => b.expense.compareTo(a.expense));
+    final highestWeek = sortedByExpense.first;
+    final lowestWeek = sortedByExpense.last;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(label: 'Weekly Analysis', cs: cs),
+        const SizedBox(height: 12),
+        _ReportCard(
+          isDark: isDark, cs: cs,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Avg weekly spend chip
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.show_chart_rounded, size: 12, color: cs.primary),
+                        const SizedBox(width: 5),
+                        Text('Avg ₹${_fmt(avgWeekly)}/week', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.primary)),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  if (highestWeek.expense > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('W${highestWeek.week} highest', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFEF4444))),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Week bars
+              ...weekData.map((w) {
+                final ratio = maxExpense > 0 ? w.expense / maxExpense : 0.0;
+                final isHighest = w.week == highestWeek.week && w.expense > 0;
+                final isLowest = w.week == lowestWeek.week && w.expense > 0 && lowestWeek.expense < highestWeek.expense;
+                final barColor = isHighest
+                    ? const Color(0xFFEF4444)
+                    : isLowest
+                        ? const Color(0xFF22C55E)
+                        : cs.primary;
+                final aboveAvg = w.expense > avgWeekly && avgWeekly > 0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 52,
+                            child: Text(
+                              'W${w.week} (${w.start}-${w.end})',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.55)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                minHeight: 10,
+                                backgroundColor: cs.outline.withOpacity(0.1),
+                                valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 64,
+                            child: Text(
+                              '₹${_fmt(w.expense)}',
+                              textAlign: TextAlign.right,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: barColor),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          if (aboveAvg)
+                            Icon(Icons.arrow_upward_rounded, size: 12, color: const Color(0xFFEF4444))
+                          else if (w.expense > 0)
+                            Icon(Icons.arrow_downward_rounded, size: 12, color: const Color(0xFF22C55E))
+                          else
+                            const SizedBox(width: 12),
+                        ],
+                      ),
+                      if (w.txnCount > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 60, top: 3),
+                          child: Text(
+                            '${w.txnCount} txn${w.txnCount > 1 ? 's' : ''} • income ₹${_fmt(w.income)}',
+                            style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.4)),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+              // Insight row
+              if (highestWeek.expense > 0 && lowestWeek.expense < highestWeek.expense) ...[
+                const Divider(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline_rounded, size: 14, color: const Color(0xFFF59E0B)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Week ${highestWeek.week} spent ${((highestWeek.expense / (lowestWeek.expense > 0 ? lowestWeek.expense : 1) - 1) * 100).toInt()}% more than Week ${lowestWeek.week}',
+                        style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.55)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeekData {
+  final int week, start, end, txnCount;
+  final double expense, income;
+  const _WeekData({required this.week, required this.start, required this.end, required this.expense, required this.income, required this.txnCount});
 }
 
 // ── Daily Spending Chart ──────────────────────────────────────────────────────

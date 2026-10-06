@@ -11,7 +11,8 @@ import 'package:split_ex/widgets/app_header.dart';
 
 class PersonalTransactionsScreen extends ConsumerStatefulWidget {
   final String monthKey;
-  const PersonalTransactionsScreen({super.key, required this.monthKey});
+  final String? initialCategory;
+  const PersonalTransactionsScreen({super.key, required this.monthKey, this.initialCategory});
 
   @override
   ConsumerState<PersonalTransactionsScreen> createState() => _PersonalTransactionsScreenState();
@@ -26,6 +27,12 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
   DateTime? _dateFrom;
   DateTime? _dateTo;
   _PersonalSortOption _sortOption = _PersonalSortOption.timeDesc;
+
+  @override
+  void initState() {
+    super.initState();
+    _categoryFilter = widget.initialCategory;
+  }
 
   bool get _hasAdvancedFilters =>
       _categoryFilter != null || _dateFrom != null || _dateTo != null || _sortOption != _PersonalSortOption.timeDesc;
@@ -58,7 +65,13 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppHeader(showBack: true, title: 'Transactions • ${_formatMonth(widget.monthKey)}', showNotification: false),
+      appBar: AppHeader(
+        showBack: true,
+        title: widget.initialCategory != null
+            ? '${widget.initialCategory} • ${_formatMonth(widget.monthKey)}'
+            : 'Transactions • ${_formatMonth(widget.monthKey)}',
+        showNotification: false,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => showAddPersonalTransactionSheet(context),
         child: const Icon(Icons.add),

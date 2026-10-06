@@ -46,12 +46,8 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Step-by-step Play Store publishing guide with asset requirements.
 - **Why:** Covers everything needed to get the app from code to live on the store.
 
-### `docs/PERSONAL_EXPENSE.md`
-- **What:** Personal finance tracker screen reference — all screens, data models, providers, and navigation flows.
-- **Why:** Documents the personal expense section including debt tracking, budgets, recurring, reports, and settlements.
-
 ### `docs/APP_HELPER.md`
-- **What:** High-level app flow, architecture diagram, and design decisions.
+- **What:** High-level app flow, architecture diagram, design decisions, and personal finance module reference (navigation, debt balance logic, budget status thresholds).
 - **Why:** Helps new developers (or future-you) understand how the app works without reading every file.
 
 ---
@@ -101,6 +97,14 @@ Every file in the project explained with **What** it does and **Why** it exists.
 ### `lib/models/project_model.dart`
 - **What:** ProjectModel (id, name, description, projectType, estimatedBudget, startDate, targetEndDate, status, createdBy, createdAt) and ProjectExpenseModel (adds vendor, notes, paymentMethod: cash/upi/card/bankTransfer).
 - **Why:** Represents a personal project with a budget envelope. ProjectExpenseModel tracks individual spend items against that budget.
+
+### `lib/models/personal_transaction_model.dart`
+- **What:** PersonalTransactionModel — id, title, amount, type (expense/income), category, date, notes, userId, month, createdAt, debtType (lent/borrowed/null), personName, isSettled, settledAmount, partialSettlements `[{amount, date, note}]`. Computed: `hasDebt`, `remainingAmount` (amount − settledAmount).
+- **Why:** Core model for personal finance. Doubles as a debt record when debtType is set. Also receives auto-logged entries from the Loan EMI tracker (tagged with `loanSourceId`).
+
+### `lib/models/loan_model.dart`
+- **What:** Three data classes — `LoanModel` (loan metadata: title, loanType, principal, annualInterestRate, tenureMonths, startDate, emiDueDay, emiStartDate, status, charges, recurringId, customEmi), `LoanPaymentModel` (individual payment log: amount, principalComponent, interestComponent, remainingPrincipalAfter, date, type, note), `AmortizationEntry` (computed schedule row: month, dueDate, emi, principal, interest, remainingPrincipal, isPaid). Computed getters: `baseEmi`, `netDisbursed`, `effectiveEmiStart`, `endDate`.
+- **Why:** Core data layer for the Loan & EMI module. `emiStartDate` decouples the first EMI date from the loan start date for accurate schedule generation.
 
 ### `lib/models/user_model.dart`
 - **What:** User data class — uid, name, email, avatarUrl, upiId, rooms list, createdAt.
@@ -190,6 +194,10 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Firebase Cloud Messaging setup — token management, topic subscription.
 - **Why:** Enables push notifications when the app upgrades to Blaze plan or uses server triggers.
 
+### `lib/services/loan_service.dart`
+- **What:** All Firestore operations for the Loan & EMI module — `addLoan`, `updateLoan`, `deleteLoan`, `deleteRecurring`, `logEmiPayment`, `logPartialPayment`, `forecloseLoan`, `logMissedEmis`, `buildSchedule`, `getMissedEmiDates`. Each payment auto-logs a `personal_transactions` expense with a `loanSourceId` tag and a same-day dedup check. `_nthEmiDate` uses `loan.effectiveEmiStart` as the schedule anchor.
+- **Why:** Encapsulates all loan business logic — amortization math, payment splitting, recurring sync, and personal expense auto-logging with dedup protection.
+
 ### `lib/services/personal_expense_service.dart`
 - **What:** Firestore CRUD for personal_transactions, personal_budgets, personal_recurring subcollections. Includes debt queries and settlement.
 - **Why:** All personal finance Firestore operations in one service — transactions, budgets, recurring, and debt settlement.
@@ -255,8 +263,25 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Powers the notification bell badge and notification list screen.
 
 ### `lib/providers/personal_expense_provider.dart`
-- **What:** Providers for personal transactions, budgets, recurring, monthly summary, category spending, debts stream, and net debt balances.
-- **Why:** Reactive state for the personal expense tab — screens watch these to display financial data.
+- **What:** Reactive state for the personal expense tab.
+
+  | Provider | Description |
+  |----------|-------------|
+  | `personalTransactionsProvider(month)` | Transactions stream for a month |
+  | `personalMonthlySummaryProvider(month)` | income / expenses / remaining / budgetUsage |
+  | `personalCategorySpendingProvider(month)` | Map of spending per category |
+  | `personalBudgetsProvider(month)` | Category budgets stream for a month |
+  | `personalRecurringProvider` | All recurring transactions stream |
+  | `personalDebtsProvider` | All debt-tagged transactions (all months) |
+  | `personalDebtsByMonthProvider(month)` | Debts filtered to a specific month |
+  | `personalDebtBalancesProvider` | Net remaining balance per person (uses `remainingAmount`) |
+  | `debtPersonSuggestionsProvider` | Sorted unique person names from all debt history |
+
+- **Why:** Screens watch these to display financial data without direct Firestore calls.
+
+### `lib/providers/loan_provider.dart`
+- **What:** `loanServiceProvider`, `loansProvider` (stream), `loanPaymentsProvider(loanId)` (stream), `loanRemainingPrincipalProvider(loanId)` (derived from last payment), `loanScheduleProvider(loanId)` (computed amortization), `loanEmiProgressProvider(loanId)` (returns `LoanEmiProgress` with `paidCount`, `totalCount`, `nextDueDate`), `loanSummaryProvider` (aggregate stats across all active loans).
+- **Why:** Reactive state for the Loan module. `loanEmiProgressProvider` drives the paid/total EMI count and next due date shown on list cards and the detail hero card.
 
 ### `lib/providers/theme_provider.dart`
 - **What:** themeModeProvider, appPaletteProvider — persisted to SharedPreferences.
@@ -403,16 +428,16 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Expense entry scoped to a project with vendor and payment context.
 
 ### `lib/screens/personal/personal_expense_tab.dart`
-- **What:** Main personal finance dashboard tab with month navigation, financial summary, budget tracking, pie chart, recent transactions, recurring preview, and utility shortcuts.
-- **Why:** The primary view for personal expense tracking — provides at-a-glance financial status.
+- **What:** Main personal finance dashboard tab with month navigation, financial summary, budget tracking, pie chart, weekly spending summary card, recent transactions, recurring preview, and utility shortcuts.
+- **Why:** The primary view for personal expense tracking — provides at-a-glance financial status including a weekly bar chart for closer spend control.
 
 ### `lib/screens/personal/add_personal_transaction_screen.dart`
 - **What:** Bottom sheet form to add income/expense with optional debt tracking (Lent/Borrowed with person name).
 - **Why:** Primary data entry for personal transactions. Debt toggle enables peer-to-peer tracking.
 
 ### `lib/screens/personal/personal_transactions_screen.dart`
-- **What:** Full transaction list with search, filter chips, and day-wise grouping showing daily totals. Includes FAB.
-- **Why:** Users browse and search all transactions grouped by date with spending summaries per day.
+- **What:** Full transaction list with search, filter chips, day-wise grouping showing daily totals, and FAB. Accepts optional `initialCategory` param to pre-filter by category (used when navigating from reports).
+- **Why:** Users browse and search all transactions grouped by date. Category drill-down from reports lands here with the filter pre-applied.
 
 ### `lib/screens/personal/view_personal_transaction_sheet.dart`
 - **What:** Dual-mode bottom sheet — view transaction details (with debt info) or edit inline.
@@ -427,12 +452,40 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Automate regular expenses (rent, subscriptions) without manual entry each month.
 
 ### `lib/screens/personal/personal_reports_screen.dart`
-- **What:** Bottom sheet with income/expense pills, category pie chart, breakdown list, and daily spending bar chart.
-- **Why:** Monthly spending insights — category distribution and day-by-day spending patterns.
+- **What:** Bottom sheet with income/expense stats banner, category distribution donut (tappable chips), spending breakdown bars (tappable rows), weekly analysis section (4-week horizontal bars with avg, high/low highlights, trend insight), and daily spending bar chart (weekday vs weekend).
+- **Why:** Monthly and weekly spending insights — category drill-down navigates to a filtered transaction list for that category and month.
+
+### `lib/screens/personal/add_debt_sheet.dart` *(NEW)*
+- **What:** Dedicated debt entry bottom sheet — animated lent/borrowed toggle, person name autocomplete from `debtPersonSuggestionsProvider`, category + date picker, balance impact hint. Lent saves as `type: expense`, borrowed as `type: income`.
+- **Why:** Dedicated debt entry flow separate from the general transaction sheet, with person suggestions for faster entry.
+
+### `lib/screens/personal/debt_dashboard_screen.dart` *(NEW)*
+- **What:** Dedicated debt dashboard — gradient hero card (net balance, lent, borrowed, active count), quick actions, 6-month grouped bar chart, lent vs borrowed donut chart, most debted people (consolidated net per person), top lent/borrowed debts, recent debts with View All.
+- **Why:** Gives users a complete at-a-glance overview of all debt activity across all months in one screen.
+
+### `lib/screens/personal/debt_list_screen.dart` *(NEW)*
+- **What:** Monthly debt tracking screen — `AppMonthSelector` navigation, month hero card, search bar (person/description), filter sheet (type/status/amount range), active filter chips, separate lent/borrowed sections with debt tiles.
+- **Why:** Lets users browse and filter debts month by month with full search and filter capability.
 
 ### `lib/screens/personal/personal_debts_screen.dart`
-- **What:** Debts dashboard with separate Lent/Borrowed sections, contextual settle buttons, and settled items shown disabled.
-- **Why:** Tracks peer-to-peer money — who owes you and who you owe — with settlement workflow.
+- **What:** Debts settle screen with separate Lent/Borrowed sections, contextual settle buttons, partial settlement history, and settled items shown disabled.
+- **Why:** Tracks peer-to-peer money — who owes you and who you owe — with full settlement workflow.
+
+### `lib/screens/loans/loan_list_screen.dart`
+- **What:** Loan list screen with hero summary card, mini stat row, active/closed loan sections. Each `_LoanCard` shows: animated progress bar, remaining amount, status badge, EMI amount, **X/Y EMIs paid chip**, **Next: DD MMM due date chip**. Shared helpers (`loanStatusColor`, `fmtAmount`, `fmtCompact`) and `LoanReportSheet` (pie chart + bar chart + payment history) also live here.
+- **Why:** Central list view for all loans. The EMI progress and next due date chips give users an at-a-glance repayment status without opening the detail screen.
+
+### `lib/screens/loans/loan_detail_screen.dart`
+- **What:** 3-tab detail screen (Overview, Reports, Schedule). Hero card shows remaining principal, progress bar, rate/tenure/end date chips, and **EMI progress line** (`EMI ₹XXXX · 3/24 paid · Next: 05 Jul`). Action buttons: Log EMI, Prepay, Force Close. Payment history list. Amortization schedule tab (borrowed loans only).
+- **Why:** Full loan detail with payment actions and schedule visibility. EMI progress line replaces the static "Due day X" with live paid/total count and next date.
+
+### `lib/screens/loans/add_loan_sheet.dart`
+- **What:** Add/Edit loan bottom sheet. Inputs: loan type toggle, title, lender/borrower name, principal, rate, tenure, EMI due day, **Loan Start date picker**, **First EMI Date picker** (separate, with auto-hint and clear button), EMI override toggle, charges & fees section, notes. Shows live EMI preview and total payable. On add, checks for missed EMIs and prompts backdating.
+- **Why:** Primary loan data entry. The dedicated First EMI Date picker lets users set the exact schedule anchor independently of the disbursement date.
+
+### `lib/screens/loans/loan_reports_screen.dart`
+- **What:** Standalone reports screen with status filter chips, per-loan summary cards, and a bottom sheet showing amortization schedule + payment history for each loan.
+- **Why:** Gives users a cross-loan view of repayment status with filtering by active/settled/foreclosed.
 
 ### `lib/screens/settings/settings_screen.dart`
 - **What:** Main settings page — edit profile, change password, delete account, currency, notifications, legal, logout, version.
@@ -505,14 +558,14 @@ Every file in the project explained with **What** it does and **Why** it exists.
 | Layer | Count | Purpose |
 |-------|-------|---------|
 | Config | 4 files | Theme, routing, constants, dev flags |
-| Models | 10 files | Data structures for Firestore documents |
-| Services | 19 files | Firebase operations & business logic |
-| Providers | 13 files | Reactive state management |
-| Screens | 41 files | User interface |
+| Models | 12 files | Data structures for Firestore documents |
+| Services | 20 files | Firebase operations & business logic |
+| Providers | 14 files | Reactive state management |
+| Screens | 48 files | User interface |
 | Widgets | 2 files | Reusable UI components |
 | Utils | 1 file | Pure utility functions |
-| Docs | 5 files | Documentation & guides |
-| **Total** | **~89 files** | |
+| Docs | 4 files | Documentation & guides |
+| **Total** | **~100 files** | |
 
 ---
 

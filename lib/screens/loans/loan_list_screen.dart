@@ -412,6 +412,7 @@ class _LoanCardState extends ConsumerState<_LoanCard> with SingleTickerProviderS
     final cs          = Theme.of(context).colorScheme;
     final loan        = widget.loan;
     final remaining   = ref.watch(loanRemainingPrincipalProvider(loan.id));
+    final emiProgress = ref.watch(loanEmiProgressProvider(loan.id));
     final progress    = 1 - (remaining / loan.principal).clamp(0.0, 1.0);
     final statusColor = loanStatusColor(loan.status, cs.primary);
     final isLent      = loan.loanType == LoanType.lent;
@@ -565,13 +566,22 @@ class _LoanCardState extends ConsumerState<_LoanCard> with SingleTickerProviderS
                         ] else ...[
                           _FooterChip(icon: Icons.payments_outlined,    label: 'EMI ₹${loan.baseEmi.toStringAsFixed(0)}'),
                           const SizedBox(width: 8),
-                          _FooterChip(icon: Icons.event_repeat_rounded, label: 'Due day ${loan.emiDueDay}'),
+                          _FooterChip(
+                            icon: Icons.check_circle_outline_rounded,
+                            label: '${emiProgress.paidCount}/${emiProgress.totalCount} EMIs',
+                          ),
                         ],
                         const Spacer(),
-                        _FooterChip(
-                          icon: Icons.schedule_rounded,
-                          label: '${loan.tenureMonths}m · ${DateFormat('MMM yy').format(loan.endDate)}',
-                        ),
+                        if (!isLent && emiProgress.nextDueDate != null)
+                          _FooterChip(
+                            icon: Icons.event_rounded,
+                            label: 'Next: ${DateFormat('dd MMM').format(emiProgress.nextDueDate!)}',
+                          )
+                        else
+                          _FooterChip(
+                            icon: Icons.schedule_rounded,
+                            label: '${loan.tenureMonths}m · ${DateFormat('MMM yy').format(loan.endDate)}',
+                          ),
                       ],
                     ),
                   ],

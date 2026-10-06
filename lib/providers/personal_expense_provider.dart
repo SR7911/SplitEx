@@ -81,6 +81,13 @@ final personalDebtsProvider =
   return ref.watch(personalExpenseServiceProvider).getDebtTransactionsStream(userId);
 });
 
+/// Debts filtered to a specific month (yyyy-MM)
+final personalDebtsByMonthProvider =
+    Provider.family<List<PersonalTransactionModel>, String>((ref, month) {
+  final all = ref.watch(personalDebtsProvider).valueOrNull ?? [];
+  return all.where((t) => t.month == month).toList();
+});
+
 /// Net balances per person: positive = they owe you, negative = you owe them
 final personalDebtBalancesProvider =
     Provider<Map<String, double>>((ref) {
@@ -90,10 +97,22 @@ final personalDebtBalancesProvider =
     if (t.personName == null || t.isSettled) continue;
     final name = t.personName!;
     if (t.debtType == DebtType.lent) {
-      map[name] = (map[name] ?? 0) + t.amount;
+      map[name] = (map[name] ?? 0) + t.remainingAmount;
     } else {
-      map[name] = (map[name] ?? 0) - t.amount;
+      map[name] = (map[name] ?? 0) - t.remainingAmount;
     }
   }
   return map;
+});
+
+/// All unique person names used in debts — for autocomplete suggestions
+final debtPersonSuggestionsProvider = Provider<List<String>>((ref) {
+  final debts = ref.watch(personalDebtsProvider).valueOrNull ?? [];
+  final names = <String>{};
+  for (final t in debts) {
+    if (t.personName != null && t.personName!.isNotEmpty) {
+      names.add(t.personName!);
+    }
+  }
+  return names.toList()..sort();
 });
