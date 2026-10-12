@@ -20,6 +20,8 @@ Firestore (Root)
 │   ├── personal_transactions/{txnId}    ← Personal income/expense tracking
 │   ├── personal_budgets/{budgetId}      ← Category budgets per month
 │   ├── personal_recurring/{recurringId} ← Recurring transaction templates
+│   ├── loans/{loanId}                   ← Loan & EMI tracker
+│   │   └── payments/{paymentId}         ← Individual loan payment log
 │   └── projects/{projectId}            ← Personal project tracker
 │       └── expenses/{expenseId}         ← Project expense items
 ├── rooms/{roomId}                       ← Roommate groups
@@ -75,7 +77,10 @@ Firebase Storage
 | `createdAt` | timestamp | Record creation time |
 | `debtType` | string? | `lent` or `borrowed` (null = no debt) |
 | `personName` | string? | Name of person involved in debt |
-| `isSettled` | boolean | Whether debt has been settled (default: false) |
+| `isSettled` | boolean | Whether debt has been fully settled (default: false) |
+| `settledAmount` | number | Total amount settled so far (default: 0) |
+| `partialSettlements` | array | History of partial settlement entries `[{amount, date, note}]` |
+| `loanSourceId` | string? | Loan ID if auto-logged by Loan EMI tracker (used for dedup) |
 
 **Indexes Required:**
 - `month` (ASC) + `date` (DESC) — for monthly transaction listing
@@ -86,8 +91,9 @@ Firebase Storage
 - Update transaction
 - Delete transaction
 - Stream by month
-- Stream debt transactions (`debtType` whereIn `['lent', 'borrowed']`)
-- Settle transaction (set `isSettled: true`)
+- Stream all debt transactions (`debtType` whereIn `['lent', 'borrowed']`)
+- Settle transaction (full: sets `isSettled: true`, `settledAmount = amount`; auto-creates income entry for lent)
+- Partial settle (increments `settledAmount`, appends to `partialSettlements`; auto-creates income entry for lent)
 
 ---
 
@@ -291,6 +297,75 @@ Firebase Storage
 
 ---
 
+### 13. `users/{uid}/loans` (Subcollection)
+
+**Path:** `users/{uid}/loans/{loanId}`  
+**Service:** `LoanService`  
+**Purpose:** Tracks borrowed and lent loans with EMI schedule, payment history, and recurring integration.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `userId` | string | Owner UID |
+| `title` | string | Loan name (e.g. "HDFC Home Loan") |
+| `loanType` | string | `borrowed` (I owe) or `lent` (someone owes me) |
+| `principal` | number | Original loan amount in ₹ |
+| `annualInterestRate` | number | Annual interest rate (0 for interest-free) |
+| `tenureMonths` | number | Total loan tenure in months |
+| `startDate` | timestamp | Loan disbursement / start date |
+| `emiDueDay` | number | Day of month EMI is due (1–28) |
+| `emiStartDate` | timestamp? | Date of first EMI; null = auto (`startDate + 1 month`) |
+| `status` | string | `active`, `settled`, or `foreclosed` |
+| `lenderBorrowerName` | string? | Bank or person name |
+| `notes` | string? | Optional remarks |
+| `recurringId` | string? | Linked `personal_recurring` doc ID for two-way sync |
+| `customEmi` | number? | User-overridden EMI (overrides calculated EMI) |
+| `processingFee` | number | One-time processing fee |
+| `insuranceFee` | number | Loan protection insurance fee |
+| `otherCharges` | number | Stamp duty, legal, etc. |
+| `gstOnFees` | number | 18% GST on processing fee (auto-calculated) |
+| `createdAt` | timestamp | Record creation time |
+
+**Computed (not stored):**
+- `baseEmi` — standard amortization EMI (or `customEmi` if set)
+- `netDisbursed` — principal minus all one-time charges
+- `effectiveEmiStart` — `emiStartDate ?? DateTime(startDate.year, startDate.month + 1, emiDueDay)`
+- `endDate` — derived from `effectiveEmiStart + tenureMonths`
+
+**Operations:**
+- Add loan (with optional missed-EMI backdating on creation)
+- Update loan (recalculates EMI, syncs linked recurring amount)
+- Delete loan (cascades payment sub-docs)
+- Force close / foreclose
+- Stream all loans for user
+
+---
+
+### 13a. `users/{uid}/loans/{loanId}/payments` (Subcollection)
+
+**Path:** `users/{uid}/loans/{loanId}/payments/{paymentId}`  
+**Service:** `LoanService`  
+**Purpose:** Individual payment log entries for a loan.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `amount` | number | Total payment amount |
+| `principalComponent` | number | Principal portion of this payment |
+| `interestComponent` | number | Interest portion of this payment |
+| `remainingPrincipalAfter` | number | Remaining principal after this payment |
+| `date` | timestamp | Payment date |
+| `type` | string | `emi`, `partial`, or `foreclosure` |
+| `note` | string? | Optional note (e.g. "Backdated EMI") |
+| `createdAt` | timestamp | Record creation time |
+
+**Operations:**
+- Log EMI payment (auto-computes interest/principal split)
+- Log partial prepayment (reduces principal, recalculates future EMI)
+- Log foreclosure (pays remaining principal + accrued interest)
+- Each payment auto-creates a `personal_transactions` expense tagged with `loanSourceId` for dedup
+- Stream payments for a loan (ordered by date descending)
+
+---
+
 ### 14. `notifications` (Top-level)
 
 **Path:** `notifications/{notificationId}`  
@@ -308,7 +383,7 @@ Firebase Storage
 
 ---
 
-### 13. `groups` (Top-level)
+### 15. `groups` (Top-level)
 
 **Path:** `groups/{groupId}`  
 **Service:** `GroupService`  
@@ -336,7 +411,7 @@ Firebase Storage
 
 ---
 
-### 15. `groups/{groupId}/expenses` (Subcollection)
+### 16. `groups/{groupId}/expenses` (Subcollection)
 
 **Path:** `groups/{groupId}/expenses/{expenseId}`  
 **Service:** `GroupExpenseService`  
@@ -396,9 +471,11 @@ Firebase Storage
 │  rooms: [roomId1, roomId2, ...]                      │
 ├─────────────────────────────────────────────────────┤
 │  ├── personal_transactions/{id} ← expense/income     │
-│  │     └── optional: debtType, personName, isSettled │
+│  │     └── optional: debtType, personName, loanSourceId │
 │  ├── personal_budgets/{id}      ← category budgets   │
 │  ├── personal_recurring/{id}    ← recurring templates│
+│  ├── loans/{id}                 ← loan tracker       │
+│  │     └── payments/{id}        ← payment log        │
 │  ├── projects/{id}              ← project envelopes  │
 │  │     └── expenses/{id}        ← project expenses   │
 │  └── notifications/{id}                              │
@@ -448,8 +525,10 @@ Firebase Storage
 | 10 | `rooms/{roomId}/bills` | Subcollection | Few per room/month |
 | 11 | `rooms/{roomId}/settlements` | Subcollection | Per debt resolution |
 | 12 | `rooms/{roomId}/activities` | Subcollection | 1 per action |
-| 13 | `groups` | Top-level | 1 per group |
-| 14 | `groups/{groupId}/expenses` | Subcollection | Many per group |
-| 15 | `notifications` | Top-level | Per event × recipients |
+| 13 | `users/{uid}/loans` | Subcollection | 1 per loan |
+| 13a | `users/{uid}/loans/{id}/payments` | Subcollection | 1 per payment |
+| 14 | `notifications` | Top-level | Per event × recipients |
+| 15 | `groups` | Top-level | 1 per group |
+| 16 | `groups/{groupId}/expenses` | Subcollection | Many per group |
 
-**Total: 1 Firestore database, 15 collections, 1 Storage bucket, 1 local store.**
+**Total: 1 Firestore database, 17 collections, 1 Storage bucket, 1 local store.**

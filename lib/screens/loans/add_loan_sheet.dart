@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/loan_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/loan_provider.dart';
+import 'package:split_ex/services/loan_service.dart';
 
 void showAddLoanSheet(BuildContext context, {LoanModel? existing}) {
   showModalBottomSheet(
@@ -33,13 +34,16 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
   final _processingFeeCtrl = TextEditingController();
   final _insuranceFeeCtrl = TextEditingController();
   final _otherChargesCtrl = TextEditingController();
+  final _customEmiCtrl = TextEditingController();
 
   LoanType _loanType = LoanType.borrowed;
   DateTime _startDate = DateTime.now();
+  DateTime? _emiStartDate; // null = auto (startDate + 1 month)
   int _emiDueDay = 1;
   bool _loading = false;
   bool _showCharges = false;
   bool _applyGst = false;
+  bool _overrideEmi = false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -56,7 +60,12 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
       _notesCtrl.text = e.notes ?? '';
       _loanType = e.loanType;
       _startDate = e.startDate;
+      _emiStartDate = e.emiStartDate;
       _emiDueDay = e.emiDueDay;
+      if (e.customEmi != null && e.customEmi! > 0) {
+        _overrideEmi = true;
+        _customEmiCtrl.text = e.customEmi!.toStringAsFixed(0);
+      }
       if (e.processingFee > 0) _processingFeeCtrl.text = e.processingFee.toStringAsFixed(0);
       if (e.insuranceFee > 0) _insuranceFeeCtrl.text = e.insuranceFee.toStringAsFixed(0);
       if (e.otherCharges > 0) _otherChargesCtrl.text = e.otherCharges.toStringAsFixed(0);
@@ -69,7 +78,7 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
   void dispose() {
     for (final c in [
       _titleCtrl, _principalCtrl, _rateCtrl, _tenureCtrl,
-      _nameCtrl, _notesCtrl, _processingFeeCtrl, _insuranceFeeCtrl, _otherChargesCtrl,
+      _nameCtrl, _notesCtrl, _processingFeeCtrl, _insuranceFeeCtrl, _otherChargesCtrl, _customEmiCtrl,
     ]) {
       c.dispose();
     }
@@ -87,6 +96,7 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
   }
 
   double get _previewEmi {
+    if (_overrideEmi) return double.tryParse(_customEmiCtrl.text) ?? 0;
     final p = double.tryParse(_principalCtrl.text) ?? 0;
     final r = double.tryParse(_rateCtrl.text) ?? 0;
     final n = int.tryParse(_tenureCtrl.text) ?? 0;
@@ -295,9 +305,13 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
                           context: context,
                           initialDate: _startDate,
                           firstDate: DateTime(2000),
-                          lastDate: DateTime(2040),
+                          lastDate: DateTime(2100),
+                          helpText: 'Select Loan Start Date',
                         );
-                        if (picked != null) setState(() => _startDate = picked);
+                        if (picked != null) setState(() {
+                          _startDate = picked;
+                          _emiStartDate = null; // reset so auto recalculates
+                        });
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -311,7 +325,7 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
                             Icon(Icons.calendar_today_rounded, size: 18, color: cs.onSurface.withOpacity(0.45)),
                             const SizedBox(width: 12),
                             Text(
-                              'Start Date: ${DateFormat('dd MMM yyyy').format(_startDate)}',
+                              'Loan Start: ${DateFormat('dd MMM yyyy').format(_startDate)}',
                               style: TextStyle(fontSize: 14, color: cs.onSurface),
                             ),
                             const Spacer(),
@@ -320,6 +334,115 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    // First EMI date
+                    InkWell(
+                      onTap: () async {
+                        final defaultEmi = DateTime(_startDate.year, _startDate.month + 1, _emiDueDay);
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _emiStartDate ?? defaultEmi,
+                          firstDate: _startDate,
+                          lastDate: DateTime(2100),
+                          helpText: 'Select First EMI Date',
+                        );
+                        if (picked != null) setState(() => _emiStartDate = picked);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: _emiStartDate != null
+                              ? Border.all(color: cs.primary.withOpacity(0.4))
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.event_repeat_rounded, size: 18,
+                                color: _emiStartDate != null ? cs.primary : cs.onSurface.withOpacity(0.45)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _emiStartDate != null
+                                        ? 'First EMI: ${DateFormat('dd MMM yyyy').format(_emiStartDate!)}'
+                                        : 'First EMI: ${DateFormat('dd MMM yyyy').format(DateTime(_startDate.year, _startDate.month + 1, _emiDueDay))} (auto)',
+                                    style: TextStyle(fontSize: 14, color: cs.onSurface),
+                                  ),
+                                  if (_emiStartDate == null)
+                                    Text('Tap to override', style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.4))),
+                                ],
+                              ),
+                            ),
+                            if (_emiStartDate != null)
+                              GestureDetector(
+                                onTap: () => setState(() => _emiStartDate = null),
+                                child: Icon(Icons.close_rounded, size: 16, color: cs.onSurface.withOpacity(0.4)),
+                              )
+                            else
+                              Icon(Icons.edit_calendar_outlined, size: 16, color: cs.onSurface.withOpacity(0.35)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── EMI Override ─────────────────────────────────────
+                    _SectionLabel(label: 'EMI Amount'),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: () => setState(() {
+                        _overrideEmi = !_overrideEmi;
+                        if (!_overrideEmi) _customEmiCtrl.clear();
+                      }),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_rounded, size: 18,
+                                color: _overrideEmi ? cs.primary : cs.onSurface.withOpacity(0.45)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Override EMI amount',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: cs.onSurface)),
+                                  Text('Use actual EMI instead of calculated',
+                                      style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.45))),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _overrideEmi,
+                              onChanged: (v) => setState(() {
+                                _overrideEmi = v;
+                                if (!v) _customEmiCtrl.clear();
+                              }),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (_overrideEmi) ...[
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _customEmiCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() {}),
+                        decoration: _dec('Custom EMI Amount (₹)', hint: 'Enter actual EMI', icon: Icons.currency_rupee),
+                      ),
+                    ],
                     const SizedBox(height: 20),
 
                     // ── EMI Preview ──────────────────────────────────────
@@ -543,6 +666,71 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
     );
   }
 
+  Future<void> _showMissedEmiDialog(
+    BuildContext context,
+    String userId,
+    String loanId,
+    List<DateTime> missed,
+    LoanService service,
+  ) async {
+    final fmt = DateFormat('dd MMM yyyy');
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 22),
+          SizedBox(width: 8),
+          Text('Past EMIs Detected'),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${missed.length} EMI${missed.length > 1 ? 's' : ''} appear unpaid since the start date:',
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            ...missed.take(5).map((d) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(children: [
+                const Icon(Icons.circle, size: 6, color: Color(0xFFF59E0B)),
+                const SizedBox(width: 8),
+                Text(fmt.format(d), style: const TextStyle(fontSize: 12)),
+              ]),
+            )),
+            if (missed.length > 5)
+              Text('  ...and ${missed.length - 5} more', style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 10),
+            const Text(
+              'Mark all as paid (backdated)?',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not Paid'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await service.logMissedEmis(userId, loanId, missed);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${missed.length} past EMI${missed.length > 1 ? 's' : ''} logged')),
+                );
+              }
+            },
+            child: const Text('Mark Paid'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     final principal = double.tryParse(_principalCtrl.text);
     final rate = double.tryParse(_rateCtrl.text);
@@ -566,34 +754,52 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
           tenureMonths: tenure,
           emiDueDay: _emiDueDay,
           notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          customEmi: _overrideEmi ? (double.tryParse(_customEmiCtrl.text) ?? 0) : 0,
           processingFee: _processingFee,
           insuranceFee: _insuranceFee,
           otherCharges: _otherCharges,
           gstOnFees: _gstAmount,
         );
       } else {
-        await service.addLoan(
-          userId,
-          LoanModel(
-            id: '',
-            userId: userId,
-            title: _titleCtrl.text.trim(),
-            loanType: _loanType,
-            principal: principal,
-            annualInterestRate: rate,
-            tenureMonths: tenure,
-            startDate: _startDate,
-            emiDueDay: _emiDueDay,
-            status: LoanStatus.active,
-            lenderBorrowerName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
-            notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-            createdAt: DateTime.now(),
-            processingFee: _processingFee,
-            insuranceFee: _insuranceFee,
-            otherCharges: _otherCharges,
-            gstOnFees: _gstAmount,
-          ),
+        final customEmiVal = _overrideEmi ? double.tryParse(_customEmiCtrl.text) : null;
+        final newLoan = LoanModel(
+          id: '',
+          userId: userId,
+          title: _titleCtrl.text.trim(),
+          loanType: _loanType,
+          principal: principal,
+          annualInterestRate: rate,
+          tenureMonths: tenure,
+          startDate: _startDate,
+          emiDueDay: _emiDueDay,
+          status: LoanStatus.active,
+          lenderBorrowerName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+          notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+          createdAt: DateTime.now(),
+          customEmi: (customEmiVal != null && customEmiVal > 0) ? customEmiVal : null,
+          processingFee: _processingFee,
+          insuranceFee: _insuranceFee,
+          otherCharges: _otherCharges,
+          gstOnFees: _gstAmount,
+          emiStartDate: _emiStartDate,
         );
+        final loanId = await service.addLoan(userId, newLoan);
+
+        // Check for missed EMIs immediately after adding
+        final loanForCheck = LoanModel(
+          id: loanId, userId: userId,
+          title: newLoan.title, loanType: newLoan.loanType,
+          principal: principal, annualInterestRate: rate,
+          tenureMonths: tenure, startDate: _startDate,
+          emiDueDay: _emiDueDay, status: LoanStatus.active,
+          createdAt: DateTime.now(),
+          emiStartDate: _emiStartDate,
+        );
+        final missed = service.getMissedEmiDates(loanForCheck, []);
+
+        if (missed.isNotEmpty && mounted) {
+          await _showMissedEmiDialog(context, userId, loanId, missed, service);
+        }
       }
       if (mounted) Navigator.pop(context);
     } catch (e) {

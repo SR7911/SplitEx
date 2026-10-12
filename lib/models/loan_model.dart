@@ -19,6 +19,8 @@ class LoanModel {
   final String? notes;
   final String? recurringId; // linked personal_recurring doc id
   final DateTime createdAt;
+  final double? customEmi; // user-overridden EMI amount
+  final DateTime? emiStartDate; // date of first EMI (defaults to startDate + 1 month)
 
   // ── One-time charges (deducted from disbursal, not part of EMI) ──────────
   final double processingFee;   // flat or % of principal
@@ -41,19 +43,26 @@ class LoanModel {
     this.notes,
     this.recurringId,
     required this.createdAt,
+    this.customEmi,
     this.processingFee = 0,
     this.insuranceFee = 0,
     this.otherCharges = 0,
     this.gstOnFees = 0,
+    this.emiStartDate,
   });
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
+  /// The reference date used to compute EMI due dates (first EMI month).
+  DateTime get effectiveEmiStart => emiStartDate ?? DateTime(startDate.year, startDate.month + 1, emiDueDay);
+
   DateTime get endDate {
-    final m = startDate.month + tenureMonths;
-    final y = startDate.year + (m - 1) ~/ 12;
-    final mo = ((m - 1) % 12) + 1;
-    return DateTime(y, mo, startDate.day);
+    final ref = effectiveEmiStart;
+    final m = ref.month + tenureMonths - 1;
+    final y = ref.year + m ~/ 12;
+    final mo = m % 12 == 0 ? 12 : m % 12;
+    final maxDay = DateTime(y, mo + 1, 0).day;
+    return DateTime(y, mo, emiDueDay.clamp(1, maxDay));
   }
 
   /// Net amount actually received after all upfront deductions.
@@ -65,6 +74,7 @@ class LoanModel {
   /// Standard EMI using reducing-balance formula.
   /// For 0% interest, EMI = principal / tenure.
   double get baseEmi {
+    if (customEmi != null && customEmi! > 0) return customEmi!;
     if (annualInterestRate == 0) return principal / tenureMonths;
     final r = annualInterestRate / (12 * 100);
     final n = tenureMonths;
@@ -103,10 +113,12 @@ class LoanModel {
       notes: map['notes'],
       recurringId: map['recurringId'],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      customEmi: (map['customEmi'] as num?)?.toDouble(),
       processingFee: (map['processingFee'] ?? 0).toDouble(),
       insuranceFee: (map['insuranceFee'] ?? 0).toDouble(),
       otherCharges: (map['otherCharges'] ?? 0).toDouble(),
       gstOnFees: (map['gstOnFees'] ?? 0).toDouble(),
+      emiStartDate: (map['emiStartDate'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -124,10 +136,12 @@ class LoanModel {
         if (notes != null) 'notes': notes,
         if (recurringId != null) 'recurringId': recurringId,
         'createdAt': FieldValue.serverTimestamp(),
+        if (customEmi != null && customEmi! > 0) 'customEmi': customEmi,
         if (processingFee > 0) 'processingFee': processingFee,
         if (insuranceFee > 0) 'insuranceFee': insuranceFee,
         if (otherCharges > 0) 'otherCharges': otherCharges,
         if (gstOnFees > 0) 'gstOnFees': gstOnFees,
+        if (emiStartDate != null) 'emiStartDate': Timestamp.fromDate(emiStartDate!),
       };
 
   LoanModel copyWith({
@@ -138,10 +152,12 @@ class LoanModel {
     int? tenureMonths,
     int? emiDueDay,
     String? notes,
+    double? customEmi,
     double? processingFee,
     double? insuranceFee,
     double? otherCharges,
     double? gstOnFees,
+    DateTime? emiStartDate,
   }) =>
       LoanModel(
         id: id,
@@ -158,10 +174,12 @@ class LoanModel {
         notes: notes ?? this.notes,
         recurringId: recurringId ?? this.recurringId,
         createdAt: createdAt,
+        customEmi: customEmi ?? this.customEmi,
         processingFee: processingFee ?? this.processingFee,
         insuranceFee: insuranceFee ?? this.insuranceFee,
         otherCharges: otherCharges ?? this.otherCharges,
         gstOnFees: gstOnFees ?? this.gstOnFees,
+        emiStartDate: emiStartDate ?? this.emiStartDate,
       );
 }
 

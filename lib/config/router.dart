@@ -18,6 +18,8 @@ import 'package:split_ex/screens/activity/activity_screen.dart';
 import 'package:split_ex/screens/developer/storage_management_screen.dart';
 import 'package:split_ex/screens/personal/personal_budgets_screen.dart';
 import 'package:split_ex/screens/personal/personal_debts_screen.dart';
+import 'package:split_ex/screens/personal/debt_dashboard_screen.dart';
+import 'package:split_ex/screens/personal/debt_list_screen.dart';
 import 'package:split_ex/screens/personal/personal_recurring_screen.dart';
 import 'package:split_ex/screens/personal/personal_transactions_screen.dart';
 import 'package:split_ex/screens/settings/settings_screen.dart';
@@ -34,9 +36,10 @@ import 'package:split_ex/screens/projects/create_project_screen.dart';
 import 'package:split_ex/screens/projects/project_dashboard_screen.dart';
 import 'package:split_ex/screens/projects/project_debts_screen.dart';
 import 'package:split_ex/screens/projects/project_expenses_screen.dart';
-import 'package:split_ex/screens/personal/loan_list_screen.dart';
-import 'package:split_ex/screens/personal/loan_detail_screen.dart';
-import 'package:split_ex/screens/personal/add_loan_sheet.dart';
+import 'package:split_ex/screens/loans/loan_list_screen.dart';
+import 'package:split_ex/screens/loans/loan_detail_screen.dart';
+import 'package:split_ex/screens/loans/add_loan_sheet.dart';
+import 'package:split_ex/screens/loans/loan_reports_screen.dart';
 
 /// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
 class RouterNotifier extends ChangeNotifier {
@@ -191,6 +194,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/personal/transactions/category',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, String>? ?? {};
+          final monthKey = extra['monthKey'] ?? DateFormat('yyyy-MM').format(DateTime.now());
+          final category = extra['category'];
+          return PersonalTransactionsScreen(monthKey: monthKey, initialCategory: category);
+        },
+      ),
+      GoRoute(
         path: '/personal/budgets',
         builder: (context, state) {
           final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
@@ -205,10 +217,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/personal/debts',
         builder: (context, state) => const PersonalDebtsScreen(),
       ),
+      GoRoute(
+        path: '/personal/debt-dashboard',
+        builder: (context, state) => const DebtDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/personal/debt-list',
+        builder: (context, state) => const DebtListScreen(),
+      ),
       // ─── Loan Routes ───
       GoRoute(
         path: '/personal/loans',
         builder: (context, state) => const LoanListScreen(),
+      ),
+      GoRoute(
+        path: '/personal/loans/reports',
+        builder: (context, state) => const LoanReportsScreen(),
       ),
       GoRoute(
         path: '/personal/loans/:loanId',

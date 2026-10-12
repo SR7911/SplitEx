@@ -48,6 +48,37 @@ final loanScheduleProvider =
   return ref.watch(loanServiceProvider).buildSchedule(loanList.first, payments);
 });
 
+// ── Computed: EMI progress (paid count, total, next due date) ────────────
+
+class LoanEmiProgress {
+  final int paidCount;
+  final int totalCount;
+  final DateTime? nextDueDate;
+  const LoanEmiProgress({required this.paidCount, required this.totalCount, this.nextDueDate});
+}
+
+final loanEmiProgressProvider =
+    Provider.family<LoanEmiProgress, String>((ref, loanId) {
+  final loans = ref.watch(loansProvider).valueOrNull ?? [];
+  final loanList = loans.where((l) => l.id == loanId).toList();
+  if (loanList.isEmpty) return const LoanEmiProgress(paidCount: 0, totalCount: 0);
+  final loan = loanList.first;
+  final payments = ref.watch(loanPaymentsProvider(loanId)).valueOrNull ?? [];
+  final paidCount = payments.where((p) => p.type == PaymentType.emi).length;
+  final now = DateTime.now();
+  DateTime? nextDue;
+  for (int i = paidCount + 1; i <= loan.tenureMonths; i++) {
+    final ref2 = loan.effectiveEmiStart;
+    final rawMonth = ref2.month + i - 1;
+    final y = ref2.year + (rawMonth - 1) ~/ 12;
+    final mo = ((rawMonth - 1) % 12) + 1;
+    final maxDay = DateTime(y, mo + 1, 0).day;
+    final due = DateTime(y, mo, loan.emiDueDay.clamp(1, maxDay));
+    if (!due.isBefore(now)) { nextDue = due; break; }
+  }
+  return LoanEmiProgress(paidCount: paidCount, totalCount: loan.tenureMonths, nextDueDate: nextDue);
+});
+
 // ── Computed: summary stats across all active loans ───────────────────────
 
 class LoanSummary {

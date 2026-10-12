@@ -168,31 +168,53 @@ Expense added/edited/deleted
 Personal Tab (Bottom Nav)
     │
     ├── Dashboard shows: greeting, financial status, income/expense pills,
-    │   budget usage, category budgets, pie chart, recent transactions, recurring
+    │   budget usage, category budgets, pie chart, weekly spending summary,
+    │   recent transactions, recurring
     │
     ├── Add Transaction (FAB)
     │     ├── Enter: Amount, Title, Category, Date, Notes
     │     ├── Optional: "Involves someone else?" toggle
-    │     │     ├── "I Lent" → person owes you
-    │     │     └── "I Borrowed" → you owe person
+    │     │     ├── "I Lent" → person owes you (saved as expense)
+    │     │     └── "I Borrowed" → you owe person (saved as income)
     │     └── Save → Firestore (users/{uid}/personal_transactions)
     │
     ├── All Transactions → Day-wise grouped list + FAB
     │     └── Tap → View/Edit bottom sheet (shows debt info if applicable)
     │
-    ├── Reports → Bottom sheet with pie chart + daily bar chart
+    ├── Reports → Bottom sheet with stats, category donut, breakdown, weekly analysis, daily bar chart
+    │     ├── Tap any category chip or breakdown row → filtered transaction list for that category
+    │     ├── Weekly Analysis: 4-week bars (W1–W4), avg/high/low highlights, trend insight
+    │     └── Daily Spending: bar chart with weekday vs weekend color coding
     │
-    ├── Debts & Settlements
-    │     ├── Lent section: green, "Settled?" button
-    │     ├── Borrowed section: red, "Settle Up" button
-    │     └── Settled items: greyed out, strikethrough, no action
+    ├── Debts → Debt Dashboard (/personal/debt-dashboard)
+    │     ├── Hero card: net balance, lent, borrowed, active count
+    │     ├── 6-month grouped bar chart, lent vs borrowed donut chart
+    │     ├── Most debted people (consolidated net per person)
+    │     ├── Add Debt (sheet) — person autocomplete, lent/borrowed toggle
+    │     └── View All → Monthly Debt List (/personal/debt-list)
+    │           ├── Month navigation, search, filters (type/status/amount)
+    │           └── Separate lent/borrowed sections
+    │
+    ├── Debts & Settlements (/personal/debts)
+    │     ├── Lent section: green, full/partial settle button
+    │     ├── Borrowed section: red, full/partial settle button
+    │     └── Settled items: greyed out, strikethrough, partial history shown
     │
     ├── Budgets → Category budget management
+    │     ├── Healthy: 0–70% (green)
+    │     ├── Warning: 70–100% (orange)
+    │     └── Over Budget: >100% (red)
     │
     └── Recurring → Active/Past with add/pause/delete
 ```
 
-**Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `personal_debts_screen.dart`, `personal_expense_service.dart`, `personal_expense_provider.dart`
+**Debt balance logic:**
+- Lent → saved as `type: expense` (deducts balance on creation)
+- Borrowed → saved as `type: income` (adds to balance on creation)
+- Lent settled → auto-creates `type: income` entry in settlement month
+- Borrowed settled → no auto-transaction (deduction already happened at creation)
+
+**Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `add_debt_sheet.dart`, `debt_dashboard_screen.dart`, `debt_list_screen.dart`, `personal_debts_screen.dart`, `personal_reports_screen.dart`, `personal_transactions_screen.dart`, `personal_expense_service.dart`, `personal_expense_provider.dart`
 
 ### 8. Group Expenses Flow
 ```
@@ -235,6 +257,57 @@ Status management: active → completed / paused (popup menu)
 ```
 
 **Key files:** `projects_list_screen.dart`, `project_dashboard_screen.dart`, `add_project_expense_sheet.dart`, `project_service.dart`, `project_provider.dart`
+
+### 10. Loan & EMI Manager Flow
+```
+Personal Tab → Loans & EMI
+    │
+    ├── Loan List Screen
+    │     ├── Hero card: total outstanding, borrowed vs lent, monthly EMI
+    │     ├── Per-loan card:
+    │     │     ├── Remaining amount + status badge
+    │     │     ├── Animated progress bar (% paid)
+    │     │     ├── EMI amount chip
+    │     │     ├── X/Y EMIs paid chip
+    │     │     └── Next: DD MMM due date chip
+    │     └── FAB → Add Loan sheet
+    │
+    ├── Add Loan Sheet
+    │     ├── Loan type: Borrowed / Lent
+    │     ├── Title, lender/borrower name, principal, rate, tenure, EMI due day
+    │     ├── Loan Start Date picker
+    │     ├── First EMI Date picker (auto = start + 1 month, overridable)
+    │     ├── EMI override toggle + custom EMI field
+    │     ├── Charges & Fees (processing, insurance, other, 18% GST)
+    │     ├── Live EMI preview + total payable
+    │     └── On save: checks for missed EMIs → prompts backdating dialog
+    │
+    └── Loan Detail Screen (3 tabs)
+          ├── Overview tab
+          │     ├── Hero card: remaining, progress bar, rate/tenure/end chips
+          │     ├── EMI line: “EMI ₹XXXX · 3/24 paid · Next: 05 Jul”
+          │     ├── Action buttons: Log EMI | Prepay | Force Close
+          │     └── Payment history (EMI / Partial / Foreclosure badges)
+          ├── Reports tab
+          │     ├── Pie chart: principal paid/remaining + interest paid/remaining
+          │     ├── Monthly principal vs interest bar chart
+          │     └── Payment history list
+          └── Schedule tab (borrowed loans only)
+                └── Month-by-month amortization table; paid months highlighted
+```
+
+**EMI auto-expense logging:**
+- Every logged payment (EMI / partial / foreclosure) auto-creates a `personal_transactions` expense with category `Loan EMI`
+- Tagged with `loanSourceId` on the transaction document
+- Dedup guard: checks for existing entry with same `loanSourceId` + same date before inserting
+- Appears in the personal expense list under the correct month
+
+**EMI schedule anchor:**
+- `emiStartDate` field stores the user-set first EMI date
+- If not set, `effectiveEmiStart = startDate + 1 month` (auto)
+- All amortization, missed-EMI detection, and `endDate` computation use `effectiveEmiStart`
+
+**Key files:** `loan_list_screen.dart`, `loan_detail_screen.dart`, `add_loan_sheet.dart`, `loan_reports_screen.dart`, `loan_service.dart`, `loan_provider.dart`, `loan_model.dart`
 
 ---
 
@@ -337,6 +410,14 @@ Projects are user-private, scoped under the user's document:
 users/{uid}/projects/{projectId}/expenses/{expenseId}
 ```
 No sharing — only the owner can read/write.
+
+## Loan Data Isolation
+
+Loans are user-private, scoped under the user's document:
+```
+users/{uid}/loans/{loanId}/payments/{paymentId}
+```
+Each payment auto-logs to `users/{uid}/personal_transactions` with `loanSourceId` for traceability.
 
 ---
 

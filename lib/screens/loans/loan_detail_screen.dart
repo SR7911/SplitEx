@@ -4,9 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/loan_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/loan_provider.dart';
-import 'package:split_ex/screens/personal/add_loan_sheet.dart';
-import 'package:split_ex/screens/personal/loan_list_screen.dart'
-    show loanStatusLabel, fmtAmount;
+import 'package:split_ex/screens/loans/add_loan_sheet.dart';
+import 'package:split_ex/screens/loans/loan_list_screen.dart'
+    show loanStatusLabel, fmtAmount, LoanReportSheet, loanStatusColor;
 import 'package:split_ex/widgets/app_header.dart';
 import 'package:split_ex/widgets/design_system/design_system.dart';
 
@@ -55,8 +55,9 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
   @override
   void initState() {
     super.initState();
+    // tabs: Overview | Reports | Schedule (borrowed only)
     _tabController = TabController(
-      length: widget.loan.loanType == LoanType.borrowed ? 2 : 1,
+      length: widget.loan.loanType == LoanType.borrowed ? 3 : 2,
       vsync: this,
     );
   }
@@ -67,15 +68,41 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
     super.dispose();
   }
 
+  void _showDeleteDialog(BuildContext context, WidgetRef ref, LoanModel loan) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Loan?'),
+        content: Text('Delete "${loan.title}" and all payment history? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _kRed),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final userId = ref.read(authStateProvider).valueOrNull?.uid;
+              if (userId == null) return;
+              await ref.read(loanServiceProvider).deleteLoan(userId, loan.id);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loan          = widget.loan;
     final remaining     = ref.watch(loanRemainingPrincipalProvider(loan.id));
+    final emiProgress   = ref.watch(loanEmiProgressProvider(loan.id));
     final paymentsAsync = ref.watch(loanPaymentsProvider(loan.id));
     final schedule      = ref.watch(loanScheduleProvider(loan.id));
     final isActive      = loan.status == LoanStatus.active;
     final progress      = 1 - (remaining / loan.principal).clamp(0.0, 1.0);
     final cs            = Theme.of(context).colorScheme;
+    final statusColor   = loanStatusColor(loan.status, cs.primary);
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -89,11 +116,29 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
               icon: const Icon(Icons.edit_outlined),
               onPressed: () => showAddLoanSheet(context, existing: loan),
             ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            onSelected: (v) {
+              if (v == 'delete') _showDeleteDialog(context, ref, loan);
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(children: [
+                  Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                  SizedBox(width: 10),
+                  Text('Delete Loan', style: TextStyle(color: Colors.red, fontSize: 13)),
+                ]),
+              ),
+            ],
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
             const Tab(text: 'Overview'),
+            const Tab(text: 'Reports'),
             if (loan.loanType == LoanType.borrowed) const Tab(text: 'Schedule'),
           ],
         ),
@@ -104,13 +149,15 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
           ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
             children: [
-              _HeroCard(loan: loan, remaining: remaining, progress: progress),
+              _HeroCard(loan: loan, remaining: remaining, progress: progress, statusColor: statusColor, emiProgress: emiProgress),
               const SizedBox(height: 16),
               if (isActive) _ActionButtons(loan: loan, remaining: remaining),
               if (isActive) const SizedBox(height: 20),
               _PaymentHistory(paymentsAsync: paymentsAsync),
             ],
           ),
+          // Reports tab — reuses LoanReportSheet content as a scrollable page
+          _ReportsTab(loan: loan),
           if (loan.loanType == LoanType.borrowed)
             _AmortizationTab(schedule: schedule, loan: loan),
         ],
@@ -118,8 +165,6 @@ class _LoanDetailViewState extends ConsumerState<_LoanDetailView>
     );
   }
 }
-
-// ── AppBar gradient ─────────────────────────────────────────────────────
 
 class _AppBarGradient extends StatelessWidget {
   @override
@@ -141,17 +186,16 @@ class _AppBarGradient extends StatelessWidget {
   }
 }
 
-// ── Hero card ─────────────────────────────────────────────────────────────
-
 class _HeroCard extends StatelessWidget {
   final LoanModel loan;
   final double remaining;
   final double progress;
-  const _HeroCard({required this.loan, required this.remaining, required this.progress});
+  final Color statusColor;
+  final LoanEmiProgress emiProgress;
+  const _HeroCard({required this.loan, required this.remaining, required this.progress, required this.statusColor, required this.emiProgress});
 
   @override
   Widget build(BuildContext context) {
-    final cs     = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isLent = loan.loanType == LoanType.lent;
 
@@ -160,15 +204,15 @@ class _HeroCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
-              ? [cs.primary.withValues(alpha: 0.85), cs.primary.withValues(alpha: 0.55)]
-              : [cs.primary, cs.primary.withValues(alpha: 0.78)],
+              ? [statusColor.withValues(alpha: 0.85), statusColor.withValues(alpha: 0.55)]
+              : [statusColor, statusColor.withValues(alpha: 0.78)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppRadius.xxl),
         boxShadow: [
           BoxShadow(
-            color: cs.primary.withValues(alpha: isDark ? 0.2 : 0.35),
+            color: statusColor.withValues(alpha: isDark ? 0.2 : 0.35),
             blurRadius: 20,
             offset: const Offset(0, 6),
           ),
@@ -255,7 +299,8 @@ class _HeroCard extends StatelessWidget {
                     ),
                     if (loan.loanType == LoanType.borrowed)
                       Text(
-                        'EMI ₹${loan.baseEmi.toStringAsFixed(0)} · Due day ${loan.emiDueDay}',
+                        'EMI ₹${loan.baseEmi.toStringAsFixed(0)} · ${emiProgress.paidCount}/${emiProgress.totalCount} paid'
+                        '${emiProgress.nextDueDate != null ? ' · Next: ${DateFormat('dd MMM').format(emiProgress.nextDueDate!)}' : ''}',
                         style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.75)),
                       )
                     else
@@ -331,8 +376,6 @@ class _InfoChip extends StatelessWidget {
     );
   }
 }
-
-// ── Action buttons ────────────────────────────────────────────────────────
 
 class _ActionButtons extends ConsumerWidget {
   final LoanModel loan;
@@ -516,8 +559,6 @@ class _DangerButton extends StatelessWidget {
   }
 }
 
-// ── Payment history ───────────────────────────────────────────────────────
-
 class _PaymentHistory extends StatelessWidget {
   final AsyncValue<List<LoanPaymentModel>> paymentsAsync;
   const _PaymentHistory({required this.paymentsAsync});
@@ -635,8 +676,6 @@ class _PaymentHistory extends StatelessWidget {
     );
   }
 }
-
-// ── Amortization schedule tab ─────────────────────────────────────────────
 
 class _AmortizationTab extends StatelessWidget {
   final List<AmortizationEntry> schedule;
@@ -756,5 +795,21 @@ class _Cell extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── Reports Tab ───────────────────────────────────────────────────────────
+// Embeds the same pie + bar chart content from LoanReportSheet as a full tab.
+
+class _ReportsTab extends ConsumerWidget {
+  final LoanModel loan;
+  const _ReportsTab({required this.loan});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Delegate entirely to LoanReportSheet's body by embedding it in a
+    // scrollable page — we strip the sheet handle/header since the AppBar
+    // already shows the loan title.
+    return LoanReportSheet(loan: loan, embeddedMode: true);
   }
 }
