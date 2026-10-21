@@ -10,6 +10,7 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        BankSmsStore.foregroundChannel = BankSmsStore.attach(this, flutterEngine, this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.splitex.in.app/install")
             .setMethodCallHandler { call, result ->
                 if (call.method == "installApk") {
@@ -31,5 +32,21 @@ class MainActivity : FlutterActivity() {
                     result.notImplemented()
                 }
             }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == BankSmsStore.PERMISSION_REQUEST) {
+            BankSmsStore.pendingPermission?.success(BankSmsStore.hasPermission(this))
+            BankSmsStore.pendingPermission = null
+            BankSmsStore.foregroundChannel?.invokeMethod("permissionChanged", null)
+        }
+    }
+
+    override fun onDestroy() {
+        BankSmsStore.pendingPermission?.error("CANCELLED", "Permission request was cancelled.", null)
+        BankSmsStore.pendingPermission = null
+        BankSmsStore.foregroundChannel = null
+        super.onDestroy()
     }
 }

@@ -11,6 +11,7 @@ import 'package:split_ex/screens/personal/personal_reports_screen.dart';
 import 'package:split_ex/screens/personal/view_personal_transaction_sheet.dart';
 import 'package:split_ex/providers/loan_provider.dart';
 import 'package:split_ex/widgets/design_system/design_system.dart';
+import 'package:split_ex/screens/personal/personal_tools_section.dart';
 
 // -- Shared accent colors --------------------------------------------------
 const _kGreen  = Color(0xFF22C55E);
@@ -100,6 +101,8 @@ class _PersonalExpenseTabState extends ConsumerState<PersonalExpenseTab> {
             _BudgetUsageCard(summary: summary),
             const SizedBox(height: 20),
             _QuickActionsRow(monthKey: _monthKey),
+            const SizedBox(height: 20),
+            PersonalToolsSection(monthKey: _monthKey),
             const SizedBox(height: 20),
             _WeeklyExpenseSummaryCard(monthKey: _monthKey),
             const SizedBox(height: 20),

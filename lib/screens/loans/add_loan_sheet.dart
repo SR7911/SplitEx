@@ -666,71 +666,6 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
     );
   }
 
-  Future<void> _showMissedEmiDialog(
-    BuildContext context,
-    String userId,
-    String loanId,
-    List<DateTime> missed,
-    LoanService service,
-  ) async {
-    final fmt = DateFormat('dd MMM yyyy');
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Row(children: [
-          Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 22),
-          SizedBox(width: 8),
-          Text('Past EMIs Detected'),
-        ]),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${missed.length} EMI${missed.length > 1 ? 's' : ''} appear unpaid since the start date:',
-              style: const TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 10),
-            ...missed.take(5).map((d) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(children: [
-                const Icon(Icons.circle, size: 6, color: Color(0xFFF59E0B)),
-                const SizedBox(width: 8),
-                Text(fmt.format(d), style: const TextStyle(fontSize: 12)),
-              ]),
-            )),
-            if (missed.length > 5)
-              Text('  ...and ${missed.length - 5} more', style: const TextStyle(fontSize: 12)),
-            const SizedBox(height: 10),
-            const Text(
-              'Mark all as paid (backdated)?',
-              style: TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Not Paid'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await service.logMissedEmis(userId, loanId, missed);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${missed.length} past EMI${missed.length > 1 ? 's' : ''} logged')),
-                );
-              }
-            },
-            child: const Text('Mark Paid'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _submit() async {
     final principal = double.tryParse(_principalCtrl.text);
     final rate = double.tryParse(_rateCtrl.text);
@@ -798,7 +733,7 @@ class _AddLoanSheetState extends ConsumerState<_AddLoanSheet> {
         final missed = service.getMissedEmiDates(loanForCheck, []);
 
         if (missed.isNotEmpty && mounted) {
-          await _showMissedEmiDialog(context, userId, loanId, missed, service);
+          await showMissedEmiDialog(context, userId, loanId, missed, service);
         }
       }
       if (mounted) Navigator.pop(context);
@@ -847,6 +782,75 @@ class _DayDropdown extends StatelessWidget {
           .map((d) => DropdownMenuItem(value: d, child: Text('$d')))
           .toList(),
       onChanged: (v) => onChanged(v!),
+    );
+  }
+}
+
+Future<void> showMissedEmiDialog(
+  BuildContext context,
+  String userId,
+  String loanId,
+  List<DateTime> missed,
+  LoanService service, {
+  String? loanTitle,
+}) async {
+  final fmt = DateFormat('dd MMM yyyy');
+  final confirmed = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      title: const Row(children: [
+        Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B), size: 22),
+        SizedBox(width: 8),
+        Text('Past EMIs Detected'),
+      ]),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (loanTitle != null) ...[
+            Text(loanTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            '${missed.length} EMI${missed.length > 1 ? 's' : ''} appear unpaid since the start date:',
+            style: const TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 10),
+          ...missed.take(5).map((d) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(children: [
+              const Icon(Icons.circle, size: 6, color: Color(0xFFF59E0B)),
+              const SizedBox(width: 8),
+              Text(fmt.format(d), style: const TextStyle(fontSize: 12)),
+            ]),
+          )),
+          if (missed.length > 5)
+            Text('  ...and ${missed.length - 5} more', style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 10),
+          const Text(
+            'Mark all as paid (backdated)?',
+            style: TextStyle(fontSize: 12),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Not Paid'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Mark Paid'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  await service.logMissedEmis(userId, loanId, missed);
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${missed.length} EMI payment(s) logged with expenses')),
     );
   }
 }

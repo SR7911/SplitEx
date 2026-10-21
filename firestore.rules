@@ -23,6 +23,30 @@ service cloud.firestore {
         allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();
       }
 
+      // Import receipts retain deduplication after a user edits/deletes an expense.
+      match /bank_sms_receipts/{receiptId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /personal_accounts/{accountId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /personal_transfers/{transferId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /merchant_category_rules/{ruleId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      match /personal_savings_goals/{goalId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        match /entries/{entryId} {
+          allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+      }
+
       // Personal budgets - owner only
       match /personal_budgets/{budgetId} {
         allow read, create, update, delete: if request.auth.uid == userId || isDeveloper();

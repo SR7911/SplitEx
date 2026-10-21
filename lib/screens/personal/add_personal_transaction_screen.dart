@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
+import 'package:split_ex/widgets/personal_account_picker.dart';
+import 'package:split_ex/widgets/debt_due_date_picker.dart';
 
 const personalCategories = [
   'Food',
@@ -56,6 +58,8 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
   bool _saving = false;
   bool _involvesPerson = false;
   DebtType _debtType = DebtType.lent;
+  String? _accountId;
+  DateTime? _dueDate;
 
   @override
   void dispose() {
@@ -77,18 +81,28 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
       id: '',
       title: _titleCtrl.text.trim(),
       amount: double.parse(_amountCtrl.text.trim()),
-      type: _type,
+      type: _involvesPerson ? (_debtType == DebtType.lent ? TransactionType.expense : TransactionType.income) : _type,
       category: _category,
       date: _date,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
       userId: userId,
       month: DateFormat('yyyy-MM').format(_date),
       createdAt: DateTime.now(),
+      accountId: _accountId,
+      dueDate: _involvesPerson ? _dueDate : null,
       debtType: _involvesPerson ? _debtType : null,
       personName: _involvesPerson ? _personCtrl.text.trim() : null,
     );
 
-    await ref.read(personalExpenseServiceProvider).addTransaction(userId, txn);
+    try {
+      await ref.read(personalExpenseServiceProvider).addTransaction(userId, txn);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save. Check your account, amount and repayment date, then retry.')));
+      }
+      return;
+    }
 
     if (mounted) {
       Navigator.pop(context);
@@ -231,6 +245,8 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                 const SizedBox(height: 16),
 
                 // Debt toggle
+                PersonalAccountPicker(value: _accountId, enabled: !_saving, onChanged: (v) => setState(() => _accountId = v)),
+                const SizedBox(height: 16),
                 SwitchListTile(
                   value: _involvesPerson,
                   onChanged: (v) => setState(() => _involvesPerson = v),
@@ -241,6 +257,7 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                 ),
 
                 if (_involvesPerson) ...[
+                  DebtDueDatePicker(value: _dueDate, debtDate: _date, enabled: !_saving, onChanged: (v) => setState(() => _dueDate = v)),
                   const SizedBox(height: 12),
                   SegmentedButton<DebtType>(
                     segments: const [

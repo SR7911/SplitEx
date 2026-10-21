@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TransactionType { expense, income }
+
 enum RecurringFrequency { weekly, monthly }
+
 enum DebtType { lent, borrowed }
 
 class PersonalTransactionModel {
@@ -15,11 +17,14 @@ class PersonalTransactionModel {
   final String userId;
   final String month; // yyyy-MM
   final DateTime createdAt;
+  final String? accountId;
+  final DateTime? dueDate;
   // Debt tracking fields
   final DebtType? debtType;
   final String? personName;
   final bool isSettled;
   final double settledAmount;
+  final double writtenOffAmount;
   final List<Map<String, dynamic>> partialSettlements;
 
   const PersonalTransactionModel({
@@ -33,17 +38,25 @@ class PersonalTransactionModel {
     required this.userId,
     required this.month,
     required this.createdAt,
+    this.accountId,
+    this.dueDate,
     this.debtType,
     this.personName,
     this.isSettled = false,
     this.settledAmount = 0,
+    this.writtenOffAmount = 0,
     this.partialSettlements = const [],
   });
 
-  bool get hasDebt => debtType != null && personName != null && personName!.isNotEmpty;
-  double get remainingAmount => amount - settledAmount;
+  bool get hasDebt =>
+      debtType != null && personName != null && personName!.isNotEmpty;
+  double get remainingAmount =>
+      (amount - settledAmount - writtenOffAmount).clamp(0.0, double.infinity);
 
-  factory PersonalTransactionModel.fromMap(Map<String, dynamic> map, String id) {
+  factory PersonalTransactionModel.fromMap(
+    Map<String, dynamic> map,
+    String id,
+  ) {
     return PersonalTransactionModel(
       id: id,
       title: map['title'] ?? '',
@@ -58,13 +71,21 @@ class PersonalTransactionModel {
       userId: map['userId'] ?? '',
       month: map['month'] ?? '',
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      accountId: map['accountId'] as String?,
+      dueDate: (map['dueDate'] as Timestamp?)?.toDate(),
       debtType: map['debtType'] != null
-          ? DebtType.values.firstWhere((e) => e.name == map['debtType'], orElse: () => DebtType.lent)
+          ? DebtType.values.firstWhere(
+              (e) => e.name == map['debtType'],
+              orElse: () => DebtType.lent,
+            )
           : null,
       personName: map['personName'],
       isSettled: map['isSettled'] ?? false,
       settledAmount: (map['settledAmount'] ?? 0).toDouble(),
-      partialSettlements: List<Map<String, dynamic>>.from(map['partialSettlements'] ?? []),
+      writtenOffAmount: (map['writtenOffAmount'] ?? 0).toDouble(),
+      partialSettlements: List<Map<String, dynamic>>.from(
+        map['partialSettlements'] ?? [],
+      ),
     );
   }
 
@@ -79,10 +100,13 @@ class PersonalTransactionModel {
       'userId': userId,
       'month': month,
       'createdAt': FieldValue.serverTimestamp(),
+      if (accountId != null) 'accountId': accountId,
+      if (dueDate != null) 'dueDate': Timestamp.fromDate(dueDate!),
       if (debtType != null) 'debtType': debtType!.name,
       if (personName != null) 'personName': personName,
       'isSettled': isSettled,
       'settledAmount': settledAmount,
+      'writtenOffAmount': writtenOffAmount,
       'partialSettlements': partialSettlements,
     };
   }
@@ -138,6 +162,8 @@ class RecurringTransaction {
   final String userId;
   final DateTime? lastRunDate;
   final DateTime? endDate;
+  final DateTime? createdAt;
+
   /// Snapshot of fields before each edit — newest first.
   final List<RecurringEditSnapshot> editHistory;
 
@@ -153,6 +179,7 @@ class RecurringTransaction {
     required this.userId,
     this.lastRunDate,
     this.endDate,
+    this.createdAt,
     this.editHistory = const [],
   });
 
@@ -175,6 +202,7 @@ class RecurringTransaction {
       userId: map['userId'] ?? '',
       lastRunDate: (map['lastRunDate'] as Timestamp?)?.toDate(),
       endDate: (map['endDate'] as Timestamp?)?.toDate(),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       editHistory: (map['editHistory'] as List<dynamic>? ?? [])
           .map((e) => RecurringEditSnapshot.fromMap(e as Map<String, dynamic>))
           .toList(),
@@ -191,6 +219,7 @@ class RecurringTransaction {
       'dayOfMonth': dayOfMonth,
       'active': active,
       'userId': userId,
+      if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       if (lastRunDate != null) 'lastRunDate': Timestamp.fromDate(lastRunDate!),
       if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
       'editHistory': editHistory.map((e) => e.toMap()).toList(),
@@ -199,7 +228,11 @@ class RecurringTransaction {
 
   bool get isExpired {
     if (endDate == null) return false;
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final today = DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+    );
     final end = DateTime(endDate!.year, endDate!.month, endDate!.day);
     return !end.isAfter(today);
   }
@@ -237,24 +270,25 @@ class RecurringEditSnapshot {
       dayOfMonth: map['dayOfMonth'] ?? 1,
       endDate: map['endDate'] != null
           ? (map['endDate'] is Timestamp
-              ? (map['endDate'] as Timestamp).toDate()
-              : DateTime.tryParse(map['endDate'].toString()))
+                ? (map['endDate'] as Timestamp).toDate()
+                : DateTime.tryParse(map['endDate'].toString()))
           : null,
       editedAt: map['editedAt'] != null
           ? (map['editedAt'] is Timestamp
-              ? (map['editedAt'] as Timestamp).toDate()
-              : DateTime.tryParse(map['editedAt'].toString()) ?? DateTime.now())
+                ? (map['editedAt'] as Timestamp).toDate()
+                : DateTime.tryParse(map['editedAt'].toString()) ??
+                      DateTime.now())
           : DateTime.now(),
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'title': title,
-        'amount': amount,
-        'category': category,
-        'frequency': frequency.name,
-        'dayOfMonth': dayOfMonth,
-        if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
-        'editedAt': Timestamp.fromDate(editedAt),
-      };
+    'title': title,
+    'amount': amount,
+    'category': category,
+    'frequency': frequency.name,
+    'dayOfMonth': dayOfMonth,
+    if (endDate != null) 'endDate': Timestamp.fromDate(endDate!),
+    'editedAt': Timestamp.fromDate(editedAt),
+  };
 }

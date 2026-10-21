@@ -155,11 +155,7 @@ class LoanService {
       type: PaymentType.emi,
     );
 
-    await _paymentCol(userId, loanId).add(payment.toMap());
-    await _tracker.trackWrites(1);
-
-    // Auto-add as personal expense transaction
-    await _addPersonalExpenseForPayment(userId, loan, emi, paymentDate, 'EMI');
+    await _saveEmiWithExpense(userId, loan, payment);
 
     // If fully paid, mark settled
     if (newRemaining < 1.0) {
@@ -264,7 +260,9 @@ class LoanService {
       final due = _nthEmiDate(loan, i);
       if (due.isAfter(now)) break;
       // Check if an EMI payment exists within ±15 days of this due date
-      final hasPaid = emiPayments.any((p) => p.date.difference(due).inDays.abs() <= 15);
+      final match = emiPayments.indexWhere((p) => p.date.difference(due).inDays.abs() <= 15);
+      final hasPaid = match >= 0;
+      if (hasPaid) emiPayments.removeAt(match);
       if (!hasPaid) missed.add(due);
     }
     return missed;
@@ -283,7 +281,6 @@ class LoanService {
     // Get current remaining principal
     final paymentsSnap = await _paymentCol(userId, loanId)
         .orderBy('date', descending: true)
-        .limit(1)
         .get();
     _tracker.trackReads(1);
 
@@ -292,8 +289,12 @@ class LoanService {
       remaining = (paymentsSnap.docs.first['remainingPrincipalAfter'] as num?)?.toDouble() ?? remaining;
     }
 
+    final payments = paymentsSnap.docs.map((d) =>
+        LoanPaymentModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
+    final stillMissed = getMissedEmiDates(loan, payments).toSet();
+    final dates = missedDates.toSet().where(stillMissed.contains).toList()..sort();
     final monthlyRate = loan.annualInterestRate / (12 * 100);
-    for (final dueDate in missedDates) {
+    for (final dueDate in dates) {
       if (remaining < 1.0) break;
       final interest = remaining * monthlyRate;
       final emi = loan.baseEmi;
@@ -310,9 +311,7 @@ class LoanService {
         type: PaymentType.emi,
         note: 'Backdated EMI',
       );
-      await _paymentCol(userId, loanId).add(payment.toMap());
-      await _tracker.trackWrites(1);
-      await _addPersonalExpenseForPayment(userId, loan, emi, dueDate, 'EMI (Backdated)');
+      await _saveEmiWithExpense(userId, loan, payment);
     }
 
     if (remaining < 1.0) {
@@ -386,6 +385,35 @@ class LoanService {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  /// Save both records atomically with stable IDs for safe retries.
+  Future<void> _saveEmiWithExpense(
+    String userId, LoanModel loan, LoanPaymentModel payment,
+  ) async {
+    final day = DateFormat('yyyy-MM-dd').format(payment.date);
+    final paymentRef = _paymentCol(userId, loan.id).doc('emi_$day');
+    final expenseRef = _firestore.collection('users').doc(userId)
+        .collection('personal_transactions').doc('loan_${loan.id}_emi_$day');
+    await _firestore.runTransaction((transaction) async {
+      final existing = await transaction.get(paymentRef);
+      if (existing.exists) return;
+      final expense = PersonalTransactionModel(
+        id: expenseRef.id,
+        title: '${loan.title} – EMI',
+        amount: payment.amount,
+        type: TransactionType.expense,
+        category: 'Loan EMI',
+        date: payment.date,
+        notes: 'Auto-logged from Loan Tracker',
+        userId: userId,
+        month: DateFormat('yyyy-MM').format(payment.date),
+        createdAt: DateTime.now(),
+      );
+      transaction.set(paymentRef, payment.toMap());
+      transaction.set(expenseRef, {...expense.toMap(), 'loanSourceId': loan.id});
+    });
+    await _tracker.trackWrites(2);
+  }
 
   Future<void> _closeLoan(String userId, String loanId, LoanModel loan, LoanStatus status) async {
     await _loanCol(userId).doc(loanId).update({'status': status.name});

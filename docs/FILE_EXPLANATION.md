@@ -1,6 +1,6 @@
 # SplitEx — File-by-File Explanation
 
-Every file in the project explained with **What** it does and **Why** it exists.
+Reference to the app's main files, with **What** each does and **Why** it exists. Updated 2026-10-21 to include Android SMS recording and the recent personal finance features.
 
 ---
 
@@ -26,25 +26,25 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Firestore Security Rules that enforce read/write permissions server-side.
 - **Why:** Prevents unauthorized data access. Only room members can read room data; only admin can delete expenses.
 
+### `BANK_SMS_RECORDING.md` and `PERSONAL_FINANCE_FEATURES.md`
+- **What:** Feature guides for SMS consent/review/importing, accounts/transfers, calendar, monthly review, merchant rules and savings goals.
+- **Why:** Explain user entry points, accounting semantics, privacy, setup and verification. Recent storage additions are also summarized in [APP_HELPER.md](APP_HELPER.md).
+
 ---
 
 ## `docs/` — Documentation
 
-### `docs/BRD.md`
-- **What:** Business Requirements Document — complete specification of what the app should do.
-- **Why:** Acts as the single source of truth for features, user roles, data models, and constraints.
+### `docs/CHANGELOG.md`
+- **What:** Historical changes plus a dated unreleased section for the recent implementation.
+- **Why:** Records behavior changes and verification without implying deployment.
 
-### `docs/HID.md`
-- **What:** Hierarchical Implementation Document — development order with dependency tree.
-- **Why:** Ensures features are built in the correct sequence (can't build expenses before rooms exist).
+### `docs/DEPLOYMENT.md`
+- **What:** Release build, signing, Firebase rules/App Check, SMS permissions and device verification checklist.
+- **Why:** Separates implemented functionality from the setup and validation required for production.
 
-### `docs/PRODUCTION_CHECKLIST.md`
-- **What:** Pre-release checklist (disable dev mode, deploy rules, test flows).
-- **Why:** Prevents shipping a broken or insecure app to production.
-
-### `docs/PLAYSTORE_DEPLOYMENT.md`
-- **What:** Step-by-step Play Store publishing guide with asset requirements.
-- **Why:** Covers everything needed to get the app from code to live on the store.
+### `docs/FILE_EXPLANATION.md`
+- **What:** This source-file reference.
+- **Why:** Maps features to the files responsible for their data, logic, state and UI.
 
 ### `docs/APP_HELPER.md`
 - **What:** High-level app flow, architecture diagram, design decisions, and personal finance module reference (navigation, debt balance logic, budget status thresholds).
@@ -59,7 +59,7 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Every Flutter app needs a `main()`. This sets up all infrastructure before the UI renders.
 
 ### `lib/app.dart`
-- **What:** Root `MaterialApp.router` widget. Applies theme, dark mode, router config, and offline banner.
+- **What:** Root `MaterialApp.router` widget. Applies theme, dark mode, router config and offline banner; binds SMS processing to auth changes and foreground resume without blocking startup on optional SMS failures.
 - **Why:** Separates app shell configuration from initialization logic in `main.dart`.
 
 ---
@@ -99,12 +99,28 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Represents a personal project with a budget envelope. ProjectExpenseModel tracks individual spend items against that budget.
 
 ### `lib/models/personal_transaction_model.dart`
-- **What:** PersonalTransactionModel — id, title, amount, type (expense/income), category, date, notes, userId, month, createdAt, debtType (lent/borrowed/null), personName, isSettled, settledAmount, partialSettlements `[{amount, date, note}]`. Computed: `hasDebt`, `remainingAmount` (amount − settledAmount).
+- **What:** PersonalTransactionModel — personal income/expense fields, optional `accountId`, debt direction/person, optional repayment `dueDate`, settlement/write-off history, `settledAmount` and `writtenOffAmount`. `remainingAmount` clamps `amount - settledAmount - writtenOffAmount` at zero. Recurring records support optional `createdAt` for the calendar's start bound.
 - **Why:** Core model for personal finance. Doubles as a debt record when debtType is set. Also receives auto-logged entries from the Loan EMI tracker (tagged with `loanSourceId`).
 
 ### `lib/models/loan_model.dart`
 - **What:** Three data classes — `LoanModel` (loan metadata: title, loanType, principal, annualInterestRate, tenureMonths, startDate, emiDueDay, emiStartDate, status, charges, recurringId, customEmi), `LoanPaymentModel` (individual payment log: amount, principalComponent, interestComponent, remainingPrincipalAfter, date, type, note), `AmortizationEntry` (computed schedule row: month, dueDate, emi, principal, interest, remainingPrincipal, isPaid). Computed getters: `baseEmi`, `netDisbursed`, `effectiveEmiStart`, `endDate`.
 - **Why:** Core data layer for the Loan & EMI module. `emiStartDate` decouples the first EMI date from the loan start date for accurate schedule generation.
+
+### `lib/models/personal_account_model.dart`
+- **What:** Cash/bank/credit card accounts, own-account transfers and balance calculation using integer paise arithmetic.
+- **Why:** Derives tracked balances from opening balances, assigned transactions and transfers without treating transfers as spending.
+
+### `lib/models/payment_calendar_model.dart`
+- **What:** Read-only monthly events projected from loan EMIs, recurring schedules and dated debts, including recorded/overdue/scheduled state.
+- **Why:** Centralizes date clamping, log matching and duplicate-schedule exclusion for the calendar.
+
+### `lib/models/monthly_money_review.dart`
+- **What:** Monthly totals, category comparisons, budget checks, uncategorized expenses and current outstanding debt summaries.
+- **Why:** Keeps selected-month and equal-elapsed-date comparison logic independent of the UI.
+
+### `lib/models/savings_goal_model.dart`
+- **What:** Savings targets, optional dates/account labels and signed progress entries, with integer-paise amounts and progress helpers.
+- **Why:** Tracks savings plans separately from cash transactions and transfers.
 
 ### `lib/models/user_model.dart`
 - **What:** User data class — uid, name, email, avatarUrl, upiId, rooms list, createdAt.
@@ -195,12 +211,36 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Enables push notifications when the app upgrades to Blaze plan or uses server triggers.
 
 ### `lib/services/loan_service.dart`
-- **What:** All Firestore operations for the Loan & EMI module — `addLoan`, `updateLoan`, `deleteLoan`, `deleteRecurring`, `logEmiPayment`, `logPartialPayment`, `forecloseLoan`, `logMissedEmis`, `buildSchedule`, `getMissedEmiDates`. Each payment auto-logs a `personal_transactions` expense with a `loanSourceId` tag and a same-day dedup check. `_nthEmiDate` uses `loan.effectiveEmiStart` as the schedule anchor.
+- **What:** Loan CRUD, payment logging, missed-EMI detection and schedules. EMI logs and their personal expenses are saved atomically with stable IDs; partial/foreclosure expense imports retain source/date duplicate checks. Expenses include `loanSourceId`. Schedules use `loan.effectiveEmiStart`.
 - **Why:** Encapsulates all loan business logic — amortization math, payment splitting, recurring sync, and personal expense auto-logging with dedup protection.
 
 ### `lib/services/personal_expense_service.dart`
-- **What:** Firestore CRUD for personal_transactions, personal_budgets, personal_recurring subcollections. Includes debt queries and settlement.
+- **What:** Firestore CRUD for personal transactions, budgets and recurring entries, including account assignment validation, debt editing, dated partial/full settlements and close-debt write-offs. Lent receipts create income; borrowed repayments create expenses.
 - **Why:** All personal finance Firestore operations in one service — transactions, budgets, recurring, and debt settlement.
+
+### `lib/services/bank_sms_parser.dart`
+- **What:** Pure parser for supported INR bank/UPI/card debit/credit alerts, sender normalization, review decisions and stable import identities.
+- **Why:** Rejects non-payment messages and keeps parsing independently testable without Android or Firestore.
+
+### `lib/services/bank_sms_repository.dart`
+- **What:** Reviews duplicate candidates, creates or links personal entries/transfers and stores durable import receipts atomically. Applies merchant categories and can save a rule with an approved new expense.
+- **Why:** Protects retries and existing records without uploading raw SMS bodies.
+
+### `lib/services/bank_sms_service.dart`
+- **What:** Riverpod/ChangeNotifier bridge to the Android MethodChannel, permission/configuration state, local reviews and foreground/background queue processing. Includes `bankSmsBackgroundMain`.
+- **Why:** Coordinates capture/import lifecycle with authentication and Android jobs; account changes clear local SMS state.
+
+### `lib/services/personal_account_service.dart`
+- **What:** Owner-scoped account CRUD/archive and own-account transfer create/edit/delete operations, with account validation.
+- **Why:** Keeps transfers separate from income/expenses and preserves history when an account is archived.
+
+### `lib/services/merchant_category_service.dart`
+- **What:** Owner-scoped normalized sender/merchant category rules, deterministic IDs, suggestions, CRUD and pause/resume providers.
+- **Why:** Reuses a chosen category for future matching debit alerts without granting sender trust.
+
+### `lib/services/savings_goal_service.dart`
+- **What:** Goal CRUD/archive, progress/history providers and atomic contribution/withdrawal/deletion updates with stable entry IDs.
+- **Why:** Preserves aggregate/history consistency and prevents negative progress without creating personal transactions.
 
 ### `lib/services/upi_service.dart`
 - **What:** Constructs UPI intent URLs and launches payment apps (GPay, PhonePe, Paytm).
@@ -221,6 +261,18 @@ Every file in the project explained with **What** it does and **Why** it exists.
 ---
 
 ## `lib/providers/` — State Management (Riverpod)
+
+### `lib/providers/personal_account_provider.dart`
+- **What:** Account, transfer and assigned-transaction streams, plus loading/error-aware derived balances.
+- **Why:** Recalculates balances when assignments or transfers change.
+
+### `lib/providers/payment_calendar_provider.dart`
+- **What:** Combines loan/payment, recurring and debt data for the displayed month.
+- **Why:** Supplies the calendar's read-only event projection.
+
+### `lib/providers/monthly_money_review_provider.dart`
+- **What:** Month-family provider watching current/previous transactions, budgets and debts.
+- **Why:** Keeps review comparisons reactive with explicit loading/error handling. Savings and merchant-rule providers live in their service files.
 
 ### `lib/providers/group_provider.dart`
 - **What:** groupServiceProvider, groupExpenseServiceProvider, groupBalanceServiceProvider, userGroupsProvider, groupStreamProvider, groupExpensesProvider, groupNetBalancesProvider, groupSimplifiedDebtsProvider, groupUserBalanceProvider, groupTotalExpenseProvider.
@@ -295,6 +347,38 @@ Every file in the project explained with **What** it does and **Why** it exists.
 
 ## `lib/screens/` — UI Screens
 
+### `lib/screens/personal/personal_tools_section.dart`
+- **What:** Dashboard cards for Accounts & Wallets, Payment Calendar, Monthly Money Review and Savings Goals, plus the Android SMS review badge.
+- **Why:** Provides consistent entry points and passes the selected dashboard month to the review route.
+
+### `lib/screens/personal/personal_accounts_screen.dart`
+- **What:** Tracked account balances, account create/edit/archive/restore, assigned transactions and editable dated transfer history.
+- **Why:** Provides account bookkeeping in one place without changing spending totals for own-account transfers.
+
+### `lib/screens/personal/payment_calendar_screen.dart`
+- **What:** Full month grid, payment dots/amounts, arrows/swipes/date jump/Today, event filters and day/month agenda.
+- **Why:** Gives scheduled payments a calendar view; event taps open existing details without recording anything.
+
+### `lib/screens/personal/monthly_money_review_screen.dart`
+- **What:** Monthly income/spending comparison, category changes, budgets, uncategorized expense editing and current debt sheets.
+- **Why:** Turns recorded data into a monthly review with direct access to entries that need attention.
+
+### `lib/screens/personal/savings_goals_screen.dart`
+- **What:** Goals list and detail screens with target/date/account-label forms, progress history, contributions/withdrawals and archive/restore.
+- **Why:** Keeps savings planning and history accessible from Personal.
+
+### `lib/screens/personal/merchant_category_rules_screen.dart`
+- **What:** Add/edit/pause/delete sender/merchant category rules.
+- **Why:** Gives users control over categories remembered from SMS review.
+
+### `lib/screens/settings/bank_sms_settings_screen.dart`
+- **What:** SMS disclosure, capture/permission controls, sender trust and editable review actions; `reviewOnly` also serves the Personal inbox.
+- **Why:** Reuses the review workflow for settings and Personal, including linking existing entries and remembering merchant categories.
+
+### `lib/screens/personal/debt_widgets.dart`
+- **What:** Shared debt tiles and actions, Receive/Repay controls, remaining/original amount presentation, editing, settlement date and history sheets.
+- **Why:** Keeps debt behavior and styling consistent across dashboards and lists.
+
 ### `lib/screens/auth/login_screen.dart`
 - **What:** Email/password login form + Google Sign-In button + Forgot Password link.
 - **Why:** Entry point for existing users. Guards all app content behind authentication.
@@ -331,29 +415,13 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Room configuration — member list, invite code, admin controls (remove member, lock month).
 - **Why:** Admin needs to manage the room. Members can see who's in the group.
 
-### `lib/screens/expense/add_expense_screen.dart`
-- **What:** Full-page expense form (title, amount, category, date, split type, members).
-- **Why:** Primary data entry screen. Used when navigating from room detail.
-
 ### `lib/screens/expense/add_expense_sheet.dart`
-- **What:** Bottom sheet version of add expense — quick entry from home screen.
+- **What:** Expense entry bottom sheet with title, amount, category, date, split type, members and receipt attachment.
 - **Why:** Faster UX. Users can add expenses without leaving the home screen.
 
-### `lib/screens/expense/edit_expense_screen.dart`
-- **What:** Pre-filled expense form for editing an existing expense.
-- **Why:** Users/admins need to correct mistakes (wrong amount, wrong category).
-
-### `lib/screens/expense/expense_list_screen.dart`
-- **What:** Paginated list of all expenses with filter chips (by category, person, date).
-- **Why:** Users need to browse and search past expenses.
-
 ### `lib/screens/expense/view_expense_sheet.dart`
-- **What:** Read-only bottom sheet showing expense details (who paid, split breakdown).
-- **Why:** Quick view without navigating to a new screen.
-
-### `lib/screens/bills/add_bill_screen.dart`
-- **What:** Form for adding fixed monthly bills (rent, electricity, water) with receipt upload.
-- **Why:** Bills have different logic — they're recurring and may need proof of payment.
+- **What:** Expense detail sheet with permitted inline editing, payer and split breakdown. Expense lists are hosted in the room UI.
+- **Why:** Lets authorized users inspect and correct an expense without a separate edit screen.
 
 ### `lib/screens/bills/add_bill_sheet.dart`
 - **What:** Bottom sheet version of bill entry.
@@ -387,7 +455,7 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** In-app notification feed — list of all notifications with read/unread state.
 - **Why:** Users review past notifications and mark them as read.
 
-### `lib/screens/admin/storage_management_screen.dart`
+### `lib/screens/developer/storage_management_screen.dart`
 - **What:** Admin-only screen showing Firestore document counts and storage usage.
 - **Why:** Helps admins stay within free tier limits and identify cleanup needs.
 
@@ -455,20 +523,20 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **What:** Bottom sheet with income/expense stats banner, category distribution donut (tappable chips), spending breakdown bars (tappable rows), weekly analysis section (4-week horizontal bars with avg, high/low highlights, trend insight), and daily spending bar chart (weekday vs weekend).
 - **Why:** Monthly and weekly spending insights — category drill-down navigates to a filtered transaction list for that category and month.
 
-### `lib/screens/personal/add_debt_sheet.dart` *(NEW)*
-- **What:** Dedicated debt entry bottom sheet — animated lent/borrowed toggle, person name autocomplete from `debtPersonSuggestionsProvider`, category + date picker, balance impact hint. Lent saves as `type: expense`, borrowed as `type: income`.
+### `lib/screens/personal/add_debt_sheet.dart`
+- **What:** Debt add/edit sheet with lent/borrowed direction, person suggestions, category, original date, optional account and repayment due date. Lent saves as expense; borrowed saves as income.
 - **Why:** Dedicated debt entry flow separate from the general transaction sheet, with person suggestions for faster entry.
 
-### `lib/screens/personal/debt_dashboard_screen.dart` *(NEW)*
-- **What:** Dedicated debt dashboard — gradient hero card (net balance, lent, borrowed, active count), quick actions, 6-month grouped bar chart, lent vs borrowed donut chart, most debted people (consolidated net per person), top lent/borrowed debts, recent debts with View All.
+### `lib/screens/personal/debt_dashboard_screen.dart`
+- **What:** Debt summaries, monthly activity chart with amount tooltips, categories, top lent/borrowed and recent debts, with matching detail sheets. View All opens the all-time list; Monthly Debts opens month-based activity.
 - **Why:** Gives users a complete at-a-glance overview of all debt activity across all months in one screen.
 
-### `lib/screens/personal/debt_list_screen.dart` *(NEW)*
-- **What:** Monthly debt tracking screen — `AppMonthSelector` navigation, month hero card, search bar (person/description), filter sheet (type/status/amount range), active filter chips, separate lent/borrowed sections with debt tiles.
+### `lib/screens/personal/debt_list_screen.dart`
+- **What:** Monthly debt tracking with `AppMonthSelector`, summaries, expandable/collapsible top categories, search and filters, shared debt tiles and add-debt FAB.
 - **Why:** Lets users browse and filter debts month by month with full search and filter capability.
 
 ### `lib/screens/personal/personal_debts_screen.dart`
-- **What:** Debts settle screen with separate Lent/Borrowed sections, contextual settle buttons, partial settlement history, and settled items shown disabled.
+- **What:** All-time debt list with amount summaries and Lent/Borrowed/Settled tabs. Shared tiles support editing, Receive/Repay, dated settlement, close-debt warnings and per-debt history.
 - **Why:** Tracks peer-to-peer money — who owes you and who you owe — with full settlement workflow.
 
 ### `lib/screens/loans/loan_list_screen.dart`
@@ -515,6 +583,18 @@ Every file in the project explained with **What** it does and **Why** it exists.
 
 ## `lib/widgets/` — Reusable Widgets
 
+### `lib/widgets/design_system/app_finance_tile.dart`
+- **What:** `AppFinanceTile` and `AppFinanceEmptyState`, exported by `design_system.dart`, with compact typography and themed icon/value presentation.
+- **Why:** Matches new finance lists and empty states to the app's existing visual style.
+
+### `lib/widgets/personal_form_sheet.dart`
+- **What:** Shared personal-finance modal shell and input styling, including drag handle, rounded top, title/icon and consistent spacing.
+- **Why:** Aligns accounts, transfers, goals, merchant rules and SMS forms across themes.
+
+### `lib/widgets/personal_account_picker.dart` and `lib/widgets/debt_due_date_picker.dart`
+- **What:** Optional account assignment and debt repayment-date controls.
+- **Why:** Reuses validated entry controls across personal/debt/SMS forms.
+
 ### `lib/widgets/offline_banner.dart`
 - **What:** Persistent banner at top of screen when device is offline.
 - **Why:** Users need to know their actions are queued and not yet synced.
@@ -532,8 +612,20 @@ Every file in the project explained with **What** it does and **Why** it exists.
 - **Why:** Defines how the Android APK/AAB is compiled.
 
 ### `android/app/src/main/AndroidManifest.xml`
-- **What:** App permissions, activity declarations, intent filters.
-- **Why:** Required by Android OS. Declares what the app needs (internet, camera, notifications).
+- **What:** App permissions, activity declarations and intent filters, including opt-in SMS capture receiver, connectivity-constrained job service and references to SMS backup exclusions.
+- **Why:** Registers the native SMS components and permissions without requesting message history access.
+
+### `android/app/src/main/kotlin/com/splitex/in/app/BankSms.kt`
+- **What:** Owner-bound app-private SMS capture/review queues, multipart receiver, persisted Android job and background Flutter engine invocation.
+- **Why:** Receives new alerts after opt-in, keeps raw text local and retries processing with connectivity, subject to Android restrictions.
+
+### `android/app/src/main/kotlin/com/splitex/in/app/MainActivity.kt`
+- **What:** Attaches the bank SMS MethodChannel and forwards runtime SMS permission results.
+- **Why:** Connects Flutter settings/review state to native Android capture controls.
+
+### `android/app/src/main/res/xml/backup_rules.xml` and `data_extraction_rules.xml`
+- **What:** Exclude the `splitex_bank_sms` preferences from Android cloud/device-transfer backups.
+- **Why:** Keeps captured raw SMS and local review data out of those backups.
 
 ### `android/build.gradle.kts`
 - **What:** Project-level Gradle config — repositories, classpath dependencies.
@@ -553,19 +645,33 @@ Every file in the project explained with **What** it does and **Why** it exists.
 
 ---
 
-## Summary Table
+## `test/` — Recent Finance Coverage
 
-| Layer | Count | Purpose |
-|-------|-------|---------|
-| Config | 4 files | Theme, routing, constants, dev flags |
-| Models | 12 files | Data structures for Firestore documents |
-| Services | 20 files | Firebase operations & business logic |
-| Providers | 14 files | Reactive state management |
-| Screens | 48 files | User interface |
-| Widgets | 2 files | Reusable UI components |
-| Utils | 1 file | Pure utility functions |
-| Docs | 4 files | Documentation & guides |
-| **Total** | **~100 files** | |
+| Files | Coverage |
+|-------|----------|
+| `bank_sms_parser_test.dart`, `bank_sms_repository_test.dart`, `bank_sms_settings_test.dart` | Parsing/rejection, identity/deduplication, import/linking, account matching and review UI |
+| `debt_screens_test.dart` | Debt navigation, categories, Receive/Repay, partial amounts and history |
+| `payment_calendar_test.dart` | Scheduling, date clamping, EMI matching and calendar projection |
+| `personal_accounts_test.dart`, `personal_accounts_screen_test.dart` | Balance/transfer calculations, service validation, owner isolation and account UI |
+| `personal_finance_features_test.dart`, `personal_finance_features_screen_test.dart` | Monthly comparisons, savings atomic/history guards, merchant rules, owner isolation, navigation and forms |
+
+Last implementation verification recorded 100 passing tests for the full suite and a successful debug APK build. `flutter test --dart-define=CAPTURE_PREVIEW=true` also captures fixture previews under ignored `build/previews/`. These tests do not verify physical SMS delivery/background execution or deployed production rules. See [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
+
+## Layer Summary
+
+| Layer | Purpose |
+|-------|---------|
+| Config | Theme, routing, constants and development flags |
+| Models | Stored data structures and derived finance calculations |
+| Services | Firebase/native operations and business rules |
+| Providers | Reactive state and selected-month projections |
+| Screens | Feature entry points, forms and detail views |
+| Widgets | Shared design system, finance tiles, sheets and pickers |
+| Android | SMS receiver, queues, background execution and platform configuration |
+| Tests | Parser, model, service, ownership and widget verification |
+| Docs | Four guides in `docs/`, supplemented by root feature/schema guides |
 
 ---
 

@@ -1,7 +1,7 @@
 name: split_ex
 description: "SplitEx - Roommate Expense Splitting App"
 publish_to: 'none'
-version: 4.1.0+9
+version: 7.0.0+15
 
 environment:
   sdk: ^3.11.5
@@ -40,7 +40,10 @@ dependencies:
   url_launcher: ^6.3.1
   intl: ^0.20.2
   uuid: ^4.5.1
+  crypto: ^3.0.7
   image_picker: ^1.1.2
+  # pdf 3.12.x requires archive <4.1.0; image 4.11+ uses archive's newer API.
+  image: '>=4.10.2 <4.11.0'
   pdf: ^3.11.2
   share_plus: ^10.1.4
   path_provider: ^2.1.5
@@ -49,6 +52,7 @@ dependencies:
   dio: ^5.4.0
 
 dev_dependencies:
+  fake_cloud_firestore: ^3.1.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
@@ -65,7 +69,10 @@ flutter_launcher_icons:
   image_path: "assets/icons/app_icon.png"
 
   adaptive_icon_background: "#14B8A6"
-  adaptive_icon_foreground: "assets/icons/app_icon.png"
+  # Full-bleed teal canvas: no inner rounded tile inside the launcher mask.
+  # Artwork padding is included in this Android-specific asset.
+  adaptive_icon_foreground: "assets/icons/app_icon_android.png"
+  adaptive_icon_foreground_inset: 0
 
 flutter:
   uses-material-design: true

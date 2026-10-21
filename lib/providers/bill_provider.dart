@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/models/bill_model.dart';
-import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/services/bill_service.dart';
 
 final billServiceProvider = Provider<BillService>((ref) => BillService());

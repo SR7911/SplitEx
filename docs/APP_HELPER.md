@@ -1,12 +1,14 @@
 # SplitEx — App Flow & Architecture Guide
 
+Updated 2026-10-21. See the [recent changelog](CHANGELOG.md), [file reference](FILE_EXPLANATION.md) and [deployment guide](DEPLOYMENT.md). Detailed feature guides: [Bank SMS recording](../BANK_SMS_RECORDING.md) and [personal finance additions](../PERSONAL_FINANCE_FEATURES.md).
+
 ---
 
 ## What is SplitEx?
 
 SplitEx is a multi-module expense management app built with Flutter + Firebase:
 1. **Room-based splitting** — Roommates create shared rooms, log expenses, auto-calculate who owes whom, and settle via UPI
-2. **Personal finance** — Track personal income/expenses, set budgets, manage recurring transactions, and track peer-to-peer debts (Lent/Borrowed)
+2. **Personal finance** — Track income/expenses, budgets, recurring entries, debts and loan EMIs; review bank SMS, manage accounts/transfers, browse scheduled payments, review monthly spending and track savings goals
 3. **Group Expenses** — Create/join groups with invite codes, split expenses equally or selectively, view simplified debts
 4. **Project Tracker** — Personal project budgets with category breakdown, vendor tracking, and status management
 
@@ -187,18 +189,17 @@ Personal Tab (Bottom Nav)
     │     └── Daily Spending: bar chart with weekday vs weekend color coding
     │
     ├── Debts → Debt Dashboard (/personal/debt-dashboard)
-    │     ├── Hero card: net balance, lent, borrowed, active count
-    │     ├── 6-month grouped bar chart, lent vs borrowed donut chart
-    │     ├── Most debted people (consolidated net per person)
-    │     ├── Add Debt (sheet) — person autocomplete, lent/borrowed toggle
-    │     └── View All → Monthly Debt List (/personal/debt-list)
-    │           ├── Month navigation, search, filters (type/status/amount)
-    │           └── Separate lent/borrowed sections
+    │     ├── Debt summaries, activity chart and detail sheets
+    │     ├── View All → All-time list (/personal/debts)
+    │     │     └── Lent / Borrowed / Settled tabs and summary
+    │     └── Monthly Debts → Monthly list (/personal/debt-list)
+    │           ├── Month navigation, summaries, search and filters
+    │           └── Expand/collapse top categories; add debt FAB
     │
     ├── Debts & Settlements (/personal/debts)
-    │     ├── Lent section: green, full/partial settle button
-    │     ├── Borrowed section: red, full/partial settle button
-    │     └── Settled items: greyed out, strikethrough, partial history shown
+    │     ├── Lent: Receive; Borrowed: Repay; full/partial settlement date
+    │     ├── Partial debts: original amount struck before remaining balance
+    │     └── Tap to edit; settlement/write-off history on each debt
     │
     ├── Budgets → Category budget management
     │     ├── Healthy: 0–70% (green)
@@ -212,7 +213,12 @@ Personal Tab (Bottom Nav)
 - Lent → saved as `type: expense` (deducts balance on creation)
 - Borrowed → saved as `type: income` (adds to balance on creation)
 - Lent settled → auto-creates `type: income` entry in settlement month
-- Borrowed settled → no auto-transaction (deduction already happened at creation)
+- Borrowed repaid → auto-creates `type: expense` on the selected settlement date
+- Full and partial settlements both use the chosen date; it cannot precede the original debt date
+- Remaining balance = `max(0, amount - settledAmount - writtenOffAmount)`
+- Close debt → warning, write off the unpaid balance, retain history; no cash transaction is generated
+- Editing a debt updates its original personal transaction. Paid/written-off amounts constrain the minimum amount; settlement history restricts changes of person/direction
+- Optional `dueDate` is the expected repayment date used by the calendar; it is separate from an actual settlement date
 
 **Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `add_debt_sheet.dart`, `debt_dashboard_screen.dart`, `debt_list_screen.dart`, `personal_debts_screen.dart`, `personal_reports_screen.dart`, `personal_transactions_screen.dart`, `personal_expense_service.dart`, `personal_expense_provider.dart`
 
@@ -270,6 +276,7 @@ Personal Tab → Loans & EMI
     │     │     ├── EMI amount chip
     │     │     ├── X/Y EMIs paid chip
     │     │     └── Next: DD MMM due date chip
+    │     ├── On entry: check missed EMI dates and prompt to record them
     │     └── FAB → Add Loan sheet
     │
     ├── Add Loan Sheet
@@ -299,8 +306,10 @@ Personal Tab → Loans & EMI
 **EMI auto-expense logging:**
 - Every logged payment (EMI / partial / foreclosure) auto-creates a `personal_transactions` expense with category `Loan EMI`
 - Tagged with `loanSourceId` on the transaction document
-- Dedup guard: checks for existing entry with same `loanSourceId` + same date before inserting
+- EMI payment logs and their matching personal expenses use stable IDs and an atomic transaction for retry protection
+- Partial/foreclosure payment expenses retain their source/date duplicate guard
 - Appears in the personal expense list under the correct month
+- Missing past EMIs are checked when entering Loans & EMI and require confirmation in the existing popup; this is not an unattended due-date scheduler
 
 **EMI schedule anchor:**
 - `emiStartDate` field stores the user-set first EMI date
@@ -310,6 +319,70 @@ Personal Tab → Loans & EMI
 **Key files:** `loan_list_screen.dart`, `loan_detail_screen.dart`, `add_loan_sheet.dart`, `loan_reports_screen.dart`, `loan_service.dart`, `loan_provider.dart`, `loan_model.dart`
 
 ---
+
+## Personal Finance Tools and Entry Points
+
+The Personal dashboard's tools section places Accounts & Wallets beside Payment Calendar, followed by Monthly Money Review beside Savings Goals. On Android, the SMS inbox shows pending reviews below these tools.
+
+| Entry point | Route | Purpose |
+|-------------|-------|---------|
+| Personal → Accounts & Wallets | `/personal/accounts` | Accounts, tracked balances and transfer history |
+| Personal → Payment Calendar | `/personal/calendar` | Monthly payment forecast and agenda |
+| Personal → Monthly Money Review | `/personal/money-review` | Selected dashboard month, category changes and budget checks |
+| Personal → Savings Goals | `/personal/goals` | Active/archived goals and progress |
+| Open a goal | `/personal/goals/:goalId` | Contributions, withdrawals and history |
+| Personal → SMS Review Inbox | `/personal/sms-review` | Review captured Android alerts |
+| Settings → Bank SMS Recording | `/settings/bank-sms` | Disclosure, capture permission, sender trust and rules |
+| Bank SMS Recording → Merchant Category Rules | `/personal/merchant-rules` | Add/edit/pause/delete merchant category rules |
+
+### Bank SMS recording and review
+
+1. The user opts in to capture new bank SMS after reading the disclosure and grants `RECEIVE_SMS`. There is no inbox/history scan and no `READ_SMS` or `SEND_SMS` permission.
+2. Native Android capture queues candidate financial alerts locally. A connectivity-constrained background job or foreground resume invokes Dart parsing and import processing.
+3. The parser recognizes supported INR debit/credit messages and rejects OTPs, failed payments, requests, promotional and balance-only alerts. Untrusted senders, credits, uncertain alerts and potential duplicates require review.
+4. A user can record a reviewed personal expense/income, create an own-account transfer, link an existing transaction/transfer, or dismiss the alert. Linking an existing EMI or settlement avoids recording it twice.
+5. Future clear debits can be recorded automatically only with automatic recording enabled, a trusted sender, a payee/reference/account ending and no review condition. Merchant rules can select a category without bypassing these safeguards.
+
+Accepted imports and durable receipts are written atomically. Receipts prevent repeat imports even after an imported transaction is edited or deleted. Raw SMS and pending review items remain in app-private device storage, excluded from Android backups; signing out or changing users clears them. Android delivery/background restrictions can delay processing, and missed messages cannot be recovered by scanning history. SMS creates personal entries/transfers only; it does not create group expenses or automatically settle a debt/loan.
+
+### Accounts and own-account transfers
+
+Tracked balance = opening balance + assigned income - assigned expenses + incoming transfers - outgoing transfers. Credit card debt is stored as a negative balance. Transfers have their own collection and do not change spending, income or budget totals. Existing transactions remain unassigned until edited; archiving preserves history and prevents new assignments/transfers.
+
+SMS can assign an account automatically only when its four-digit ending matches exactly one active non-cash account. These are bookkeeping balances, not live bank balances. Loan, recurring and settlement entries can be assigned by editing their resulting personal transaction.
+
+### Payment calendar
+
+The Monday-first grid supports month arrows/swipes, a date jump, Today, event filters and daily/whole-month agendas. Events project loan EMIs, recurring schedules and debts with repayment dates. Monthly dates clamp to short-month endings; loan-linked recurring entries are excluded to avoid duplicate events. Partial debts show the unpaid balance; closed loans have no future unpaid installments.
+
+The calendar is read-only. Opening a date/event never logs an expense or verifies a bank payment. EMI events match existing logs once within the 15-day matching window; recurring recorded status follows its last run. Schedule edits can change projected history, and undated debts do not appear.
+
+### Monthly Money Review and Savings Goals
+
+The review opens the dashboard's selected month and supports its own month navigation. Current-month comparisons use equal elapsed dates in the previous month, clamped for short months; completed months use full-month comparisons. Income/expense totals follow the Personal dashboard, including lending/borrowing and settlement entries. Transfers and savings progress are excluded. Category changes, budget overruns and uncategorized expenses support drill-down; tapping an uncategorized expense edits the original record. Outstanding debt totals are explicitly **current across all months**, not historical month-end balances.
+
+Savings Goals tracks targets, optional dates/account labels and dated contribution/withdrawal history. Amounts use integer paise; atomic aggregate/history writes and stable entry IDs protect retries. Withdrawals or history deletions cannot leave negative savings. Archive preserves history and blocks new entries/history changes until restored. Progress is a planning record: it does not reserve an account balance, move funds or create income/expenses.
+
+### Personal storage additions
+
+All paths below are scoped to the authenticated owner under `users/{uid}`; other users cannot read or write them through the new rules.
+
+| Path | Stored data |
+|------|-------------|
+| `personal_accounts/{accountId}` | Name, cash/bank/credit-card type, opening balance, optional last four digits, archive state |
+| `personal_transfers/{transferId}` | Source/destination account IDs, positive amount, date and note |
+| `bank_sms_receipts/{receiptId}` | Durable SMS import/link identity and target metadata; no raw body |
+| `merchant_category_rules/{ruleId}` | Normalized sender/merchant, category and enabled state; deterministic rule ID |
+| `personal_savings_goals/{goalId}` | Title, `targetMinor`, `savedMinor`, optional `targetDate`/`accountId`, archive state and creation timestamp |
+| `personal_savings_goals/{goalId}/entries/{entryId}` | Signed `amountMinor` in paise, date and note |
+
+Existing `personal_transactions` now supports `accountId`, debt `dueDate`, `writtenOffAmount` and settlement/write-off history. SMS-created entries add source/reference/sender/account-ending/message-ID metadata. Optional fields keep older records readable. Recurring records can include `createdAt` as the calendar's start bound. Reviews and forecasts are derived locally/from existing collections; there is no separate monthly-review or calendar collection.
+
+Deploy the updated [Firestore rules](../firestore.rules) before live use; building the app does not deploy them. See [deployment checks](DEPLOYMENT.md) for App Check, Android SMS permissions and physical-device verification.
+
+### Shared finance UI
+
+New tools reuse the Gilmer theme, `AppSectionHeader`, `AppFinanceTile`, `AppFinanceEmptyState` and `PersonalFormSheet`. Compact tiles use 13-point titles, 11-point secondary text, 14-point amounts and 38-pixel icon boxes; cards use 16-pixel padding and sections use 20-pixel gaps. Shared account/due-date pickers and themed sheets keep entry forms consistent across light/dark modes.
 
 ## State Management Pattern
 
@@ -446,13 +519,14 @@ Each payment auto-logs to `users/{uid}/personal_transactions` with `loanSourceId
 ### Production Mode
 1. Set `DevConfig.skipAuth = false`
 2. Ensure Firebase Auth providers are enabled
-3. Run: `flutter run --release`
+3. Deploy updated Firestore rules and configure production App Check in both foreground and SMS background entrypoints (see [DEPLOYMENT.md](DEPLOYMENT.md))
+4. Run: `flutter run --release`
 
 ---
 
 ## Environment Setup Required
 
-- Flutter SDK (^3.11.5)
+- Flutter SDK compatible with the project's Dart constraint and Android build configuration
 - Dart SDK (^3.11.5)
 - Firebase project with:
   - Authentication (Email + Google)
@@ -460,7 +534,7 @@ Each payment auto-logs to `users/{uid}/personal_transactions` with `loanSourceId
   - Cloud Storage
   - Cloud Messaging (FCM)
 - Android Studio / VS Code
-- Physical device or emulator (API 23+)
+- Physical device or emulator supported by the resolved Android minSdk; physical Android testing is required to verify actual SMS delivery/background execution
 
 ---
 

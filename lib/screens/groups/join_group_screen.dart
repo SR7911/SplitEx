@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:split_ex/providers/group_provider.dart';
 import 'package:split_ex/providers/room_provider.dart';
 import 'package:split_ex/widgets/app_header.dart';
-import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class JoinGroupScreen extends ConsumerStatefulWidget {
   const JoinGroupScreen({super.key});

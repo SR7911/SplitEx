@@ -2,6 +2,35 @@
 
 ---
 
+## ## SPLITEX022 (2026-10-21)
+
+### Personal finance features
+
+- Added opt-in **Android Bank SMS Recording**, with a disclosure and `RECEIVE_SMS` permission. New senders and uncertain payments go to review; trusted senders can record clear debit alerts automatically. Credits, transfers and possible duplicates require review. Imports affect personal finance only.
+- Added **Personal → SMS Review Inbox** to edit, approve, dismiss or link alerts to existing transactions/transfers. Durable import receipts prevent repeat imports; raw messages stay on the device and are excluded from Android backups. Sign-out/account changes clear local SMS data.
+- Added **Merchant Category Rules** in Bank SMS settings. Exact normalized sender/merchant matches suggest or apply a category. The review checkbox saves a rule with a new expense; rules can be edited, paused or deleted without changing older transactions or granting sender trust.
+- Added **Accounts & Wallets** for cash, bank and credit card balances, optional transaction assignments, archive/restore and dated own-account transfers. Transfers do not inflate income, expenses or budgets; legacy entries stay unassigned.
+- Added **Payment Calendar** with a full month grid, month navigation, Today/date jump, filters, payment markers and daily/monthly agendas for EMIs, recurring entries and dated debts. Browsing does not record payments.
+- Added **Monthly Money Review** beside Savings Goals in the Personal tools section. It opens the dashboard's selected month, compares category spending with the previous month, highlights budget overruns and lets users edit uncategorized expenses. Current-month comparisons use matching elapsed dates; outstanding debt totals explicitly show current balances across all months.
+- Added **Savings Goals** with targets, optional dates/account labels, dated contributions/withdrawals, history and archive/restore. Progress uses integer paise and atomic updates, with retry protection and guards against negative savings. Contributions are planning records and do not move money or create income/expenses.
+
+### Debts, EMI logging and interface corrections
+
+- Separated the all-time debt list (Lent, Borrowed, Settled tabs) from monthly debt activity and summaries. Added debt entry FABs, expandable monthly categories, chart amount tooltips and summary detail sheets.
+- Restored per-debt settlement/write-off history, added debt editing and dated partial/full settlements, and differentiated **Receive** from **Repay** in tiles and sheets. Partially settled tiles show the original amount struck through before the remaining balance.
+- Receiving lent money creates personal income; repaying borrowed money creates a personal expense on the selected settlement date. This supersedes the borrowed-settlement behavior described in older changelog entries.
+- Added **Close debt** with an amount-loss warning. Written-off balances reduce outstanding debt without creating a cash transaction; editing a debt updates its original personal transaction.
+- Loans & EMI checks for missing past installments when entered and prompts with the existing confirmation dialog. Confirmed EMI logs and their personal expenses are saved atomically with stable IDs. Passing a due date alone does not run an unattended EMI recorder.
+- Aligned the new finance screens, tiles and sheets with the app's Gilmer typography, compact spacing, theme colors and light/dark styling.
+- Constrained `image` to `>=4.10.2 <4.11.0` to avoid the `decodeLazy` incompatibility with the resolved `archive` dependency.
+
+### Setup and verification
+
+- Added owner-only rules for `bank_sms_receipts`, `personal_accounts`, `personal_transfers`, `merchant_category_rules` and `personal_savings_goals` (including nested entries). Rules require a separate deployment; app builds do not deploy them.
+- Last implementation verification: **100 automated tests passed** with `flutter test --dart-define=CAPTURE_PREVIEW=true`; `flutter build apk --debug --no-pub` succeeded. Targeted analysis had no errors or warnings, with style information remaining.
+- Physical-device SMS delivery/background execution and production rule deployment remain release checks; automated tests do not verify either.
+- Detailed behavior: [Bank SMS recording](../BANK_SMS_RECORDING.md), [personal finance features](../PERSONAL_FINANCE_FEATURES.md). Setup: [deployment guide](DEPLOYMENT.md).
+
 ## SPLITEX011
 - Loan & EMI Manager — clarity, auto-expense sync, and card improvements
 - **`emiStartDate` field added to `LoanModel`** — user can now set the exact first EMI date separately from the loan start date; defaults to `startDate + 1 month` if not set (`effectiveEmiStart` getter)

@@ -11,7 +11,6 @@ import 'package:split_ex/screens/room/create_room_screen.dart';
 import 'package:split_ex/screens/room/join_room_screen.dart';
 import 'package:split_ex/screens/room/room_detail_screen.dart';
 import 'package:split_ex/screens/room/room_settings_screen.dart';
-import 'package:split_ex/screens/dashboard/dashboard_screen.dart';
 import 'package:split_ex/screens/analytics/analytics_screen.dart';
 import 'package:split_ex/screens/reminders/notifications_screen.dart';
 import 'package:split_ex/screens/activity/activity_screen.dart';
@@ -23,6 +22,12 @@ import 'package:split_ex/screens/personal/debt_list_screen.dart';
 import 'package:split_ex/screens/personal/personal_recurring_screen.dart';
 import 'package:split_ex/screens/personal/personal_transactions_screen.dart';
 import 'package:split_ex/screens/settings/settings_screen.dart';
+import 'package:split_ex/screens/settings/bank_sms_settings_screen.dart';
+import 'package:split_ex/screens/personal/personal_accounts_screen.dart';
+import 'package:split_ex/screens/personal/payment_calendar_screen.dart';
+import 'package:split_ex/screens/personal/monthly_money_review_screen.dart';
+import 'package:split_ex/screens/personal/savings_goals_screen.dart';
+import 'package:split_ex/screens/personal/merchant_category_rules_screen.dart';
 import 'package:split_ex/screens/settings/edit_profile_screen.dart';
 import 'package:split_ex/screens/settings/change_password_screen.dart';
 import 'package:split_ex/screens/settings/notification_preferences_screen.dart';
@@ -38,7 +43,6 @@ import 'package:split_ex/screens/projects/project_debts_screen.dart';
 import 'package:split_ex/screens/projects/project_expenses_screen.dart';
 import 'package:split_ex/screens/loans/loan_list_screen.dart';
 import 'package:split_ex/screens/loans/loan_detail_screen.dart';
-import 'package:split_ex/screens/loans/add_loan_sheet.dart';
 import 'package:split_ex/screens/loans/loan_reports_screen.dart';
 
 /// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
@@ -193,6 +197,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           return PersonalTransactionsScreen(monthKey: monthKey);
         },
       ),
+      GoRoute(path: '/personal/accounts', builder: (context, state) => const PersonalAccountsScreen()),
+      GoRoute(path: '/personal/money-review', builder: (context, state) => MonthlyMoneyReviewScreen(initialMonth: DateTime.tryParse('${state.extra ?? DateFormat('yyyy-MM').format(DateTime.now())}-01'))),
+      GoRoute(path: '/personal/goals', builder: (context, state) => const SavingsGoalsScreen()),
+      GoRoute(path: '/personal/goals/:goalId', builder: (context, state) => SavingsGoalDetailScreen(goalId: state.pathParameters['goalId']!)),
+      GoRoute(path: '/personal/merchant-rules', builder: (context, state) => const MerchantCategoryRulesScreen()),
+      GoRoute(path: '/personal/calendar', builder: (context, state) => const PaymentCalendarScreen()),
+      GoRoute(path: '/personal/sms-review', builder: (context, state) => const BankSmsSettingsScreen(reviewOnly: true)),
       GoRoute(
         path: '/personal/transactions/category',
         builder: (context, state) {
@@ -215,7 +226,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/personal/debts',
-        builder: (context, state) => const PersonalDebtsScreen(),
+        builder: (context, state) => PersonalDebtsScreen(initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '')?.clamp(0, 2) ?? 0),
       ),
       GoRoute(
         path: '/personal/debt-dashboard',
@@ -243,6 +254,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/bank-sms',
+        builder: (context, state) => const BankSmsSettingsScreen(),
       ),
       GoRoute(
         path: '/settings/edit-profile',
