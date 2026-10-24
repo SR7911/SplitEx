@@ -3,35 +3,116 @@ import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/services/usage_tracker.dart';
 
 class PersonalExpenseService {
-  final _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
+  PersonalExpenseService({FirebaseFirestore? firestore}) : _firestore = firestore ?? FirebaseFirestore.instance;
   final _tracker = UsageTracker.instance;
 
   // ─── Transactions ───
 
-  CollectionReference _txnCol(String userId) =>
-      _firestore.collection('users').doc(userId).collection('personal_transactions');
+  CollectionReference _txnCol(String userId) => _firestore
+      .collection('users')
+      .doc(userId)
+      .collection('personal_transactions');
 
-  Stream<List<PersonalTransactionModel>> getTransactionsStream(String userId, String month) {
+  Stream<List<PersonalTransactionModel>> getTransactionsStream(
+    String userId,
+    String month,
+  ) {
     _tracker.trackReads(1);
     return _txnCol(userId)
         .where('month', isEqualTo: month)
         .orderBy('date', descending: true)
         .snapshots()
         .map((snap) {
-      _tracker.trackReads(snap.docs.length);
-      return snap.docs
-          .map((d) => PersonalTransactionModel.fromMap(d.data() as Map<String, dynamic>, d.id))
-          .toList();
-    });
+          _tracker.trackReads(snap.docs.length);
+          return snap.docs
+              .map(
+                (d) => PersonalTransactionModel.fromMap(
+                  d.data() as Map<String, dynamic>,
+                  d.id,
+                ),
+              )
+              .toList();
+        });
   }
 
-  Future<void> addTransaction(String userId, PersonalTransactionModel txn) async {
+  Future<void> addTransaction(
+    String userId,
+    PersonalTransactionModel txn,
+  ) async {
+    if (!txn.amount.isFinite || txn.amount <= 0) throw StateError('Enter a valid positive amount.');
+    if (txn.dueDate != null && DateTime(txn.dueDate!.year, txn.dueDate!.month, txn.dueDate!.day)
+        .isBefore(DateTime(txn.date.year, txn.date.month, txn.date.day))) {
+      throw StateError('Repayment date cannot be before the debt date.');
+    }
+    if (txn.accountId != null) {
+      final account = await _firestore.collection('users').doc(userId).collection('personal_accounts').doc(txn.accountId).get();
+      if (!account.exists || account.data()?['archived'] == true) throw StateError('Choose an active account.');
+    }
     await _txnCol(userId).add(txn.toMap());
     await _tracker.trackWrites(1);
   }
 
-  Future<void> updateTransaction(String userId, String txnId, Map<String, dynamic> data) async {
-    await _txnCol(userId).doc(txnId).update(data);
+  Future<void> updateTransaction(
+    String userId,
+    String txnId,
+    Map<String, dynamic> data,
+  ) async {
+    final transactionRef = _txnCol(userId).doc(txnId);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(transactionRef);
+      final current = snapshot.data() as Map<String, dynamic>?;
+      if (current == null) throw StateError('Transaction no longer exists.');
+      final updates = Map<String, dynamic>.from(data);
+      final assigned = updates['accountId'] as String?;
+      if (assigned != null && assigned != current['accountId']) {
+        final account = await transaction.get(_firestore.collection('users').doc(userId).collection('personal_accounts').doc(assigned));
+        if (!account.exists || account.data()?['archived'] == true) throw StateError('Choose an active account.');
+      }
+      final due = (updates.containsKey('dueDate') ? updates['dueDate'] : current['dueDate']) as Timestamp?;
+      final date = ((updates['date'] ?? current['date']) as Timestamp).toDate();
+      if (due != null && DateTime(due.toDate().year, due.toDate().month, due.toDate().day).isBefore(DateTime(date.year, date.month, date.day))) {
+        throw StateError('Repayment date cannot be before the debt date.');
+      }
+      if (current['debtType'] != null) {
+        final paid = (current['settledAmount'] as num? ?? 0).toDouble();
+        final writtenOff = (current['writtenOffAmount'] as num? ?? 0)
+            .toDouble();
+        final amount = (updates['amount'] as num? ?? current['amount'] as num)
+            .toDouble();
+        if (!amount.isFinite || amount <= 0 || amount < paid + writtenOff) {
+          throw StateError(
+            'Amount cannot be less than the settled and written-off balance.',
+          );
+        }
+        if (paid + writtenOff > 0) {
+          for (final field in ['debtType', 'personName', 'type']) {
+            if (updates.containsKey(field) &&
+                updates[field] != current[field]) {
+              throw StateError(
+                'Cannot change the person or debt direction after settlement.',
+              );
+            }
+          }
+          final date = (updates['date'] as Timestamp?)?.toDate();
+          final history = List<Map<String, dynamic>>.from(
+            current['partialSettlements'] ?? [],
+          );
+          if (date != null &&
+              history.any(
+                (entry) => DateTime.parse(
+                  entry['date'] as String,
+                ).isBefore(DateTime(date.year, date.month, date.day)),
+              )) {
+            throw StateError(
+              'Debt date cannot be after a recorded settlement.',
+            );
+          }
+        }
+        updates['isSettled'] = paid + writtenOff >= amount;
+      }
+      transaction.update(transactionRef, updates);
+    });
     await _tracker.trackWrites(1);
   }
 
@@ -42,109 +123,133 @@ class PersonalExpenseService {
 
   // ─── Debts ───
 
-  Stream<List<PersonalTransactionModel>> getDebtTransactionsStream(String userId) {
+  Stream<List<PersonalTransactionModel>> getDebtTransactionsStream(
+    String userId,
+  ) {
     _tracker.trackReads(1);
     return _txnCol(userId)
         .where('debtType', whereIn: ['lent', 'borrowed'])
         .orderBy('date', descending: true)
         .snapshots()
         .map((snap) {
-      _tracker.trackReads(snap.docs.length);
-      return snap.docs
-          .map((d) => PersonalTransactionModel.fromMap(d.data() as Map<String, dynamic>, d.id))
-          .toList();
-    });
+          _tracker.trackReads(snap.docs.length);
+          return snap.docs
+              .map(
+                (d) => PersonalTransactionModel.fromMap(
+                  d.data() as Map<String, dynamic>,
+                  d.id,
+                ),
+              )
+              .toList();
+        });
   }
 
-  Future<void> settleTransaction(String userId, String txnId) async {
-    final doc = await _txnCol(userId).doc(txnId).get();
-    await _tracker.trackReads(1);
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) return;
+  Future<void> settleTransaction(
+    String userId,
+    String txnId, {
+    DateTime? settlementDate,
+  }) => _recordSettlement(userId, txnId, settlementDate: settlementDate);
 
-    final totalAmount = (data['amount'] ?? 0).toDouble();
-    final now = DateTime.now();
-    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final existing = List<Map<String, dynamic>>.from(data['partialSettlements'] ?? []);
-    existing.add({'amount': totalAmount, 'date': now.toIso8601String(), 'note': 'Full settlement'});
+  Future<void> partialSettleTransaction(
+    String userId,
+    String txnId,
+    double partialAmount,
+    String? note, {
+    DateTime? settlementDate,
+  }) => _recordSettlement(
+    userId,
+    txnId,
+    amount: partialAmount,
+    note: note,
+    settlementDate: settlementDate,
+  );
 
-    await _txnCol(userId).doc(txnId).update({
-      'isSettled': true,
-      'settledAmount': totalAmount,
-      'partialSettlements': existing,
-    });
-    await _tracker.trackWrites(1);
+  Future<void> closeDebt(String userId, String txnId) =>
+      _recordSettlement(userId, txnId, writeOff: true);
 
-    if (data['debtType'] == 'lent') {
-      await _txnCol(userId).add({
-        'title': 'Settlement: ${data['personName'] ?? 'Unknown'} repaid',
-        'amount': totalAmount,
-        'type': 'income',
-        'category': data['category'] ?? 'Other',
-        'date': Timestamp.fromDate(now),
-        'notes': 'Auto-generated on settling "${data['title']}"',
-        'userId': userId,
-        'month': month,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isSettled': false,
+  Future<void> _recordSettlement(
+    String userId,
+    String txnId, {
+    double? amount,
+    String? note,
+    DateTime? settlementDate,
+    bool writeOff = false,
+  }) async {
+    final debtRef = _txnCol(userId).doc(txnId);
+    final repaymentRef = _txnCol(userId).doc();
+    final date = settlementDate ?? DateTime.now();
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(debtRef);
+      final data = snapshot.data() as Map<String, dynamic>?;
+      if (data == null || data['isSettled'] == true) return;
+      final total = (data['amount'] as num).toDouble();
+      final paid = (data['settledAmount'] as num? ?? 0).toDouble();
+      final writtenOff = (data['writtenOffAmount'] as num? ?? 0).toDouble();
+      final remaining = total - paid - writtenOff;
+      final payment = amount ?? remaining;
+      if (!payment.isFinite || payment <= 0 || payment > remaining) {
+        throw StateError(
+          'Amount must be between zero and the remaining balance.',
+        );
+      }
+      final debtDate = (data['date'] as Timestamp).toDate();
+      if (DateTime(
+        date.year,
+        date.month,
+        date.day,
+      ).isBefore(DateTime(debtDate.year, debtDate.month, debtDate.day))) {
+        throw StateError('Settlement date cannot be before the debt date.');
+      }
+      final history = List<Map<String, dynamic>>.from(
+        data['partialSettlements'] ?? [],
+      );
+      history.add({
+        'amount': payment,
+        'date': date.toIso8601String(),
+        'note': writeOff
+            ? 'Closed: unpaid balance written off'
+            : (note ?? 'Settlement'),
+        'type': writeOff ? 'writeOff' : 'payment',
       });
-      await _tracker.trackWrites(1);
-    }
-  }
-
-  Future<void> partialSettleTransaction(String userId, String txnId, double partialAmount, String? note) async {
-    final doc = await _txnCol(userId).doc(txnId).get();
-    await _tracker.trackReads(1);
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) return;
-
-    final totalAmount = (data['amount'] ?? 0).toDouble();
-    final currentSettled = (data['settledAmount'] ?? 0).toDouble();
-    final newSettled = currentSettled + partialAmount;
-    final isNowFullySettled = newSettled >= totalAmount;
-    final now = DateTime.now();
-    final month = '${now.year}-${now.month.toString().padLeft(2, '0')}';
-    final existing = List<Map<String, dynamic>>.from(data['partialSettlements'] ?? []);
-    existing.add({'amount': partialAmount, 'date': now.toIso8601String(), 'note': note ?? ''});
-
-    await _txnCol(userId).doc(txnId).update({
-      'settledAmount': newSettled,
-      'isSettled': isNowFullySettled,
-      'partialSettlements': existing,
-    });
-    await _tracker.trackWrites(1);
-
-    if (data['debtType'] == 'lent') {
-      await _txnCol(userId).add({
-        'title': 'Partial Settlement: ${data['personName'] ?? 'Unknown'} repaid ₹${partialAmount.toStringAsFixed(0)}',
-        'amount': partialAmount,
-        'type': 'income',
-        'category': data['category'] ?? 'Other',
-        'date': Timestamp.fromDate(now),
-        'notes': note ?? 'Partial settlement for "${data['title']}"',
-        'userId': userId,
-        'month': month,
-        'createdAt': FieldValue.serverTimestamp(),
-        'isSettled': false,
+      transaction.update(debtRef, {
+        'settledAmount': writeOff ? paid : paid + payment,
+        'isSettled': writeOff || paid + writtenOff + payment >= total,
+        'partialSettlements': history,
+        if (writeOff) 'writtenOffAmount': writtenOff + remaining,
       });
-      await _tracker.trackWrites(1);
-    }
+      if (!writeOff) {
+        transaction.set(repaymentRef, {
+          'title': 'Settlement: ${data['personName'] ?? 'Unknown'}',
+          'amount': payment,
+          'type': data['debtType'] == 'lent' ? 'income' : 'expense',
+          'category': data['category'] ?? 'Other',
+          'date': Timestamp.fromDate(date),
+          'notes': note ?? 'Settlement for "${data['title']}"',
+          'userId': userId,
+          'month': '${date.year}-${date.month.toString().padLeft(2, '0')}',
+          'createdAt': FieldValue.serverTimestamp(),
+          'debtSourceId': txnId,
+          'isSettled': false,
+        });
+      }
+    });
+    await _tracker.trackWrites(writeOff ? 1 : 2);
   }
-
-  // ─── Category Budgets ───
 
   CollectionReference _budgetCol(String userId) =>
       _firestore.collection('users').doc(userId).collection('personal_budgets');
 
   Stream<List<CategoryBudget>> getBudgetsStream(String userId, String month) {
     _tracker.trackReads(1);
-    return _budgetCol(userId)
-        .where('month', isEqualTo: month)
-        .snapshots()
-        .map((snap) {
+    return _budgetCol(userId).where('month', isEqualTo: month).snapshots().map((
+      snap,
+    ) {
       _tracker.trackReads(snap.docs.length);
       return snap.docs
-          .map((d) => CategoryBudget.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .map(
+            (d) =>
+                CategoryBudget.fromMap(d.data() as Map<String, dynamic>, d.id),
+          )
           .toList();
     });
   }
@@ -172,24 +277,34 @@ class PersonalExpenseService {
 
   // ─── Recurring Transactions ───
 
-  CollectionReference _recurringCol(String userId) =>
-      _firestore.collection('users').doc(userId).collection('personal_recurring');
+  CollectionReference _recurringCol(String userId) => _firestore
+      .collection('users')
+      .doc(userId)
+      .collection('personal_recurring');
 
   Stream<List<RecurringTransaction>> getRecurringStream(String userId) {
     _tracker.trackReads(1);
-    return _recurringCol(userId)
-        .orderBy('dayOfMonth')
-        .snapshots()
-        .map((snap) {
+    return _recurringCol(userId).orderBy('dayOfMonth').snapshots().map((snap) {
       _tracker.trackReads(snap.docs.length);
       return snap.docs
-          .map((d) => RecurringTransaction.fromMap(d.data() as Map<String, dynamic>, d.id))
+          .map(
+            (d) => RecurringTransaction.fromMap(
+              d.data() as Map<String, dynamic>,
+              d.id,
+            ),
+          )
           .toList();
     });
   }
 
-  Future<void> addRecurring(String userId, RecurringTransaction recurring) async {
-    await _recurringCol(userId).add(recurring.toMap());
+  Future<void> addRecurring(
+    String userId,
+    RecurringTransaction recurring,
+  ) async {
+    await _recurringCol(userId).add({
+      ...recurring.toMap(),
+      'createdAt': Timestamp.fromDate(recurring.createdAt ?? DateTime.now()),
+    });
     await _tracker.trackWrites(1);
   }
 
@@ -216,9 +331,10 @@ class PersonalExpenseService {
       editedAt: DateTime.now(),
     );
 
-    final updatedHistory = [snapshot, ...current.editHistory]
-        .map((e) => e.toMap())
-        .toList();
+    final updatedHistory = [
+      snapshot,
+      ...current.editHistory,
+    ].map((e) => e.toMap()).toList();
 
     final updateMap = <String, dynamic>{
       'editHistory': updatedHistory,

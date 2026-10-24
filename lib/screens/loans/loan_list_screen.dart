@@ -41,11 +41,49 @@ const _kTeal   = Color(0xFF14B8A6);
 
 // ── Screen ────────────────────────────────────────────────────────────────
 
-class LoanListScreen extends ConsumerWidget {
+class LoanListScreen extends ConsumerStatefulWidget {
   const LoanListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoanListScreen> createState() => _LoanListScreenState();
+}
+
+class _LoanListScreenState extends ConsumerState<LoanListScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkDueEmis());
+  }
+
+  Future<void> _checkDueEmis() async {
+    try {
+      final loans = await ref.read(loansProvider.future);
+      if (!mounted) return;
+      final userId = ref.read(authStateProvider).valueOrNull?.uid;
+      if (userId == null) return;
+      final service = ref.read(loanServiceProvider);
+      for (final loan in loans) {
+        if (loan.status != LoanStatus.active || loan.loanType != LoanType.borrowed) continue;
+        final payments = await service.getPaymentsStream(userId, loan.id).first;
+        if (!mounted) return;
+        final missed = service.getMissedEmiDates(loan, payments);
+        if (missed.isNotEmpty) {
+          await showMissedEmiDialog(context, userId, loan.id, missed, service,
+              loanTitle: loan.title);
+          if (!mounted) return;
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not check due EMIs: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final loansAsync = ref.watch(loansProvider);
     final summary    = ref.watch(loanSummaryProvider);
 

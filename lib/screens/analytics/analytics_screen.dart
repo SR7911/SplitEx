@@ -1,7 +1,6 @@
 ﻿import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:split_ex/config/constants.dart';
 import 'package:split_ex/models/expense_model.dart';
 import 'package:split_ex/providers/expense_provider.dart';
 import 'package:split_ex/widgets/app_header.dart';

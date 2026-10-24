@@ -5,6 +5,8 @@ import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
 import 'package:split_ex/screens/personal/add_personal_transaction_screen.dart';
+import 'package:split_ex/widgets/personal_account_picker.dart';
+import 'package:split_ex/widgets/debt_due_date_picker.dart';
 
 void showAddDebtSheet(BuildContext context, {String? initialMonth}) {
   showModalBottomSheet(
@@ -37,6 +39,8 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
   late DateTime _date;
   bool _saving = false;
   bool _showSuggestions = false;
+  String? _accountId;
+  DateTime? _dueDate;
 
   @override
   void initState() {
@@ -90,11 +94,21 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
       userId: userId,
       month: DateFormat('yyyy-MM').format(_date),
       createdAt: DateTime.now(),
+      accountId: _accountId,
+      dueDate: _dueDate,
       debtType: _debtType,
       personName: _personCtrl.text.trim(),
     );
 
-    await ref.read(personalExpenseServiceProvider).addTransaction(userId, txn);
+    try {
+      await ref.read(personalExpenseServiceProvider).addTransaction(userId, txn);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save. Check your account, amount and repayment date, then retry.')));
+      }
+      return;
+    }
 
     if (mounted) {
       Navigator.pop(context);
@@ -297,6 +311,9 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
                 const SizedBox(height: 12),
 
                 // Notes
+                PersonalAccountPicker(value: _accountId, enabled: !_saving, onChanged: (v) => setState(() => _accountId = v)),
+                DebtDueDatePicker(value: _dueDate, debtDate: _date, enabled: !_saving, onChanged: (v) => setState(() => _dueDate = v)),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _notesCtrl,
                   decoration: _inputDeco(context, 'Notes (optional)', Icons.edit_note),

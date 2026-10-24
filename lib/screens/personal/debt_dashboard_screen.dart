@@ -6,12 +6,13 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
 import 'package:split_ex/screens/personal/add_debt_sheet.dart';
+import 'package:split_ex/screens/personal/debt_widgets.dart';
+import 'package:split_ex/screens/personal/personal_debts_screen.dart';
 import 'package:split_ex/widgets/app_header.dart';
 import 'package:split_ex/widgets/design_system/design_system.dart';
 
 const _kGreen = Color(0xFF22C55E);
 const _kRed = Color(0xFFEF4444);
-const _kBlue = Color(0xFF3B82F6);
 
 class DebtDashboardScreen extends ConsumerWidget {
   const DebtDashboardScreen({super.key});
@@ -31,6 +32,11 @@ class DebtDashboardScreen extends ConsumerWidget {
           tooltip: 'Add Debt',
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showAddDebtSheet(context),
+        tooltip: 'Add Debt',
+        child: const Icon(Icons.add_rounded),
+      ),
       body: GradientBody(
         child: debtsAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -49,10 +55,16 @@ class _DashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lent = allDebts.where((t) => t.debtType == DebtType.lent).toList();
-    final borrowed = allDebts.where((t) => t.debtType == DebtType.borrowed).toList();
+    final borrowed = allDebts
+        .where((t) => t.debtType == DebtType.borrowed)
+        .toList();
 
-    final totalLent = lent.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.remainingAmount);
-    final totalBorrowed = borrowed.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.remainingAmount);
+    final totalLent = lent
+        .where((t) => !t.isSettled)
+        .fold<double>(0, (s, t) => s + t.remainingAmount);
+    final totalBorrowed = borrowed
+        .where((t) => !t.isSettled)
+        .fold<double>(0, (s, t) => s + t.remainingAmount);
     final netBalance = totalLent - totalBorrowed;
     final activeCount = allDebts.where((t) => !t.isSettled).length;
 
@@ -72,6 +84,7 @@ class _DashboardBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
       children: [
         _HeroCard(
+          debts: allDebts,
           totalLent: totalLent,
           totalBorrowed: totalBorrowed,
           netBalance: netBalance,
@@ -80,9 +93,16 @@ class _DashboardBody extends StatelessWidget {
         const SizedBox(height: 16),
         _QuickActions(allDebts: allDebts),
         const SizedBox(height: 20),
+
         _MonthlyChart(allDebts: allDebts),
         const SizedBox(height: 20),
-        _BorrowedVsLentChart(totalLent: totalLent, totalBorrowed: totalBorrowed),
+        _BorrowedVsLentChart(
+          totalLent: totalLent,
+          totalBorrowed: totalBorrowed,
+          debts: allDebts,
+        ),
+        const SizedBox(height: 20),
+        DebtInsights(debts: allDebts, includeDetails: false),
         const SizedBox(height: 20),
         _MostDebtedPeople(allDebts: allDebts),
         const SizedBox(height: 20),
@@ -112,11 +132,13 @@ class _DashboardBody extends StatelessWidget {
 // ── Hero Card ──────────────────────────────────────────────────────────────
 
 class _HeroCard extends StatelessWidget {
+  final List<PersonalTransactionModel> debts;
   final double totalLent;
   final double totalBorrowed;
   final double netBalance;
   final int activeCount;
   const _HeroCard({
+    required this.debts,
     required this.totalLent,
     required this.totalBorrowed,
     required this.netBalance,
@@ -133,8 +155,18 @@ class _HeroCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.xxl),
-        gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        boxShadow: [BoxShadow(color: gradientColors.first.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 6))],
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: gradientColors.first.withValues(alpha: 0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(22),
       child: Column(
@@ -143,30 +175,77 @@ class _HeroCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Net Balance', style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7), fontWeight: FontWeight.w500)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(20)),
-                child: Text('$activeCount active', style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+              Text(
+                'Net Balance',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => showDebtDetailsSheet(
+                  context,
+                  'Outstanding Debts',
+                  debts.where((t) => !t.isSettled).toList(),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'View All',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
           Text(
             '${isPositive ? '+' : '-'}₹${netBalance.abs().toStringAsFixed(0)}',
-            style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -1.5),
+            style: const TextStyle(
+              fontSize: 38,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -1.5,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            isPositive ? 'Others owe you more' : 'You owe others more',
-            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.65)),
+            isPositive
+                ? 'Others owe you more · $activeCount active'
+                : 'You owe others more · $activeCount active',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.65),
+            ),
           ),
           const SizedBox(height: 20),
           Row(
             children: [
-              _HeroChip(icon: Icons.call_made, label: 'Lent', value: '₹${totalLent.toStringAsFixed(0)}', color: _kGreen),
+              _HeroChip(
+                icon: Icons.call_made,
+                label: 'Lent',
+                value: '₹${totalLent.toStringAsFixed(0)}',
+                color: _kGreen,
+              ),
               const SizedBox(width: 10),
-              _HeroChip(icon: Icons.call_received, label: 'Borrowed', value: '₹${totalBorrowed.toStringAsFixed(0)}', color: _kRed),
+              _HeroChip(
+                icon: Icons.call_received,
+                label: 'Borrowed',
+                value: '₹${totalBorrowed.toStringAsFixed(0)}',
+                color: _kRed,
+              ),
             ],
           ),
         ],
@@ -180,7 +259,12 @@ class _HeroChip extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _HeroChip({required this.icon, required this.label, required this.value, required this.color});
+  const _HeroChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -194,16 +278,33 @@ class _HeroChip extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 28, height: 28,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(8)),
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Icon(icon, size: 14, color: Colors.white),
             ),
             const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.65))),
-                Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.white.withValues(alpha: 0.65),
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ],
@@ -221,15 +322,36 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Row(
       children: [
-        _ActionBtn(icon: Icons.add_rounded, label: 'Add Debt', color: _kGreen, onTap: () => showAddDebtSheet(context)),
+        _ActionBtn(
+          icon: Icons.calendar_month,
+          label: 'Monthly Debts',
+          color: primary,
+          onTap: () => context.push('/personal/debt-list'),
+        ),
         const SizedBox(width: 10),
-        _ActionBtn(icon: Icons.list_alt_rounded, label: 'View All', color: _kBlue, onTap: () => context.push('/personal/debt-list')),
+        _ActionBtn(
+          icon: Icons.list_alt_rounded,
+          label: 'View All',
+          color: primary,
+          onTap: () => context.push('/personal/debts'),
+        ),
         const SizedBox(width: 10),
-        _ActionBtn(icon: Icons.call_made, label: 'Lent', color: _kGreen, onTap: () => context.push('/personal/debts')),
+        _ActionBtn(
+          icon: Icons.call_made,
+          label: 'Lent',
+          color: _kGreen,
+          onTap: () => context.push('/personal/debts'),
+        ),
         const SizedBox(width: 10),
-        _ActionBtn(icon: Icons.call_received, label: 'Borrowed', color: _kRed, onTap: () => context.push('/personal/debts')),
+        _ActionBtn(
+          icon: Icons.call_received,
+          label: 'Borrowed',
+          color: _kRed,
+          onTap: () => context.push('/personal/debts?tab=1'),
+        ),
       ],
     );
   }
@@ -240,7 +362,12 @@ class _ActionBtn extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _ActionBtn({required this.icon, required this.label, required this.color, required this.onTap});
+  const _ActionBtn({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +386,14 @@ class _ActionBtn extends StatelessWidget {
             children: [
               Icon(icon, size: 20, color: color),
               const SizedBox(height: 4),
-              Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
             ],
           ),
         ),
@@ -277,7 +411,6 @@ class _MonthlyChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Build last 6 months
     final now = DateTime.now();
@@ -301,16 +434,27 @@ class _MonthlyChart extends StatelessWidget {
       }
     }
 
-    final maxVal = [...lentByMonth.values, ...borrowedByMonth.values].fold<double>(0, (a, b) => a > b ? a : b);
+    final maxVal = [
+      ...lentByMonth.values,
+      ...borrowedByMonth.values,
+    ].fold<double>(0, (a, b) => a > b ? a : b);
     if (maxVal == 0) return const SizedBox.shrink();
 
     return Container(
-      decoration: appCardDecoration(context),
+      decoration: debtCardDecoration(context),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSectionHeader(title: 'Monthly Debt Activity', actionLabel: null, onAction: null),
+          AppSectionHeader(
+            title: 'Monthly Debt Activity',
+            actionLabel: 'View All',
+            onAction: () => showDebtDetailsSheet(
+              context,
+              'Monthly Debt Activity',
+              allDebts,
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 140,
@@ -318,19 +462,49 @@ class _MonthlyChart extends StatelessWidget {
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
                 maxY: maxVal * 1.2,
-                barTouchData: BarTouchData(enabled: false),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) =>
+                        BarTooltipItem(
+                          '${DateFormat('MMM yyyy').format(DateTime.parse('${months[group.x]}-01'))}\n${rodIndex == 0 ? 'Lent' : 'Borrowed'}: ₹${NumberFormat('#,##0.##').format(rod.toY)}',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                  ),
+                ),
                 titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (val, _) {
                         final idx = val.toInt();
-                        if (idx < 0 || idx >= months.length) return const SizedBox.shrink();
-                        final label = DateFormat('MMM').format(DateTime.parse('${months[idx]}-01'));
-                        return Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5)));
+                        if (idx < 0 || idx >= months.length)
+                          return const SizedBox.shrink();
+                        final label = DateFormat(
+                          'MMM',
+                        ).format(DateTime.parse('${months[idx]}-01'));
+                        return Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: cs.onSurface.withValues(alpha: 0.5),
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -338,7 +512,10 @@ class _MonthlyChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => FlLine(color: cs.outline.withValues(alpha: 0.08), strokeWidth: 1),
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: cs.outline.withValues(alpha: 0.08),
+                    strokeWidth: 1,
+                  ),
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: List.generate(months.length, (i) {
@@ -346,8 +523,18 @@ class _MonthlyChart extends StatelessWidget {
                   return BarChartGroupData(
                     x: i,
                     barRods: [
-                      BarChartRodData(toY: lentByMonth[m]!, color: _kGreen, width: 8, borderRadius: BorderRadius.circular(4)),
-                      BarChartRodData(toY: borrowedByMonth[m]!, color: _kRed, width: 8, borderRadius: BorderRadius.circular(4)),
+                      BarChartRodData(
+                        toY: lentByMonth[m]!,
+                        color: _kGreen,
+                        width: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      BarChartRodData(
+                        toY: borrowedByMonth[m]!,
+                        color: _kRed,
+                        width: 8,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ],
                   );
                 }),
@@ -378,9 +565,24 @@ class _Legend extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
         const SizedBox(width: 5),
-        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.6),
+          ),
+        ),
       ],
     );
   }
@@ -389,45 +591,80 @@ class _Legend extends StatelessWidget {
 // ── Borrowed vs Lent Donut ─────────────────────────────────────────────────
 
 class _BorrowedVsLentChart extends StatelessWidget {
+  final List<PersonalTransactionModel> debts;
   final double totalLent;
   final double totalBorrowed;
-  const _BorrowedVsLentChart({required this.totalLent, required this.totalBorrowed});
+  const _BorrowedVsLentChart({
+    required this.totalLent,
+    required this.totalBorrowed,
+    required this.debts,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final total = totalLent + totalBorrowed;
     if (total == 0) return const SizedBox.shrink();
 
     return Container(
-      decoration: appCardDecoration(context),
+      decoration: debtCardDecoration(context),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSectionHeader(title: 'Lent vs Borrowed', actionLabel: null, onAction: null),
+          AppSectionHeader(
+            title: 'Lent vs Borrowed',
+            actionLabel: 'View All',
+            onAction: () => showDebtDetailsSheet(
+              context,
+              'Outstanding Debts',
+              debts.where((t) => !t.isSettled).toList(),
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
               SizedBox(
-                width: 100, height: 100,
-                child: PieChart(PieChartData(
-                  sectionsSpace: 3,
-                  centerSpaceRadius: 28,
-                  sections: [
-                    PieChartSectionData(value: totalLent, color: _kGreen, title: '', radius: 32),
-                    PieChartSectionData(value: totalBorrowed, color: _kRed, title: '', radius: 32),
-                  ],
-                )),
+                width: 100,
+                height: 100,
+                child: PieChart(
+                  PieChartData(
+                    sectionsSpace: 3,
+                    centerSpaceRadius: 28,
+                    sections: [
+                      PieChartSectionData(
+                        value: totalLent,
+                        color: _kGreen,
+                        title: '',
+                        radius: 32,
+                      ),
+                      PieChartSectionData(
+                        value: totalBorrowed,
+                        color: _kRed,
+                        title: '',
+                        radius: 32,
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ChartLegendRow(color: _kGreen, label: 'You Lent', amount: totalLent, total: total),
+                    _ChartLegendRow(
+                      color: _kGreen,
+                      label: 'You Lent',
+                      amount: totalLent,
+                      total: total,
+                    ),
                     const SizedBox(height: 12),
-                    _ChartLegendRow(color: _kRed, label: 'You Borrowed', amount: totalBorrowed, total: total),
+                    _ChartLegendRow(
+                      color: _kRed,
+                      label: 'You Borrowed',
+                      amount: totalBorrowed,
+                      total: total,
+                    ),
                   ],
                 ),
               ),
@@ -444,7 +681,12 @@ class _ChartLegendRow extends StatelessWidget {
   final String label;
   final double amount;
   final double total;
-  const _ChartLegendRow({required this.color, required this.label, required this.amount, required this.total});
+  const _ChartLegendRow({
+    required this.color,
+    required this.label,
+    required this.amount,
+    required this.total,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -452,12 +694,37 @@ class _ChartLegendRow extends StatelessWidget {
     final pct = total > 0 ? (amount / total * 100).toInt() : 0;
     return Row(
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7)))),
-        Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+        Text(
+          '₹${amount.toStringAsFixed(0)}',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
         const SizedBox(width: 6),
-        Text('$pct%', style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.4))),
+        Text(
+          '$pct%',
+          style: TextStyle(
+            fontSize: 11,
+            color: cs.onSurface.withValues(alpha: 0.4),
+          ),
+        ),
       ],
     );
   }
@@ -465,181 +732,348 @@ class _ChartLegendRow extends StatelessWidget {
 
 // ── Most Debted People ─────────────────────────────────────────────────────
 
-class _MostDebtedPeople extends ConsumerWidget {
+class _MostDebtedPeople extends StatelessWidget {
   final List<PersonalTransactionModel> allDebts;
   const _MostDebtedPeople({required this.allDebts});
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final balances = ref.watch(personalDebtBalancesProvider);
-    if (balances.isEmpty) return const SizedBox.shrink();
-
-    final sorted = balances.entries.toList()
-      ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
-    final top = sorted.take(5).toList();
-
-    return Container(
-      decoration: appCardDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppSectionHeader(title: 'Most Debted People', actionLabel: null, onAction: null),
-          const SizedBox(height: 14),
-          ...top.map((e) {
-            final isPositive = e.value >= 0;
-            final color = isPositive ? _kGreen : _kRed;
-            final label = isPositive ? 'owes you' : 'you owe';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: color.withValues(alpha: 0.12),
-                    child: Text(e.key[0].toUpperCase(), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(e.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text(label, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5))),
-                      ],
-                    ),
-                  ),
-                  Text(
-                    '${isPositive ? '+' : '-'}₹${e.value.abs().toStringAsFixed(0)}',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+  Widget build(BuildContext context) {
+    final people = _groupPeople(allDebts.where((t) => !t.isSettled).toList());
+    if (people.isEmpty) return const SizedBox.shrink();
+    return DebtSectionCard(
+      title: 'Most Debted People',
+      onViewAll: () => showDebtPeopleSheet(context, allDebts),
+      children: people
+          .take(5)
+          .map((items) => _personRow(context, items))
+          .toList(),
     );
   }
 }
-
-// ── Top Debts Section ──────────────────────────────────────────────────────
 
 class _TopDebtsSection extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
   final List<PersonalTransactionModel> debts;
-  const _TopDebtsSection({required this.title, required this.icon, required this.color, required this.debts});
-
+  const _TopDebtsSection({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.debts,
+  });
   @override
   Widget build(BuildContext context) {
     if (debts.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-    final top = debts.take(3).toList();
+    return DebtSectionCard(
+      title: title,
+      onViewAll: () => showDebtDetailsSheet(context, title, debts),
+      children: debts
+          .take(3)
+          .map((t) => DebtTile(txn: t, showActions: false, embedded: true))
+          .toList(),
+    );
+  }
+}
 
+class _RecentDebts extends StatelessWidget {
+  final List<PersonalTransactionModel> allDebts;
+  const _RecentDebts({required this.allDebts});
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...allDebts]..sort((a, b) => b.date.compareTo(a.date));
+    return DebtSectionCard(
+      title: 'Recent Debts',
+      onViewAll: () => showDebtDetailsSheet(context, 'Recent Debts', sorted),
+      children: sorted
+          .take(5)
+          .map((t) => DebtTile(txn: t, showActions: false, embedded: true))
+          .toList(),
+    );
+  }
+}
+
+class DebtInsights extends StatelessWidget {
+  final List<PersonalTransactionModel> debts;
+  final bool includeDetails;
+  final bool collapsibleCategories;
+  const DebtInsights({
+    super.key,
+    required this.debts,
+    this.includeDetails = true,
+    this.collapsibleCategories = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final categories = _groupCategories(debts);
+    return Column(
+      children: [
+        if (collapsibleCategories)
+          _ExpandableDebtCategories(debts: debts)
+        else
+          DebtSectionCard(
+            title: 'Top Categories',
+            onViewAll: () => showDebtCategorySheet(context, debts),
+            children: categories.isEmpty
+                ? [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: Text(
+                          'No debt activity in this period',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]
+                : categories
+                      .take(3)
+                      .map((items) => _categoryRow(context, items, debts))
+                      .toList(),
+          ),
+        if (includeDetails && debts.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          _MostDebtedPeople(allDebts: debts),
+          for (final type in DebtType.values) ...[
+            const SizedBox(height: 16),
+            _TopDebtsSection(
+              title: type == DebtType.lent
+                  ? 'Top Lent Debts'
+                  : 'Top Borrowed Debts',
+              icon: type == DebtType.lent
+                  ? Icons.call_made
+                  : Icons.call_received,
+              color: type == DebtType.lent ? _kGreen : _kRed,
+              debts:
+                  debts
+                      .where((t) => !t.isSettled && t.debtType == type)
+                      .toList()
+                    ..sort(
+                      (a, b) => b.remainingAmount.compareTo(a.remainingAmount),
+                    ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _ExpandableDebtCategories extends StatefulWidget {
+  final List<PersonalTransactionModel> debts;
+  const _ExpandableDebtCategories({required this.debts});
+
+  @override
+  State<_ExpandableDebtCategories> createState() =>
+      _ExpandableDebtCategoriesState();
+}
+
+class _ExpandableDebtCategoriesState extends State<_ExpandableDebtCategories> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final categories = _groupCategories(widget.debts);
+    final cs = Theme.of(context).colorScheme;
     return Container(
-      decoration: appCardDecoration(context),
-      padding: const EdgeInsets.all(16),
+      decoration: debtCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSectionHeader(title: title, actionLabel: null, onAction: null),
-          const SizedBox(height: 14),
-          ...top.map((t) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(icon, size: 16, color: color),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          Material(
+            color: Colors.transparent,
+            child: Tooltip(
+              message: _expanded ? 'Collapse categories' : 'Expand categories',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      Text(t.personName ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text(t.title, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(DateFormat('dd MMM yyyy').format(t.date), style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4))),
+                      const Expanded(
+                        child: AppSectionHeader(title: 'Top Categories'),
+                      ),
+                      Icon(
+                        _expanded
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: cs.primary,
+                        size: 22,
+                      ),
                     ],
                   ),
                 ),
-                Text('₹${t.remainingAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-              ],
+              ),
             ),
-          )),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            alignment: Alignment.topCenter,
+            curve: Curves.easeInOut,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!_expanded || categories.isEmpty)
+                    Text(
+                      categories.isEmpty
+                          ? 'No debt activity in this period'
+                          : '${categories.length} ${categories.length == 1 ? 'category' : 'categories'} · ${_money(_amount(widget.debts))} total',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary(context),
+                      ),
+                    ),
+                  if (_expanded)
+                    for (int i = 0; i < categories.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 8),
+                      _categoryRow(context, categories[i], widget.debts),
+                    ],
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Recent Debts ───────────────────────────────────────────────────────────
-
-class _RecentDebts extends StatelessWidget {
-  final List<PersonalTransactionModel> allDebts;
-  const _RecentDebts({required this.allDebts});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final recent = [...allDebts]
-      ..sort((a, b) => b.date.compareTo(a.date));
-    final top = recent.take(5).toList();
-
-    return Container(
-      decoration: appCardDecoration(context),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppSectionHeader(
-            title: 'Recent Debts',
-            actionLabel: 'View All',
-            onAction: () => context.push('/personal/debt-list'),
-          ),
-          const SizedBox(height: 14),
-          if (top.isEmpty)
-            AppEmptyState(icon: Icons.handshake_outlined, title: 'No debts yet')
-          else
-            ...top.map((t) {
-              final isLent = t.debtType == DebtType.lent;
-              final color = isLent ? _kGreen : _kRed;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: color.withValues(alpha: 0.1),
-                      child: Icon(isLent ? Icons.call_made : Icons.call_received, size: 14, color: color),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(t.personName ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text(t.title, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text('₹${t.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-                        Text(DateFormat('dd MMM').format(t.date), style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4))),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
+List<List<PersonalTransactionModel>> _groupCategories(
+  List<PersonalTransactionModel> debts,
+) {
+  final groups = <String, List<PersonalTransactionModel>>{};
+  for (final debt in debts) {
+    groups.putIfAbsent(debt.category, () => []).add(debt);
   }
+  return groups.values.toList()
+    ..sort((a, b) => _amount(b).compareTo(_amount(a)));
+}
+
+double _amount(List<PersonalTransactionModel> debts) =>
+    debts.fold<double>(0, (sum, t) => sum + t.amount);
+String _money(double amount) => '₹${NumberFormat('#,##0.##').format(amount)}';
+
+Widget _categoryRow(
+  BuildContext context,
+  List<PersonalTransactionModel> items,
+  List<PersonalTransactionModel> all,
+) {
+  final total = _amount(all);
+  final share = total == 0 ? 0 : (_amount(items) / total * 100).round();
+  return DebtInfoRow(
+    icon: Icons.category_outlined,
+    title: items.first.category,
+    subtitle: '${items.length} ${items.length == 1 ? 'debt' : 'debts'}',
+    value: _money(_amount(items)),
+    detail: '$share% of total',
+    onTap: () => showDebtDetailsSheet(context, items.first.category, items),
+  );
+}
+
+List<List<PersonalTransactionModel>> _groupPeople(
+  List<PersonalTransactionModel> debts,
+) {
+  final groups = <String, List<PersonalTransactionModel>>{};
+  for (final debt in debts) {
+    groups.putIfAbsent(debt.personName ?? 'Unknown', () => []).add(debt);
+  }
+  return groups.values.toList()
+    ..sort((a, b) => _net(b).abs().compareTo(_net(a).abs()));
+}
+
+double _net(List<PersonalTransactionModel> items) => items
+    .where((t) => !t.isSettled)
+    .fold<double>(
+      0,
+      (sum, t) =>
+          sum +
+          (t.debtType == DebtType.lent
+              ? t.remainingAmount
+              : -t.remainingAmount),
+    );
+
+Widget _personRow(BuildContext context, List<PersonalTransactionModel> items) {
+  final net = _net(items);
+  final name = items.first.personName ?? 'Unknown';
+  final lent = items
+      .where((t) => !t.isSettled && t.debtType == DebtType.lent)
+      .fold<double>(0, (s, t) => s + t.remainingAmount);
+  final borrowed = items
+      .where((t) => !t.isSettled && t.debtType == DebtType.borrowed)
+      .fold<double>(0, (s, t) => s + t.remainingAmount);
+  return DebtInfoRow(
+    icon: Icons.person_outline_rounded,
+    title: name,
+    subtitle: 'Lent ${_money(lent)} · Borrowed ${_money(borrowed)}',
+    value: _money(net.abs()),
+    detail: net > 0
+        ? 'owes you'
+        : net < 0
+        ? 'you owe'
+        : 'balanced',
+    color: net > 0
+        ? AppColors.success(context)
+        : net < 0
+        ? AppColors.error(context)
+        : Theme.of(context).colorScheme.primary,
+    onTap: () => showDebtDetailsSheet(context, name, items),
+  );
+}
+
+void showDebtCategorySheet(
+  BuildContext context,
+  List<PersonalTransactionModel> debts,
+) {
+  final groups = _groupCategories(debts);
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => DebtSheetFrame(
+      title: 'Debt Categories',
+      itemCount: groups.length,
+      subtitle:
+          '${groups.length} ${groups.length == 1 ? 'category' : 'categories'} · ${_money(_amount(debts))} total',
+      icon: Icons.category_outlined,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(20),
+        itemCount: groups.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) =>
+            _categoryRow(context, groups[index], debts),
+      ),
+    ),
+  );
+}
+
+void showDebtPeopleSheet(
+  BuildContext context,
+  List<PersonalTransactionModel> debts,
+) {
+  final groups = _groupPeople(debts);
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => DebtSheetFrame(
+      title: 'People & Balances',
+      itemCount: groups.length,
+      subtitle:
+          '${groups.length} ${groups.length == 1 ? 'person' : 'people'} · Outstanding balances',
+      icon: Icons.people_outline_rounded,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(20),
+        itemCount: groups.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) => _personRow(context, groups[index]),
+      ),
+    ),
+  );
 }

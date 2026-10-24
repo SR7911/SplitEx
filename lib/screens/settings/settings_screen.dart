@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/config/theme.dart';
+import 'package:split_ex/providers/app_version_provider.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/theme_provider.dart';
 import 'package:split_ex/widgets/app_header.dart';
@@ -13,6 +14,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(userProfileProvider).valueOrNull;
+    final version = ref.watch(appVersionProvider);
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -84,6 +86,12 @@ class SettingsScreen extends ConsumerWidget {
               label: 'Notification Preferences',
               onTap: () => context.push('/settings/notifications'),
             ),
+            _SettingsTile(
+              icon: Icons.sms_outlined,
+              label: 'Bank SMS Recording',
+              subtitle: 'Auto-record payments and review detected messages',
+              onTap: () => context.push('/settings/bank-sms'),
+            ),
 
             const SizedBox(height: AppSpacing.xl),
 
@@ -123,7 +131,11 @@ class SettingsScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.all(AppSpacing.xl),
               child: Text(
-                'Version 1.0.0',
+                version.when(
+                  data: (value) => 'Version $value',
+                  loading: () => 'Loading version…',
+                  error: (_, _) => 'Version unavailable',
+                ),
                 textAlign: TextAlign.center,
                 style: AppTextStyles.caption(context),
               ),

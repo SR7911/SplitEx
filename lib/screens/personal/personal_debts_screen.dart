@@ -4,466 +4,861 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
+import 'package:split_ex/screens/personal/add_debt_sheet.dart';
+import 'package:split_ex/screens/personal/debt_widgets.dart';
+import 'package:split_ex/screens/personal/view_personal_transaction_sheet.dart';
 import 'package:split_ex/widgets/app_header.dart';
+import 'package:split_ex/widgets/design_system/design_system.dart';
 
 class PersonalDebtsScreen extends ConsumerWidget {
-  const PersonalDebtsScreen({super.key});
-
-  List<PersonalTransactionModel> _sortedBySettled(List<PersonalTransactionModel> list) {
-    final unsettled = list.where((t) => !t.isSettled).toList();
-    final settled = list.where((t) => t.isSettled).toList();
-    return [...unsettled, ...settled];
-  }
+  final int initialTab;
+  const PersonalDebtsScreen({super.key, this.initialTab = 0});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final debtsAsync = ref.watch(personalDebtsProvider);
-
-    return Scaffold(
-      appBar: const AppHeader(showBack: true, title: 'Debts & Settlements', showNotification: false),
-      body: GradientBody(
-        child: debtsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (allDebts) {
-          final lentTxns = allDebts.where((t) => t.debtType == DebtType.lent).toList();
-          final borrowedTxns = allDebts.where((t) => t.debtType == DebtType.borrowed).toList();
-
-          final totalLent = lentTxns.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.remainingAmount);
-          final totalBorrowed = borrowedTxns.where((t) => !t.isSettled).fold<double>(0, (s, t) => s + t.remainingAmount);
-
-          if (allDebts.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.handshake_outlined, size: 64, color: Colors.grey.shade300),
-                  const SizedBox(height: 12),
-                  const Text('No active debts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text('Link a person when adding expenses', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-                ],
-              ),
-            );
-          }
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(
-                children: [
-                  _SummaryChip(label: 'You Lent', subtitle: 'They owe you', amount: totalLent, color: Colors.green, icon: Icons.call_made),
-                  const SizedBox(width: 12),
-                  _SummaryChip(label: 'You Borrowed', subtitle: 'You owe them', amount: totalBorrowed, color: Colors.red, icon: Icons.call_received),
-                ],
-              ),
-              const SizedBox(height: 24),
-              if (lentTxns.isNotEmpty) ...[
-                _SectionHeader(title: 'Money You Lent', subtitle: 'People who owe you', color: Colors.green, icon: Icons.call_made),
-                const SizedBox(height: 10),
-                ..._sortedBySettled(lentTxns).map((t) => _DebtTile(txn: t, isLent: true)),
-                const SizedBox(height: 24),
-              ],
-              if (borrowedTxns.isNotEmpty) ...[
-                _SectionHeader(title: 'Money You Borrowed', subtitle: 'People you owe', color: Colors.red, icon: Icons.call_received),
-                const SizedBox(height: 10),
-                ..._sortedBySettled(borrowedTxns).map((t) => _DebtTile(txn: t, isLent: false)),
-              ],
-            ],
-          );
-        },
-      ),
-      ),
-    );
-  }
-}
-
-class _SummaryChip extends StatelessWidget {
-  final String label;
-  final String subtitle;
-  final double amount;
-  final Color color;
-  final IconData icon;
-  const _SummaryChip({required this.label, required this.subtitle, required this.amount, required this.color, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 22, color: color),
-            const SizedBox(height: 6),
-            Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-            Text(subtitle, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final Color color;
-  final IconData icon;
-  const _SectionHeader({required this.title, required this.subtitle, required this.color, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-          child: Icon(icon, size: 16, color: color),
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-            Text(subtitle, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _DebtTile extends ConsumerWidget {
-  final PersonalTransactionModel txn;
-  final bool isLent;
-  const _DebtTile({required this.txn, required this.isLent});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final color = isLent ? Colors.green : Colors.red;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final personName = txn.personName ?? 'Unknown';
-    final settled = txn.isSettled;
-    final hasPartial = txn.settledAmount > 0 && !settled;
-    final remaining = txn.remainingAmount;
-
-    return Opacity(
-      opacity: settled ? 0.5 : 1.0,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border(left: BorderSide(color: settled ? Colors.grey : (hasPartial ? Colors.orange : color), width: 3)),
-          boxShadow: [
-            if (!isDark && !settled) BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: (settled ? Colors.grey : color).withOpacity(0.1),
-                    child: settled
-                        ? const Icon(Icons.check, color: Colors.grey, size: 16)
-                        : Text(personName[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(personName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, decoration: settled ? TextDecoration.lineThrough : null)),
-                            const SizedBox(width: 6),
-                            if (settled)
-                              _Pill(label: 'Settled', color: Colors.grey)
-                            else if (hasPartial)
-                              _Pill(label: 'Partial', color: Colors.orange),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(txn.title, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text('${txn.category} • ${DateFormat('dd MMM').format(txn.date)}', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
-                      ],
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+    appBar: const AppHeader(
+      showBack: true,
+      title: 'All Debts',
+      showNotification: false,
+    ),
+    floatingActionButton: FloatingActionButton(
+      onPressed: () => showAddDebtSheet(context),
+      tooltip: 'Add Debt',
+      child: const Icon(Icons.add_rounded),
+    ),
+    body: GradientBody(
+      child: ref
+          .watch(personalDebtsProvider)
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Could not load debts: $e')),
+            data: (debts) => DefaultTabController(
+              length: 3,
+              initialIndex: initialTab,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Column(
+                  children: [
+                    DebtBalanceSummary(debts: debts),
+                    const SizedBox(height: 16),
+                    Container(
+                      decoration: debtCardDecoration(context),
+                      child: const TabBar(
+                        tabs: [
+                          Tab(text: 'Lent'),
+                          Tab(text: 'Borrowed'),
+                          Tab(text: 'Settled'),
+                        ],
+                      ),
                     ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      if (hasPartial) ...[
-                        Text('₹${txn.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4), decoration: TextDecoration.lineThrough)),
-                        Text('₹${remaining.toStringAsFixed(0)} left', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
-                      ] else
-                        Text(
-                          '₹${txn.amount.toStringAsFixed(0)}',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: settled ? Colors.grey : color, decoration: settled ? TextDecoration.lineThrough : null),
-                        ),
-                      const SizedBox(height: 6),
-                      if (!settled)
-                        GestureDetector(
-                          onTap: () => _showSettleSheet(context, ref),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: isLent ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          for (final tab in [0, 1, 2])
+                            _DebtTab(
+                              debts: debts
+                                  .where(
+                                    (t) => tab == 2
+                                        ? t.isSettled
+                                        : !t.isSettled &&
+                                              t.debtType ==
+                                                  (tab == 0
+                                                      ? DebtType.lent
+                                                      : DebtType.borrowed),
+                                  )
+                                  .toList(),
                             ),
-                            child: Text(
-                              isLent ? 'Settle?' : 'Settle Up',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isLent ? Colors.green : Colors.orange.shade700),
-                            ),
-                          ),
-                        )
-                      else
-                        Icon(Icons.check_circle, size: 18, color: Colors.grey.shade400),
-                    ],
-                  ),
-                ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            // Partial settlement history
-            if (txn.partialSettlements.isNotEmpty)
-              _PartialHistory(settlements: txn.partialSettlements, color: settled ? Colors.grey : color),
-          ],
+          ),
+    ),
+  );
+}
+
+class DebtBalanceSummary extends StatelessWidget {
+  final List<PersonalTransactionModel> debts;
+  const DebtBalanceSummary({super.key, required this.debts});
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      for (final type in DebtType.values) ...[
+        if (type == DebtType.borrowed) const SizedBox(width: 12),
+        Expanded(
+          child: AppMiniStatCard(
+            label: type == DebtType.lent
+                ? 'You Lent · Outstanding'
+                : 'You Borrowed · Outstanding',
+            value:
+                '₹${NumberFormat('#,##0.##').format(debts.where((t) => t.debtType == type && !t.isSettled).fold<double>(0, (sum, t) => sum + t.remainingAmount))}',
+            icon: type == DebtType.lent
+                ? Icons.call_made_rounded
+                : Icons.call_received_rounded,
+            color: type == DebtType.lent
+                ? AppColors.success(context)
+                : AppColors.error(context),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+class _DebtTab extends StatelessWidget {
+  final List<PersonalTransactionModel> debts;
+  const _DebtTab({required this.debts});
+  @override
+  Widget build(BuildContext context) {
+    final sorted = [...debts]
+      ..sort((a, b) {
+        final type = a.debtType!.index.compareTo(b.debtType!.index);
+        return type != 0 ? type : b.date.compareTo(a.date);
+      });
+    if (sorted.isEmpty) {
+      return const AppEmptyState(
+        icon: Icons.handshake_outlined,
+        title: 'No debts here',
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 100),
+      itemCount: sorted.length,
+      itemBuilder: (_, i) => DebtTile(txn: sorted[i]),
+    );
+  }
+}
+
+class DebtTile extends StatelessWidget {
+  final PersonalTransactionModel txn;
+  final bool showActions;
+  final bool embedded;
+  const DebtTile({
+    super.key,
+    required this.txn,
+    this.showActions = true,
+    this.embedded = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final lent = txn.debtType == DebtType.lent;
+    final color = txn.isSettled
+        ? cs.onSurface.withValues(alpha: .45)
+        : lent
+        ? AppColors.success(context)
+        : AppColors.error(context);
+    final status = txn.isSettled
+        ? (txn.writtenOffAmount > 0 ? 'Closed' : 'Settled')
+        : txn.settledAmount > 0 || txn.writtenOffAmount > 0
+        ? 'Partial'
+        : null;
+    final partiallySettled = !txn.isSettled && txn.settledAmount > 0;
+    return Padding(
+      padding: EdgeInsets.only(bottom: embedded ? 0 : 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => showPersonalTransactionDetail(context, txn),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: dark ? .07 : .04),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withValues(alpha: .12)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(
+                        lent
+                            ? Icons.call_made_rounded
+                            : Icons.call_received_rounded,
+                        color: color,
+                        size: 17,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            txn.personName ?? 'Unknown',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            txn.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: .6),
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${lent ? 'Lent' : 'Borrowed'} · ${txn.category} · ${DateFormat('dd MMM').format(txn.date)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: cs.onSurface.withValues(alpha: .4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.sizeOf(context).width * .42,
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  if (partiallySettled)
+                                    TextSpan(
+                                      text:
+                                          '₹${NumberFormat('#,##0.##').format(txn.amount)}  ',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: cs.onSurface.withValues(
+                                          alpha: .4,
+                                        ),
+                                        decoration: TextDecoration.lineThrough,
+                                        decorationColor: cs.onSurface
+                                            .withValues(alpha: .4),
+                                      ),
+                                    ),
+                                  TextSpan(
+                                    text:
+                                        '₹${NumberFormat('#,##0.##').format(txn.isSettled ? txn.amount : txn.remainingAmount)}',
+                                  ),
+                                ],
+                              ),
+                              style: TextStyle(
+                                color: color,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (showActions && !txn.isSettled)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: FilledButton.icon(
+                              onPressed: () => showDebtSettlement(context, txn),
+                              icon: Icon(
+                                lent
+                                    ? Icons.call_received_rounded
+                                    : Icons.call_made_rounded,
+                                size: 14,
+                              ),
+                              label: Text(lent ? 'Receive' : 'Repay'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: color.withValues(
+                                  alpha: dark ? .18 : .1,
+                                ),
+                                foregroundColor: color,
+                                elevation: 0,
+                                minimumSize: const Size(0, 32),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                tapTargetSize: MaterialTapTargetSize.padded,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                side: BorderSide(
+                                  color: color.withValues(alpha: .2),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          )
+                        else if (status != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            status,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: cs.onSurface.withValues(alpha: .45),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (showActions)
+                      SizedBox(
+                        width: 28,
+                        child: PopupMenuButton<String>(
+                          tooltip: 'Debt actions',
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            Icons.more_vert_rounded,
+                            size: 18,
+                            color: cs.onSurface.withValues(alpha: .4),
+                          ),
+                          onSelected: (action) {
+                            if (action == 'edit')
+                              showPersonalTransactionDetail(context, txn);
+                            if (action == 'close')
+                              showDebtSettlement(context, txn, close: true);
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('View / Edit'),
+                            ),
+                            if (!txn.isSettled)
+                              const PopupMenuItem(
+                                value: 'close',
+                                child: Text('Close Debt'),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                if (showActions && txn.partialSettlements.isNotEmpty)
+                  _DebtSettlementHistory(txn: txn),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
-
-  void _showSettleSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _SettleSheet(
-        personName: txn.personName ?? 'Unknown',
-        totalAmount: txn.amount,
-        remainingAmount: txn.remainingAmount,
-        isLent: isLent,
-        onPartial: (amount, note) async {
-          final userId = ref.read(authStateProvider).valueOrNull?.uid;
-          if (userId == null) return;
-          await ref.read(personalExpenseServiceProvider).partialSettleTransaction(userId, txn.id, amount, note);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('₹${amount.toStringAsFixed(0)} recorded!')));
-          }
-        },
-        onFull: () async {
-          final userId = ref.read(authStateProvider).valueOrNull?.uid;
-          if (userId == null) return;
-          await ref.read(personalExpenseServiceProvider).settleTransaction(userId, txn.id);
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isLent ? 'Marked as settled!' : 'Payment recorded!')));
-          }
-        },
-      ),
-    );
-  }
 }
 
-// ─── Shared Widgets ───────────────────────────────────────────────────────────
-
-class _Pill extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _Pill({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color)),
-    );
-  }
-}
-
-class _PartialHistory extends StatelessWidget {
-  final List<Map<String, dynamic>> settlements;
-  final Color color;
-  const _PartialHistory({required this.settlements, required this.color});
+class _DebtSettlementHistory extends StatelessWidget {
+  final PersonalTransactionModel txn;
+  const _DebtSettlementHistory({required this.txn});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final lent = txn.debtType == DebtType.lent;
+    final accent = lent ? AppColors.success(context) : AppColors.error(context);
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: cs.surface.withValues(alpha: .6),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: accent.withValues(alpha: .12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Settlement History', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-          const SizedBox(height: 6),
-          ...settlements.map((s) {
-            final amount = (s['amount'] ?? 0).toDouble();
-            final note = s['note'] as String? ?? '';
-            final dateStr = s['date'] as String? ?? '';
-            DateTime? date;
-            try { date = DateTime.parse(dateStr); } catch (_) {}
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_outline, size: 12, color: color),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      note.isNotEmpty ? note : 'Payment',
-                      style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.6)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          Text(
+            'Settlement History',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: accent,
+            ),
+          ),
+          const SizedBox(height: 8),
+          for (final entry in txn.partialSettlements)
+            Builder(
+              builder: (context) {
+                final writtenOff = entry['type'] == 'writeOff';
+                final color = writtenOff ? AppColors.warning(context) : accent;
+                final date = DateTime.tryParse(entry['date']?.toString() ?? '');
+                final note = (entry['note'] as String? ?? '').trim();
+                final label = writtenOff
+                    ? 'Written off'
+                    : lent
+                    ? 'Received'
+                    : 'Repaid';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        writtenOff
+                            ? Icons.money_off_rounded
+                            : Icons.check_circle_outline_rounded,
+                        size: 13,
+                        color: color,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            if (note.isNotEmpty)
+                              Text(
+                                note,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.textSecondary(context),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (date != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          DateFormat('dd MMM yyyy').format(date),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.textSecondary(context),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 8),
+                      Text(
+                        '₹${NumberFormat('#,##0.##').format(entry['amount'] as num? ?? 0)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ],
                   ),
-                  if (date != null)
-                    Text(DateFormat('dd MMM').format(date), style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.4))),
-                  const SizedBox(width: 8),
-                  Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-                ],
-              ),
-            );
-          }),
+                );
+              },
+            ),
         ],
       ),
     );
   }
 }
 
-class _SettleSheet extends StatefulWidget {
-  final String personName;
-  final double totalAmount;
-  final double remainingAmount;
-  final bool isLent;
-  final Future<void> Function(double amount, String? note) onPartial;
-  final Future<void> Function() onFull;
-  const _SettleSheet({
-    required this.personName,
-    required this.totalAmount,
-    required this.remainingAmount,
-    required this.isLent,
-    required this.onPartial,
-    required this.onFull,
-  });
-
-  @override
-  State<_SettleSheet> createState() => _SettleSheetState();
+void showDebtDetailsSheet(
+  BuildContext context,
+  String title,
+  List<PersonalTransactionModel> debts,
+) {
+  final order = {for (int i = 0; i < debts.length; i++) debts[i].id: i};
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) {
+        final current = ref.watch(personalDebtsProvider).valueOrNull ?? debts;
+        final items = current.where((t) => order.containsKey(t.id)).toList()
+          ..sort((a, b) => order[a.id]!.compareTo(order[b.id]!));
+        final outstanding = items
+            .where((t) => !t.isSettled)
+            .fold<double>(0, (sum, t) => sum + t.remainingAmount);
+        return DebtSheetFrame(
+          title: title,
+          itemCount: items.length,
+          extraContentHeight: items.fold<double>(
+            0,
+            (sum, item) =>
+                sum +
+                (item.partialSettlements.isEmpty
+                    ? 0
+                    : 48 + item.partialSettlements.length * 48),
+          ),
+          subtitle:
+              '${items.length} ${items.length == 1 ? 'debt' : 'debts'} · ₹${NumberFormat('#,##0.##').format(outstanding)} outstanding',
+          icon: Icons.handshake_outlined,
+          child: items.isEmpty
+              ? const AppEmptyState(
+                  icon: Icons.handshake_outlined,
+                  title: 'No debts here',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: items.length,
+                  itemBuilder: (_, index) => DebtTile(txn: items[index]),
+                ),
+        );
+      },
+    ),
+  );
 }
 
-class _SettleSheetState extends State<_SettleSheet> {
-  final _amountCtrl = TextEditingController();
-  final _noteCtrl = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
-  bool _loading = false;
+void showDebtSettlement(
+  BuildContext context,
+  PersonalTransactionModel txn, {
+  bool close = false,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _SettlementSheet(txn: txn, close: close),
+  );
+}
+
+class _SettlementSheet extends ConsumerStatefulWidget {
+  final PersonalTransactionModel txn;
+  final bool close;
+  const _SettlementSheet({required this.txn, required this.close});
+  @override
+  ConsumerState<_SettlementSheet> createState() => _SettlementSheetState();
+}
+
+class _SettlementSheetState extends ConsumerState<_SettlementSheet> {
+  final _amount = TextEditingController();
+  final _note = TextEditingController();
+  late DateTime _date;
+  bool _busy = false;
+  String? _error;
+  @override
+  void initState() {
+    super.initState();
+    _date = DateTime.now();
+  }
 
   @override
   void dispose() {
-    _amountCtrl.dispose();
-    _noteCtrl.dispose();
+    _amount.dispose();
+    _note.dispose();
     super.dispose();
+  }
+
+  Future<void> _save({bool full = false}) async {
+    final userId = ref.read(authStateProvider).valueOrNull?.uid;
+    if (userId == null) return;
+    final amount = double.tryParse(_amount.text);
+    if (!widget.close &&
+        !full &&
+        (amount == null ||
+            !amount.isFinite ||
+            amount <= 0 ||
+            amount > widget.txn.remainingAmount)) {
+      setState(
+        () => _error =
+            'Enter an amount up to ₹${widget.txn.remainingAmount.toStringAsFixed(2)}',
+      );
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final service = ref.read(personalExpenseServiceProvider);
+      if (widget.close) {
+        await service.closeDebt(userId, widget.txn.id);
+      } else if (full) {
+        await service.settleTransaction(
+          userId,
+          widget.txn.id,
+          settlementDate: _date,
+        );
+      } else {
+        await service.partialSettleTransaction(
+          userId,
+          widget.txn.id,
+          amount!,
+          _note.text.trim(),
+          settlementDate: _date,
+        );
+      }
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted)
+        setState(() {
+          _error = 'Could not save: $e';
+          _busy = false;
+        });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = widget.isLent ? Colors.green : Colors.red;
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-      child: Form(
-        key: _formKey,
+    final lent = widget.txn.debtType == DebtType.lent;
+    final accent = lent ? AppColors.success(context) : AppColors.error(context);
+    InputDecoration field(String label, {String? prefix}) => InputDecoration(
+      labelText: label,
+      prefixText: prefix,
+      filled: true,
+      fillColor: cs.surfaceContainerHighest.withValues(alpha: .5),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+    );
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          10,
+          20,
+          MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
-            const SizedBox(height: 16),
-            Text('Settle with ${widget.personName}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: .15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
             Row(
               children: [
-                Text('Total: ₹${widget.totalAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.5))),
-                const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                  child: Text('₹${widget.remainingAmount.toStringAsFixed(0)} remaining', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _amountCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: 'Amount',
-                prefixText: '₹ ',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                suffix: TextButton(
-                  onPressed: () => _amountCtrl.text = widget.remainingAmount.toStringAsFixed(0),
-                  child: const Text('Full'),
-                ),
-              ),
-              validator: (v) {
-                final val = double.tryParse(v ?? '');
-                if (val == null || val <= 0) return 'Enter a valid amount';
-                if (val > widget.remainingAmount) return 'Cannot exceed remaining ₹${widget.remainingAmount.toStringAsFixed(0)}';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _noteCtrl,
-              decoration: InputDecoration(
-                labelText: 'Note (optional)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _loading ? null : () async {
-                      if (!_formKey.currentState!.validate()) return;
-                      final amount = double.parse(_amountCtrl.text);
-                      setState(() => _loading = true);
-                      Navigator.pop(context);
-                      await widget.onPartial(amount, _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim());
-                    },
-                    child: const Text('Record Partial'),
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(
+                    widget.close
+                        ? Icons.money_off_rounded
+                        : lent
+                        ? Icons.call_received_rounded
+                        : Icons.call_made_rounded,
+                    color: accent,
+                    size: 20,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton(
-                    onPressed: _loading ? null : () async {
-                      setState(() => _loading = true);
-                      Navigator.pop(context);
-                      await widget.onFull();
-                    },
-                    child: Text(widget.isLent ? 'Mark Settled' : 'Mark Paid'),
+                  child: Text(
+                    widget.close
+                        ? 'Close debt?'
+                        : lent
+                        ? 'Record money received'
+                        : 'Record repayment',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            if (!widget.close)
+              Text(
+                lent
+                    ? 'From ${widget.txn.personName ?? 'this person'} · Money you lent'
+                    : 'To ${widget.txn.personName ?? 'this person'} · Money you borrowed',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary(context),
+                ),
+              ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: debtCardDecoration(context),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      lent ? 'Still owed to you' : 'You still owe',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary(context),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '₹${widget.txn.remainingAmount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (widget.close) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.warning(context).withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.warning(context),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        widget.txn.debtType == DebtType.lent
+                            ? 'You will lose the unpaid ₹${widget.txn.remainingAmount.toStringAsFixed(2)}. This balance will be written off without recording money received.'
+                            : 'The unpaid ₹${widget.txn.remainingAmount.toStringAsFixed(2)} will be written off without recording a payment.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Your original transaction and repayment history will be retained.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary(context),
+                  height: 1.5,
+                ),
+              ),
+            ] else ...[
+              TextField(
+                controller: _amount,
+                enabled: !_busy,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: field(
+                  lent ? 'Amount received' : 'Amount repaid',
+                  prefix: '₹ ',
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _note,
+                enabled: !_busy,
+                decoration: field('Note (optional)'),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withValues(alpha: .5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: Icon(Icons.calendar_month_outlined, color: accent),
+                  title: Text(
+                    lent ? 'Received date' : 'Repayment date',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  subtitle: Text(
+                    DateFormat('dd MMM yyyy').format(_date),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+                  onTap: _busy
+                      ? null
+                      : () async {
+                          final selected = await showDatePicker(
+                            context: context,
+                            initialDate: _date,
+                            firstDate: DateTime(
+                              widget.txn.date.year,
+                              widget.txn.date.month,
+                              widget.txn.date.day,
+                            ),
+                            lastDate: DateTime.now(),
+                          );
+                          if (selected != null && mounted)
+                            setState(() => _date = selected);
+                        },
+                ),
+              ),
+            ],
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: cs.error, fontSize: 12),
+                ),
+              ),
+            const SizedBox(height: 24),
+            if (widget.close)
+              FilledButton(
+                onPressed: _busy ? null : () => _save(),
+                child: Text(_busy ? 'Saving…' : 'Close & Write Off'),
+              )
+            else ...[
+              OutlinedButton(
+                onPressed: _busy ? null : () => _save(),
+                child: Text(
+                  lent ? 'Record Partial Receipt' : 'Record Partial Repayment',
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: _busy ? null : () => _save(full: true),
+                child: Text(
+                  _busy
+                      ? 'Saving…'
+                      : lent
+                      ? 'Mark Fully Received'
+                      : 'Mark Fully Repaid',
+                ),
+              ),
+            ],
           ],
         ),
       ),
