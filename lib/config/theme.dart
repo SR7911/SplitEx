@@ -6,6 +6,15 @@ enum AppPalette { purple, blue, teal, emerald, charcoal, rose, orange, indigo, c
 enum AppThemeMode { light, dark, deepDark, system }
 
 class AppTheme {
+  /// Shared by the personal hero card and its home-screen widget.
+  static List<Color> financialHeroColors({required bool isPositive, required bool isDark}) => isPositive
+      ? (isDark
+          ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
+          : [const Color(0xFF059669), const Color(0xFF0D9488)])
+      : (isDark
+          ? [const Color(0xFF7F1D1D), const Color(0xFF831843)]
+          : [const Color(0xFFDC2626), const Color(0xFFDB2777)]);
+
   static const _palettes = <AppPalette, _PaletteColors>{
     AppPalette.purple: _PaletteColors(
       light: Color(0xFF7C4DFF),

@@ -39,6 +39,13 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <receiver android:name=".ExpensesWidget" android:exported="false" android:label="My Expenses">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.CONFIGURATION_CHANGED" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/expenses_widget_info" />
+        </receiver>
         <receiver android:name=".BankSmsReceiver" android:exported="true"
             android:permission="android.permission.BROADCAST_SMS">
             <intent-filter><action android:name="android.provider.Telephony.SMS_RECEIVED" /></intent-filter>

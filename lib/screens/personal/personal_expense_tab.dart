@@ -1,5 +1,6 @@
 ﻿import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:split_ex/config/theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -239,13 +240,7 @@ class _FinancialStatusCard extends StatelessWidget {
     final savingsRate = income > 0 ? ((remaining / income) * 100).clamp(-999.0, 100.0) : 0.0;
 
     // Gradient palette: green-teal when healthy, red-orange when overspent
-    final gradientColors = isPositive
-        ? (isDark
-            ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
-            : [const Color(0xFF059669), const Color(0xFF0D9488)])
-        : (isDark
-            ? [const Color(0xFF7F1D1D), const Color(0xFF831843)]
-            : [const Color(0xFFDC2626), const Color(0xFFDB2777)]);
+    final gradientColors = AppTheme.financialHeroColors(isPositive: isPositive, isDark: isDark);
 
     final onCard = Colors.white;
     final onCardMuted = Colors.white.withValues(alpha: 0.65);
@@ -1090,8 +1085,11 @@ class _DebtsSummarySection extends ConsumerWidget {
     double totalLent = 0;
     double totalOwed = 0;
     for (final v in balances.values) {
-      if (v > 0) totalLent += v;
-      else totalOwed += v.abs();
+      if (v > 0) {
+        totalLent += v;
+      } else {
+        totalOwed += v.abs();
+      }
     }
 
     return Container(

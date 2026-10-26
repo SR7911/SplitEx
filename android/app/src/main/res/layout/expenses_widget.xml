@@ -1,0 +1,50 @@
+﻿<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+    <ImageView android:id="@+id/widget_background" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="@drawable/expenses_widget_background" android:scaleType="fitXY" android:importantForAccessibility="no" />
+    <LinearLayout android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:paddingHorizontal="18dp" android:paddingVertical="10dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <TextView android:fontFamily="@font/gilmer" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:id="@+id/widget_title" android:text="My Expenses" android:textColor="#CCFFFFFF" android:textSize="12sp" android:textStyle="bold" />
+            <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_month" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="SplitEx" android:textColor="#DDFFFFFF" android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical">
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_balance_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Remaining balance" android:textSize="11sp" android:textColor="#BBFFFFFF" />
+                <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_balance" android:layout_width="match_parent" android:layout_height="42dp"
+                    android:text="—" android:textSize="34sp" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="16sp" android:autoSizeMaxTextSize="36sp" android:autoSizeStepGranularity="1sp"
+                    android:textColor="#FFFFFF" android:textStyle="bold" android:maxLines="1" />
+            </LinearLayout>
+            <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_add" android:layout_width="48dp" android:layout_height="48dp" android:paddingHorizontal="0dp" android:gravity="center"
+                android:background="@drawable/expenses_widget_button" android:text="+" android:contentDescription="Add expense" android:textSize="26sp" android:textStyle="bold" android:textColor="#FFFFFF" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/widget_details" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="7dp">
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:id="@+id/widget_income_card" android:background="@drawable/expenses_widget_stat" android:paddingHorizontal="10dp" android:paddingVertical="5dp">
+                <TextView android:fontFamily="@font/gilmer" android:layout_width="wrap_content" android:layout_height="wrap_content" android:id="@+id/widget_income_label" android:text="↓ Income" android:textSize="10sp" android:textColor="#BBFFFFFF" />
+                <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_income" android:layout_width="match_parent" android:layout_height="22dp" android:text="—" android:textColor="#FFFFFF" android:textSize="17sp" android:textStyle="bold" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="10sp" android:autoSizeMaxTextSize="17sp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="end" android:layout_marginStart="8dp" android:id="@+id/widget_spent_card" android:background="@drawable/expenses_widget_stat" android:paddingHorizontal="10dp" android:paddingVertical="5dp">
+                <TextView android:fontFamily="@font/gilmer"  android:layout_width="wrap_content" android:layout_height="wrap_content" android:id="@+id/widget_spent_label" android:text="↑ Spent" android:textSize="10sp" android:textColor="#BBFFFFFF" />
+                <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_spent" android:layout_width="match_parent" android:layout_height="22dp" android:gravity="end" android:text="—" android:textColor="#FFFFFF" android:textSize="17sp" android:textStyle="bold" android:maxLines="1" android:autoSizeTextType="uniform" android:autoSizeMinTextSize="10sp" android:autoSizeMaxTextSize="17sp" />
+            </LinearLayout>
+        </LinearLayout>
+        <ProgressBar android:id="@+id/widget_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="7dp" android:max="100" android:progress="0" android:progressTint="#E6FFFFFF" android:progressBackgroundTint="#26FFFFFF" />
+        <TextView android:fontFamily="@font/gilmer" android:id="@+id/widget_budget" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Open SplitEx to load expenses" android:textSize="10sp" android:textColor="#DDFFFFFF" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <!-- Keep native text and click targets underneath this visual layer. -->
+    <ImageView android:id="@+id/widget_rendered"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:scaleType="fitXY" android:clickable="false" android:focusable="false"
+        android:importantForAccessibility="no" />
+</FrameLayout>
+
+
+
+
+
+
+
+

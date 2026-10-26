@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/providers/personal_expense_provider.dart';
 import 'package:split_ex/screens/personal/add_personal_transaction_screen.dart';
 import 'package:split_ex/screens/personal/view_personal_transaction_sheet.dart';
@@ -12,7 +11,8 @@ import 'package:split_ex/widgets/app_header.dart';
 class PersonalTransactionsScreen extends ConsumerStatefulWidget {
   final String monthKey;
   final String? initialCategory;
-  const PersonalTransactionsScreen({super.key, required this.monthKey, this.initialCategory});
+  final bool openAddOnStart;
+  const PersonalTransactionsScreen({super.key, required this.monthKey, this.initialCategory, this.openAddOnStart = false});
 
   @override
   ConsumerState<PersonalTransactionsScreen> createState() => _PersonalTransactionsScreenState();
@@ -32,6 +32,11 @@ class _PersonalTransactionsScreenState extends ConsumerState<PersonalTransaction
   void initState() {
     super.initState();
     _categoryFilter = widget.initialCategory;
+    if (widget.openAddOnStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showAddPersonalTransactionSheet(context);
+      });
+    }
   }
 
   bool get _hasAdvancedFilters =>

@@ -8,8 +8,53 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ExpensesWidget.CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "update" -> {
+                        val data = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                        val prefs = getSharedPreferences("expenses_widget", MODE_PRIVATE)
+                        val sameOwner = prefs.getString("userId", null) == data["userId"]
+                        val hasAmounts = data.containsKey("spent")
+                        val changed = listOf("monthKey", "spent", "income", "balance", "countLabel")
+                            .any { prefs.getString(it, null) != data[it] }
+                        val editor = prefs.edit()
+                        if (!sameOwner || !data.containsKey("userId")) editor.clear()
+                        data.forEach { (key, value) ->
+                            when (value) {
+                                is String -> editor.putString(key as String, value)
+                                is Number -> editor.putInt(key as String, value.toInt())
+                            }
+                        }
+                        editor.putString("state", when {
+                            !data.containsKey("userId") -> "signedOut"
+                            data["state"] == "error" -> "error"
+                            hasAmounts -> "saved"
+                            sameOwner && prefs.contains("spent") -> prefs.getString("state", "saved")
+                            else -> "loading"
+                        })
+                        if (hasAmounts && (changed || !sameOwner)) {
+                            editor.putLong("savedAt", System.currentTimeMillis())
+                        }
+                        editor.apply()
+                        ExpensesWidget.refresh(this)
+                        result.success(null)
+                    }
+                    "consumeAction" -> {
+                        val action = intent?.getStringExtra("expenses_widget_action")
+                        intent?.removeExtra("expenses_widget_action")
+                        result.success(action)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
         BankSmsStore.foregroundChannel = BankSmsStore.attach(this, flutterEngine, this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.splitex.in.app/install")
             .setMethodCallHandler { call, result ->

@@ -76,6 +76,12 @@ class SettingsScreen extends ConsumerWidget {
             const _PaletteTile(),
             const _BodyGradientTile(),
             _SettingsTile(
+              icon: Icons.widgets_outlined,
+              label: 'Home screen widget',
+              subtitle: 'Nothing-inspired style, appearance and privacy',
+              onTap: () => context.push('/settings/widget'),
+            ),
+            _SettingsTile(
               icon: Icons.currency_exchange_outlined,
               label: 'Default Currency',
               subtitle: '₹ INR',

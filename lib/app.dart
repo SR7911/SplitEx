@@ -7,6 +7,7 @@ import 'package:split_ex/config/theme.dart';
 import 'package:split_ex/providers/theme_provider.dart';
 import 'package:split_ex/providers/auth_provider.dart';
 import 'package:split_ex/services/bank_sms_service.dart';
+import 'package:split_ex/services/expenses_widget_sync.dart';
 
 class SplitExApp extends ConsumerStatefulWidget {
   const SplitExApp({super.key});
@@ -82,6 +83,7 @@ class _SplitExAppState extends ConsumerState<SplitExApp>
       darkTheme: darkTheme,
       themeMode: themeMode,
       routerConfig: router,
+      builder: (context, child) => ExpensesWidgetSync(child: child!),
     );
   }
 }

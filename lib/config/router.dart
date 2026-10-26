@@ -22,6 +22,7 @@ import 'package:split_ex/screens/personal/debt_list_screen.dart';
 import 'package:split_ex/screens/personal/personal_recurring_screen.dart';
 import 'package:split_ex/screens/personal/personal_transactions_screen.dart';
 import 'package:split_ex/screens/settings/settings_screen.dart';
+import 'package:split_ex/screens/settings/expenses_widget_settings_screen.dart';
 import 'package:split_ex/screens/settings/bank_sms_settings_screen.dart';
 import 'package:split_ex/screens/personal/personal_accounts_screen.dart';
 import 'package:split_ex/screens/personal/payment_calendar_screen.dart';
@@ -194,7 +195,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/personal/transactions',
         builder: (context, state) {
           final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
-          return PersonalTransactionsScreen(monthKey: monthKey);
+            return PersonalTransactionsScreen(key: ValueKey(state.uri.toString()), monthKey: monthKey, openAddOnStart: state.uri.queryParameters['add'] == 'true');
         },
       ),
       GoRoute(path: '/personal/accounts', builder: (context, state) => const PersonalAccountsScreen()),
@@ -255,6 +256,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
+      GoRoute(path: '/settings/widget', builder: (context, state) => const ExpensesWidgetSettingsScreen()),
       GoRoute(
         path: '/settings/bank-sms',
         builder: (context, state) => const BankSmsSettingsScreen(),
