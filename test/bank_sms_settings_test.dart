@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/providers/notification_provider.dart';
-import 'package:split_ex/providers/connectivity_provider.dart';
-import 'package:split_ex/screens/settings/bank_sms_settings_screen.dart';
-import 'package:split_ex/services/bank_sms_service.dart';
-import 'package:split_ex/services/bank_sms_parser.dart';
+import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
+import 'package:split_ex/shared/providers/connectivity_provider.dart';
+import 'package:split_ex/modules/personal/presentation/sms/screens/bank_sms_settings_screen.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
 
 class _OnlineConnectivity extends StateNotifier<ConnectivityStatus>
     implements ConnectivityNotifier {

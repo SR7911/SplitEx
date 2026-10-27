@@ -1,0 +1,325 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:split_ex/app/auth/providers/auth_provider.dart';
+import 'package:split_ex/app/auth/screens/login_screen.dart';
+import 'package:split_ex/app/auth/screens/register_screen.dart';
+import 'package:split_ex/app/presentation/home/home_screen.dart';
+import 'package:split_ex/app/auth/screens/profile_setup_screen.dart';
+import 'package:split_ex/modules/room/screens/room/create_room_screen.dart';
+import 'package:split_ex/modules/room/screens/room/join_room_screen.dart';
+import 'package:split_ex/modules/room/screens/room/room_detail_screen.dart';
+import 'package:split_ex/modules/room/screens/room/room_settings_screen.dart';
+import 'package:split_ex/modules/room/screens/analytics/analytics_screen.dart';
+import 'package:split_ex/modules/notifications/screens/notifications_screen.dart';
+import 'package:split_ex/modules/room/screens/activity/activity_screen.dart';
+import 'package:split_ex/modules/developer/screens/storage_management_screen.dart';
+import 'package:split_ex/modules/personal/presentation/budgets/screens/personal_budgets_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/screens/personal_debts_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/screens/debt_dashboard_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/screens/debt_list_screen.dart';
+import 'package:split_ex/modules/personal/presentation/recurring/screens/personal_recurring_screen.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/screens/personal_transactions_screen.dart';
+import 'package:split_ex/modules/settings/screens/settings_screen.dart';
+import 'package:split_ex/modules/settings/screens/expenses_widget_settings_screen.dart';
+import 'package:split_ex/modules/personal/presentation/sms/screens/bank_sms_settings_screen.dart';
+import 'package:split_ex/modules/personal/presentation/accounts/screens/personal_accounts_screen.dart';
+import 'package:split_ex/modules/personal/presentation/calendar/screens/payment_calendar_screen.dart';
+import 'package:split_ex/modules/personal/presentation/reports/screens/monthly_money_review_screen.dart';
+import 'package:split_ex/modules/personal/presentation/savings/screens/savings_goals_screen.dart';
+import 'package:split_ex/modules/personal/presentation/sms/screens/merchant_category_rules_screen.dart';
+import 'package:split_ex/modules/settings/screens/edit_profile_screen.dart';
+import 'package:split_ex/modules/settings/screens/change_password_screen.dart';
+import 'package:split_ex/modules/settings/screens/notification_preferences_screen.dart';
+import 'package:split_ex/app/bootstrap/splash_screen.dart';
+import 'package:split_ex/modules/group/screens/groups_list_screen.dart';
+import 'package:split_ex/modules/group/screens/create_group_screen.dart';
+import 'package:split_ex/modules/group/screens/join_group_screen.dart';
+import 'package:split_ex/modules/group/screens/group_dashboard_screen.dart';
+import 'package:split_ex/modules/project/screens/projects_list_screen.dart';
+import 'package:split_ex/modules/project/screens/create_project_screen.dart';
+import 'package:split_ex/modules/project/screens/project_dashboard_screen.dart';
+import 'package:split_ex/modules/project/screens/project_debts_screen.dart';
+import 'package:split_ex/modules/project/screens/project_expenses_screen.dart';
+import 'package:split_ex/modules/personal/presentation/loans/screens/loan_list_screen.dart';
+import 'package:split_ex/modules/personal/presentation/loans/screens/loan_detail_screen.dart';
+import 'package:split_ex/modules/personal/presentation/loans/screens/loan_reports_screen.dart';
+
+/// A notifier that notifies GoRouter when auth state changes without rebuilding the router itself.
+class RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+  RouterNotifier(this._ref) {
+    _ref.listen(authStateProvider, (_, __) => notifyListeners());
+    _ref.listen(profileExistsProvider, (_, __) => notifyListeners());
+  }
+}
+
+final routerNotifierProvider = Provider<RouterNotifier>((ref) => RouterNotifier(ref));
+
+final routerProvider = Provider<GoRouter>((ref) {
+  // Use read here to prevent the GoRouter instance from being recreated
+  // which causes it to reset to the initialLocation ('/splash').
+  final notifier = ref.read(routerNotifierProvider);
+
+  return GoRouter(
+    initialLocation: '/splash',
+    refreshListenable: notifier,
+    redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
+      final profileExists = ref.read(profileExistsProvider);
+
+      if (authState.isLoading) return null;
+
+      final user = authState.valueOrNull;
+      final isLoggedIn = user != null;
+      final matchedLocation = state.matchedLocation;
+      
+      final isSplash = matchedLocation == '/splash';
+      final isAuthRoute = matchedLocation == '/login' || matchedLocation == '/register';
+      final isProfileSetup = matchedLocation == '/profile-setup';
+
+      if (!isLoggedIn) {
+        return (isAuthRoute || isSplash) ? null : '/login';
+      }
+
+      // If logged in but profile existence is still being determined
+      if (profileExists.isLoading) return null;
+      
+      final hasProfile = profileExists.valueOrNull ?? false;
+
+      // Let splash screen handle its own navigation
+      if (isSplash) return null;
+
+      // Handle transitions from Auth screens
+      if (isAuthRoute) {
+        return hasProfile ? '/' : '/profile-setup';
+      }
+
+      // Ensure user with no profile is sent to setup
+      if (!hasProfile && !isProfileSetup) {
+        return '/profile-setup';
+      }
+      
+      // Ensure user with profile doesn't stay on setup
+      if (hasProfile && isProfileSetup) {
+        return '/';
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/',
+        builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/profile-setup',
+        builder: (context, state) => const ProfileSetupScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/create-room',
+        builder: (context, state) => const CreateRoomScreen(),
+      ),
+      GoRoute(
+        path: '/join-room',
+        builder: (context, state) => const JoinRoomScreen(),
+      ),
+      GoRoute(
+        path: '/room/:roomId',
+        builder: (context, state) {
+          final tabParam = state.uri.queryParameters['tab'];
+          final selectedMonthInHome = state.extra as DateTime? ?? DateTime.now();
+          var initialTabIndex = 0;
+          if (tabParam != null) {
+            switch (tabParam) {
+              case 'bills':
+              case '1':
+                initialTabIndex = 1;
+                break;
+              case 'settlements':
+              case '2':
+                initialTabIndex = 2;
+                break;
+            }
+          }
+          return RoomDetailScreen(
+            roomId: state.pathParameters['roomId']!,
+            initialTabIndex: initialTabIndex,
+            selectedMonthInHome: selectedMonthInHome
+          );
+        },
+      ),
+      GoRoute(
+        path: '/room/:roomId/activity',
+        builder: (context, state) => ActivityScreen(
+          roomId: state.pathParameters['roomId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/room/:roomId/storage',
+        builder: (context, state) => StorageManagementScreen(
+          roomId: state.pathParameters['roomId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/room/:roomId/analytics',
+        builder: (context, state) => AnalyticsScreen(
+          roomId: state.pathParameters['roomId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/room/:roomId/settings',
+        builder: (context, state) => RoomSettingsScreen(
+          roomId: state.pathParameters['roomId']!,
+        ),
+      ),
+      // ─── Personal Expense Routes ───
+      GoRoute(
+        path: '/personal/transactions',
+        builder: (context, state) {
+          final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
+            return PersonalTransactionsScreen(key: ValueKey(state.uri.toString()), monthKey: monthKey, openAddOnStart: state.uri.queryParameters['add'] == 'true');
+        },
+      ),
+      GoRoute(path: '/personal/accounts', builder: (context, state) => const PersonalAccountsScreen()),
+      GoRoute(path: '/personal/money-review', builder: (context, state) => MonthlyMoneyReviewScreen(initialMonth: DateTime.tryParse('${state.extra ?? DateFormat('yyyy-MM').format(DateTime.now())}-01'))),
+      GoRoute(path: '/personal/goals', builder: (context, state) => const SavingsGoalsScreen()),
+      GoRoute(path: '/personal/goals/:goalId', builder: (context, state) => SavingsGoalDetailScreen(goalId: state.pathParameters['goalId']!)),
+      GoRoute(path: '/personal/merchant-rules', builder: (context, state) => const MerchantCategoryRulesScreen()),
+      GoRoute(path: '/personal/calendar', builder: (context, state) => const PaymentCalendarScreen()),
+      GoRoute(path: '/personal/sms-review', builder: (context, state) => const BankSmsSettingsScreen(reviewOnly: true)),
+      GoRoute(
+        path: '/personal/transactions/category',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, String>? ?? {};
+          final monthKey = extra['monthKey'] ?? DateFormat('yyyy-MM').format(DateTime.now());
+          final category = extra['category'];
+          return PersonalTransactionsScreen(monthKey: monthKey, initialCategory: category);
+        },
+      ),
+      GoRoute(
+        path: '/personal/budgets',
+        builder: (context, state) {
+          final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
+          return PersonalBudgetsScreen(monthKey: monthKey);
+        },
+      ),
+      GoRoute(
+        path: '/personal/recurring',
+        builder: (context, state) => const PersonalRecurringScreen(),
+      ),
+      GoRoute(
+        path: '/personal/debts',
+        builder: (context, state) => PersonalDebtsScreen(initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '')?.clamp(0, 2) ?? 0),
+      ),
+      GoRoute(
+        path: '/personal/debt-dashboard',
+        builder: (context, state) => const DebtDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/personal/debt-list',
+        builder: (context, state) => const DebtListScreen(),
+      ),
+      // ─── Loan Routes ───
+      GoRoute(
+        path: '/personal/loans',
+        builder: (context, state) => const LoanListScreen(),
+      ),
+      GoRoute(
+        path: '/personal/loans/reports',
+        builder: (context, state) => const LoanReportsScreen(),
+      ),
+      GoRoute(
+        path: '/personal/loans/:loanId',
+        builder: (context, state) => LoanDetailScreen(
+          loanId: state.pathParameters['loanId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(path: '/settings/widget', builder: (context, state) => const ExpensesWidgetSettingsScreen()),
+      GoRoute(
+        path: '/settings/bank-sms',
+        builder: (context, state) => const BankSmsSettingsScreen(),
+      ),
+      GoRoute(
+        path: '/settings/edit-profile',
+        builder: (context, state) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: '/settings/change-password',
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: '/settings/notifications',
+        builder: (context, state) => const NotificationPreferencesScreen(),
+      ),
+      // ─── Groups Routes ───
+      GoRoute(
+        path: '/groups',
+        builder: (context, state) => const GroupsListScreen(),
+      ),
+      GoRoute(
+        path: '/groups/create',
+        builder: (context, state) => const CreateGroupScreen(),
+      ),
+      GoRoute(
+        path: '/groups/join',
+        builder: (context, state) => const JoinGroupScreen(),
+      ),
+      GoRoute(
+        path: '/groups/:groupId',
+        builder: (context, state) => GroupDashboardScreen(
+          groupId: state.pathParameters['groupId']!,
+        ),
+      ),
+      // ─── Projects Routes ───
+      GoRoute(
+        path: '/projects',
+        builder: (context, state) => const ProjectsListScreen(),
+      ),
+      GoRoute(
+        path: '/projects/create',
+        builder: (context, state) => const CreateProjectScreen(),
+      ),
+      GoRoute(
+        path: '/projects/:projectId',
+        builder: (context, state) => ProjectDashboardScreen(
+          projectId: state.pathParameters['projectId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/projects/:projectId/debts',
+        builder: (context, state) => ProjectDebtsScreen(
+          projectId: state.pathParameters['projectId']!,
+        ),
+      ),
+      GoRoute(
+        path: '/projects/:projectId/expenses',
+        builder: (context, state) => ProjectExpensesScreen(
+          projectId: state.pathParameters['projectId']!,
+          initialDebtFilter: state.extra as String? ?? 'all',
+        ),
+      ),
+    ],
+  );
+});

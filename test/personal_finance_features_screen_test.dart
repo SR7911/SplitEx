@@ -10,26 +10,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/config/theme.dart';
-import 'package:split_ex/models/monthly_money_review.dart';
-import 'package:split_ex/models/personal_account_model.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/models/savings_goal_model.dart';
-import 'package:split_ex/providers/auth_provider.dart';
-import 'package:split_ex/providers/connectivity_provider.dart';
-import 'package:split_ex/providers/notification_provider.dart';
-import 'package:split_ex/providers/personal_account_provider.dart';
-import 'package:split_ex/providers/monthly_money_review_provider.dart';
-import 'package:split_ex/screens/personal/monthly_money_review_screen.dart';
-import 'package:split_ex/screens/personal/merchant_category_rules_screen.dart';
-import 'package:split_ex/screens/personal/savings_goals_screen.dart';
-import 'package:split_ex/screens/personal/personal_tools_section.dart';
-import 'package:split_ex/screens/settings/bank_sms_settings_screen.dart';
-import 'package:split_ex/services/merchant_category_service.dart';
-import 'package:split_ex/services/savings_goal_service.dart';
-import 'package:split_ex/services/bank_sms_repository.dart';
-import 'package:split_ex/services/bank_sms_parser.dart';
-import 'package:split_ex/services/bank_sms_service.dart';
+import 'package:split_ex/shared/ui/theme.dart';
+import 'package:split_ex/modules/personal/presentation/reports/models/monthly_money_review.dart';
+import 'package:split_ex/modules/personal/domain/entities/accounts/personal_account.dart';
+import 'package:split_ex/modules/personal/domain/entities/accounts/personal_transfer.dart';
+import 'package:split_ex/modules/personal/domain/policies/accounts/account_balance_calculator.dart';
+import 'support/personal_transaction_fixture.dart';
+import 'package:split_ex/modules/personal/domain/entities/savings/savings_goal.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_savings_goal_repository.dart';
+import 'package:split_ex/app/auth/providers/auth_provider.dart';
+import 'package:split_ex/shared/providers/connectivity_provider.dart';
+import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
+import 'package:split_ex/modules/personal/presentation/accounts/providers/personal_account_providers.dart';
+import 'package:split_ex/modules/personal/presentation/reports/providers/monthly_money_review_provider.dart';
+import 'package:split_ex/modules/personal/presentation/reports/screens/monthly_money_review_screen.dart';
+import 'package:split_ex/modules/personal/presentation/sms/screens/merchant_category_rules_screen.dart';
+import 'package:split_ex/modules/personal/presentation/savings/screens/savings_goals_screen.dart';
+import 'package:split_ex/modules/personal/presentation/dashboard/widgets/personal_tools_section.dart';
+import 'package:split_ex/modules/personal/presentation/sms/screens/bank_sms_settings_screen.dart';
+import 'package:split_ex/modules/personal/data/repositories/merchant_category_service.dart';
+import 'package:split_ex/modules/personal/presentation/savings/providers/savings_goal_providers.dart';
+import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/presentation/sms/providers/bank_sms_providers.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
 
 class _User extends Fake implements User {
   @override
@@ -43,7 +47,7 @@ class _Online extends StateNotifier<ConnectivityStatus>
 
 void main() {
   late FakeFirebaseFirestore db;
-  late SavingsGoalService savings;
+  late FirestoreSavingsGoalRepository savings;
   late MerchantCategoryService rules;
   late BankSmsRepository repo;
   late BankSmsService smsService;
@@ -53,7 +57,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     db = FakeFirebaseFirestore();
-    savings = SavingsGoalService(firestore: db);
+    savings = FirestoreSavingsGoalRepository(firestore: db);
     rules = MerchantCategoryService(firestore: db);
     repo = BankSmsRepository(firestore: db);
     smsService = BankSmsService(repository: repo)..userId = 'alice';
@@ -185,7 +189,7 @@ void main() {
           personalAccountsProvider.overrideWith(
             (ref) => Stream.value(<PersonalAccount>[]),
           ),
-          savingsGoalServiceProvider.overrideWith((ref) => savings),
+          savingsGoalRepositoryProvider.overrideWith((ref) => savings),
           merchantCategoryServiceProvider.overrideWith((ref) => rules),
           bankSmsServiceProvider.overrideWith((ref) => smsService),
           bankSmsRepositoryProvider.overrideWith((ref) => repo),
@@ -272,6 +276,7 @@ void main() {
       await open(tester, MonthlyMoneyReviewScreen(initialMonth: now));
       await capture(tester, 'monthly_money_review_light');
       await tester.ensureVisible(find.text('1 uncategorized expense'));
+      await settle(tester);
       await tester.tap(find.text('1 uncategorized expense'));
       await settle(tester);
       expect(find.text('Needs a category'), findsOneWidget);

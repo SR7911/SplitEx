@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:split_ex/config/constants.dart';
-import 'package:split_ex/config/router.dart';
-import 'package:split_ex/config/theme.dart';
-import 'package:split_ex/providers/theme_provider.dart';
-import 'package:split_ex/providers/auth_provider.dart';
-import 'package:split_ex/services/bank_sms_service.dart';
-import 'package:split_ex/services/expenses_widget_sync.dart';
+import 'package:split_ex/app/constants.dart';
+import 'package:split_ex/app/navigation/router.dart';
+import 'package:split_ex/shared/ui/theme.dart';
+import 'package:split_ex/modules/settings/providers/theme_provider.dart';
+import 'package:split_ex/app/auth/providers/auth_provider.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/settings/services/expenses_widget_sync.dart';
 
 class SplitExApp extends ConsumerStatefulWidget {
   const SplitExApp({super.key});

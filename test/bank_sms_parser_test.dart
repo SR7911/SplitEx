@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:split_ex/services/bank_sms_parser.dart';
-import 'package:split_ex/services/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
 
 void main() {
   final parser = BankSmsParser();

@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:split_ex/services/bank_sms_parser.dart';
-import 'package:split_ex/services/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
+import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
 
 void main() {
   late FakeFirebaseFirestore db;

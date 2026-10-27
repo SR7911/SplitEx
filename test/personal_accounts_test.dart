@@ -3,12 +3,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/models/personal_account_model.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/services/personal_account_service.dart';
-import 'package:split_ex/services/bank_sms_parser.dart';
-import 'package:split_ex/services/bank_sms_repository.dart';
-import 'package:split_ex/services/personal_expense_service.dart';
+import 'package:split_ex/modules/personal/domain/entities/accounts/personal_account.dart';
+import 'package:split_ex/modules/personal/domain/entities/accounts/personal_transfer.dart';
+import 'package:split_ex/modules/personal/domain/policies/accounts/account_balance_calculator.dart';
+import 'package:split_ex/modules/personal/data/mappers/accounts/account_firestore_mapper.dart'
+    show LegacyAccountSerialization;
+import 'support/personal_transaction_fixture.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_personal_account_repository.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_personal_transaction_repository.dart';
+import 'package:split_ex/modules/personal/domain/use_cases/transactions/create_personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
+import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
 
 void main() {
   final date = DateTime(2026, 10, 20);
@@ -51,11 +56,11 @@ void main() {
     accountId: accountId,
   );
   late FakeFirebaseFirestore db;
-  late PersonalAccountService service;
+  late FirestorePersonalAccountRepository service;
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     db = FakeFirebaseFirestore();
-    service = PersonalAccountService(firestore: db);
+    service = FirestorePersonalAccountRepository(firestore: db);
     for (final a in accounts) {
       await db.doc('users/alice/personal_accounts/${a.id}').set(a.toMap());
     }
@@ -99,8 +104,8 @@ void main() {
   test(
     'personal entries persist assignments and reject missing or archived accounts',
     () async {
-      final expenses = PersonalExpenseService(firestore: db);
-      await expenses.addTransaction(
+      final expenses = FirestorePersonalTransactionRepository(firestore: db);
+      await CreatePersonalTransaction(expenses)(
         'alice',
         entry('food', 100, TransactionType.expense, 'bank'),
       );
@@ -109,30 +114,30 @@ void main() {
               .docs
               .single;
       expect(saved.data()['accountId'], 'bank');
-      await expenses.updateTransaction('alice', saved.id, {
+      await expenses.updateRaw('alice', saved.id, {
         'accountId': 'cash',
       });
       expect((await saved.reference.get()).get('accountId'), 'cash');
       await service.archive('alice', 'cash', true);
-      await expenses.updateTransaction('alice', saved.id, {
+      await expenses.updateRaw('alice', saved.id, {
         'accountId': 'cash',
         'title': 'Updated',
       });
       await expectLater(
-        expenses.addTransaction(
+        CreatePersonalTransaction(expenses)(
           'alice',
           entry('bad', 1, TransactionType.expense, 'cash'),
         ),
         throwsStateError,
       );
       await expectLater(
-        expenses.updateTransaction('alice', saved.id, {'accountId': 'missing'}),
+        expenses.updateRaw('alice', saved.id, {'accountId': 'missing'}),
         throwsStateError,
       );
     },
   );
   test('repayment dates cannot precede a debt transaction date', () async {
-    final expenses = PersonalExpenseService(firestore: db);
+    final expenses = FirestorePersonalTransactionRepository(firestore: db);
     final debt = PersonalTransactionModel(
       id: '',
       title: 'Debt',
@@ -147,13 +152,16 @@ void main() {
       personName: 'Alex',
       dueDate: date.subtract(const Duration(days: 1)),
     );
-    await expectLater(expenses.addTransaction('alice', debt), throwsStateError);
+    await expectLater(
+      CreatePersonalTransaction(expenses)('alice', debt),
+      throwsStateError,
+    );
     await db.doc('users/alice/personal_transactions/debt').set({
       ...debt.toMap(),
       'dueDate': Timestamp.fromDate(date.add(const Duration(days: 1))),
     });
     await expectLater(
-      expenses.updateTransaction('alice', 'debt', {
+      expenses.updateRaw('alice', 'debt', {
         'dueDate': Timestamp.fromDate(date.subtract(const Duration(days: 1))),
       }),
       throwsStateError,

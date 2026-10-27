@@ -11,9 +11,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/app.dart';
-import 'package:split_ex/services/fcm_service.dart';
-import 'package:split_ex/services/notification_listener.dart' as nl;
-import 'package:split_ex/services/notification_service.dart';
+import 'package:split_ex/app/composition/personal_dependencies.dart';
+import 'package:split_ex/modules/notifications/services/fcm_service.dart';
+import 'package:split_ex/modules/notifications/services/notification_listener.dart' as nl;
+import 'package:split_ex/modules/notifications/services/notification_service.dart';
 
 /// Background message handler (must be top-level function).
 @pragma('vm:entry-point')
@@ -65,7 +66,12 @@ void main() async {
     ).startListening();
   }
 
-  runApp(const ProviderScope(child: SplitExApp()));
+  runApp(
+    ProviderScope(
+      overrides: personalDependencyOverrides(),
+      child: const SplitExApp(),
+    ),
+  );
 }
 
 Future<void> _requestNotificationPermission() async {

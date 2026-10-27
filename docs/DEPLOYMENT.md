@@ -18,7 +18,7 @@ Updated 2026-10-21 for the recent personal finance and Android SMS features. Imp
 - [ ] Add release SHA-1 and SHA-256 to Firebase Console → Project Settings → Android app
 - [ ] Set Firestore to production mode
 - [ ] Verify Firebase Storage rules
-- [ ] Configure production App Check in **both** `lib/main.dart` and `bankSmsBackgroundMain` in `lib/services/bank_sms_service.dart`; both currently use `AndroidProvider.debug`
+- [ ] Configure production App Check in **both** `lib/main.dart` and `bankSmsBackgroundMain` in `lib/app/composition/personal_dependencies.dart`; both currently use `AndroidProvider.debug`
 - [ ] Deploy the new owner-only personal finance rules described in section 3
 
 ### Firestore Indexes Required

@@ -192,7 +192,7 @@ class BankSmsJobService : JobService() {
             BankSmsStore.attach(this, workerEngine, complete = { retry -> finish(retry) })
             handler.postDelayed(timeout, 120000L)
             workerEngine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint(
-                loader.findAppBundlePath(), "package:split_ex/services/bank_sms_service.dart", "bankSmsBackgroundMain"))
+                loader.findAppBundlePath(), "package:split_ex/app/composition/personal_dependencies.dart", "bankSmsBackgroundMain"))
         } catch (_: Exception) { finish(true) }
         return true
     }

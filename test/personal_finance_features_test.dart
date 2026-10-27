@@ -1,21 +1,22 @@
 import 'dart:io';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:split_ex/models/monthly_money_review.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/models/savings_goal_model.dart';
-import 'package:split_ex/services/bank_sms_parser.dart';
-import 'package:split_ex/services/bank_sms_repository.dart';
-import 'package:split_ex/services/merchant_category_service.dart';
-import 'package:split_ex/services/savings_goal_service.dart';
+import 'package:split_ex/modules/personal/presentation/reports/models/monthly_money_review.dart';
+import 'support/personal_transaction_fixture.dart';
+import 'package:split_ex/modules/personal/domain/entities/savings/savings_goal.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_savings_goal_repository.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
+import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/data/repositories/merchant_category_service.dart';
+import 'package:split_ex/modules/personal/presentation/savings/providers/savings_goal_providers.dart';
 
 void main() {
   late FakeFirebaseFirestore db;
-  late SavingsGoalService savings;
+  late FirestoreSavingsGoalRepository savings;
   late MerchantCategoryService rules;
   setUp(() {
     db = FakeFirebaseFirestore();
-    savings = SavingsGoalService(firestore: db);
+    savings = FirestoreSavingsGoalRepository(firestore: db);
     rules = MerchantCategoryService(firestore: db);
   });
   final now = DateTime(2026, 10, 21);

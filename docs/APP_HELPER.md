@@ -220,7 +220,7 @@ Personal Tab (Bottom Nav)
 - Editing a debt updates its original personal transaction. Paid/written-off amounts constrain the minimum amount; settlement history restricts changes of person/direction
 - Optional `dueDate` is the expected repayment date used by the calendar; it is separate from an actual settlement date
 
-**Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `add_debt_sheet.dart`, `debt_dashboard_screen.dart`, `debt_list_screen.dart`, `personal_debts_screen.dart`, `personal_reports_screen.dart`, `personal_transactions_screen.dart`, `personal_expense_service.dart`, `personal_expense_provider.dart`
+**Key files:** `personal_expense_tab.dart`, `add_personal_transaction_screen.dart`, `add_debt_sheet.dart`, `debt_dashboard_screen.dart`, `debt_list_screen.dart`, `personal_debts_screen.dart`, `personal_reports_screen.dart`, `personal_transactions_screen.dart`, `personal_transaction_reads.dart`, `firestore_personal_transaction_repository.dart`
 
 ### 8. Group Expenses Flow
 ```
@@ -316,7 +316,7 @@ Personal Tab → Loans & EMI
 - If not set, `effectiveEmiStart = startDate + 1 month` (auto)
 - All amortization, missed-EMI detection, and `endDate` computation use `effectiveEmiStart`
 
-**Key files:** `loan_list_screen.dart`, `loan_detail_screen.dart`, `add_loan_sheet.dart`, `loan_reports_screen.dart`, `loan_service.dart`, `loan_provider.dart`, `loan_model.dart`
+**Key files:** `loan_list_screen.dart`, `loan_detail_screen.dart`, `add_loan_sheet.dart`, `loan_reports_screen.dart`, `personal_loan.dart`, `personal_loan_payment.dart`, `personal_loan_providers.dart`, `firestore_personal_loan_repository.dart`
 
 ---
 

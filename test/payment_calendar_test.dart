@@ -7,14 +7,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/models/loan_model.dart';
-import 'package:split_ex/config/theme.dart';
-import 'package:split_ex/models/payment_calendar_model.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/providers/connectivity_provider.dart';
-import 'package:split_ex/providers/payment_calendar_provider.dart';
-import 'package:split_ex/providers/notification_provider.dart';
-import 'package:split_ex/screens/personal/payment_calendar_screen.dart';
+import 'package:split_ex/shared/ui/theme.dart';
+import 'package:split_ex/modules/personal/domain/projections/calendar/payment_calendar_event.dart';
+import 'support/personal_transaction_fixture.dart';
+import 'package:split_ex/modules/personal/domain/entities/recurring/personal_recurring_entry.dart';
+import 'package:split_ex/modules/personal/domain/entities/loans/personal_loan.dart';
+import 'package:split_ex/modules/personal/domain/entities/loans/personal_loan_payment.dart';
+import 'package:split_ex/shared/providers/connectivity_provider.dart';
+import 'package:split_ex/modules/personal/presentation/calendar/providers/payment_calendar_provider.dart';
+import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
+import 'package:split_ex/modules/personal/presentation/calendar/screens/payment_calendar_screen.dart';
 
 class _Online extends StateNotifier<ConnectivityStatus>
     implements ConnectivityNotifier {
@@ -22,12 +24,12 @@ class _Online extends StateNotifier<ConnectivityStatus>
 }
 
 final _now = DateTime(2026, 10, 20);
-LoanModel _loan({
+PersonalLoan _loan({
   String id = 'loan',
-  LoanType type = LoanType.borrowed,
+  PersonalLoanType type = PersonalLoanType.borrowed,
   String? recurringId,
-  LoanStatus status = LoanStatus.active,
-}) => LoanModel(
+  PersonalLoanStatus status = PersonalLoanStatus.active,
+}) => PersonalLoan(
   id: id,
   userId: 'alice',
   title: 'Education loan',
@@ -42,15 +44,15 @@ LoanModel _loan({
   createdAt: DateTime(2026, 9, 1),
   recurringId: recurringId,
 );
-RecurringTransaction _recurring({
+PersonalRecurringEntry _recurring({
   String id = 'rent',
-  RecurringFrequency frequency = RecurringFrequency.monthly,
+  PersonalRecurringFrequency frequency = PersonalRecurringFrequency.monthly,
   int day = 25,
   DateTime? lastRun,
   DateTime? end,
   DateTime? created,
   bool active = true,
-}) => RecurringTransaction(
+}) => PersonalRecurringEntry(
   id: id,
   title: 'Apartment rent',
   amount: 12000,
@@ -87,9 +89,9 @@ PersonalTransactionModel _debt({
 );
 List<PaymentCalendarEvent> _build({
   DateTime? month,
-  List<LoanModel> loans = const [],
-  Map<String, List<LoanPaymentModel>> payments = const {},
-  List<RecurringTransaction> recurring = const [],
+  List<PersonalLoan> loans = const [],
+  Map<String, List<PersonalLoanPayment>> payments = const {},
+  List<PersonalRecurringEntry> recurring = const [],
   List<PersonalTransactionModel> debts = const [],
 }) => buildPaymentCalendar(
   month: month ?? _now,
@@ -116,7 +118,7 @@ void main() {
     'weekly dates follow the seven-day anchor and respect start and end dates',
     () {
       final r = _recurring(
-        frequency: RecurringFrequency.weekly,
+        frequency: PersonalRecurringFrequency.weekly,
         lastRun: DateTime(2026, 10, 5),
         end: DateTime(2026, 10, 20),
       );
@@ -154,14 +156,14 @@ void main() {
         loans: [_loan()],
         payments: {
           'loan': [
-            LoanPaymentModel(
+            PersonalLoanPayment(
               id: 'paid',
               amount: 1000,
               principalComponent: 1000,
               interestComponent: 0,
               remainingPrincipalAfter: 11000,
               date: DateTime(2026, 10, 9),
-              type: PaymentType.emi,
+              type: PersonalLoanPaymentType.emi,
             ),
           ],
         },
@@ -171,7 +173,10 @@ void main() {
     },
   );
   test('closed loans do not create future unpaid installments', () {
-    expect(_build(loans: [_loan(status: LoanStatus.foreclosed)]), isEmpty);
+    expect(
+      _build(loans: [_loan(status: PersonalLoanStatus.foreclosed)]),
+      isEmpty,
+    );
   });
   test(
     'partial debt uses remaining balance, lent is incoming, no date is excluded',

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:split_ex/providers/personal_expense_provider.dart';
-import 'package:split_ex/models/expenses_widget_snapshot.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
+import 'package:split_ex/modules/settings/models/expenses_widget_snapshot.dart';
+import 'support/personal_transaction_fixture.dart';
 
 void main() {
   PersonalTransactionModel entry(
@@ -49,11 +49,11 @@ void main() {
       entry(25000.50), entry(5000.25),
     ];
     final container = ProviderContainer(overrides: [
-      personalTransactionsProvider('2026-10').overrideWith((ref) => Stream.value(entries)),
+      personalMonthTransactionsProvider('2026-10').overrideWith((ref) => Stream.value(entries)),
     ]);
     addTearDown(container.dispose);
-    await container.read(personalTransactionsProvider('2026-10').future);
-    final app = container.read(personalMonthlySummaryProvider('2026-10'));
+    await container.read(personalMonthTransactionsProvider('2026-10').future);
+    final app = container.read(personalDomainMonthlySummaryProvider('2026-10'));
     final widget = snapshot(entries);
     expect(widget.expensesMinor / 100, app.expenses);
     expect(widget.incomeMinor / 100, app.income);

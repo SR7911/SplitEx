@@ -4,14 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/models/personal_transaction_model.dart';
-import 'package:split_ex/providers/notification_provider.dart';
-import 'package:split_ex/providers/connectivity_provider.dart';
-import 'package:split_ex/providers/personal_expense_provider.dart';
-import 'package:split_ex/screens/personal/personal_debts_screen.dart';
-import 'package:split_ex/screens/personal/debt_list_screen.dart';
-import 'package:split_ex/screens/personal/debt_dashboard_screen.dart';
-import 'package:split_ex/screens/personal/debt_widgets.dart';
+import 'support/personal_transaction_fixture.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
+import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
+import 'package:split_ex/shared/providers/connectivity_provider.dart';
+import 'package:split_ex/modules/personal/presentation/debts/screens/personal_debts_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/screens/debt_list_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/screens/debt_dashboard_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_widgets.dart';
 
 class _OnlineConnectivity extends StateNotifier<ConnectivityStatus>
     implements ConnectivityNotifier {
@@ -64,7 +64,9 @@ Future<void> openScreen(
     ProviderScope(
       overrides: [
         connectivityProvider.overrideWith((ref) => _OnlineConnectivity()),
-        personalDebtsProvider.overrideWith((ref) => Stream.value(debts)),
+        personalDebtTransactionsProvider.overrideWith(
+          (ref) => Stream.value(debts),
+        ),
         unreadCountProvider.overrideWith((ref) => Stream.value(0)),
       ],
       child: MaterialApp(debugShowCheckedModeBanner: false, home: screen),

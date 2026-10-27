@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/config/theme.dart';
-import 'package:split_ex/models/personal_account_model.dart';
-import 'package:split_ex/providers/auth_provider.dart';
-import 'package:split_ex/providers/connectivity_provider.dart';
-import 'package:split_ex/providers/notification_provider.dart';
-import 'package:split_ex/providers/personal_account_provider.dart';
-import 'package:split_ex/screens/personal/personal_accounts_screen.dart';
-import 'package:split_ex/services/personal_account_service.dart';
+import 'package:split_ex/shared/ui/theme.dart';
+import 'package:split_ex/modules/personal/domain/entities/accounts/personal_account.dart';
+import 'package:split_ex/modules/personal/domain/entities/accounts/personal_transfer.dart';
+import 'package:split_ex/modules/personal/domain/policies/accounts/account_balance_calculator.dart';
+import 'package:split_ex/modules/personal/data/mappers/accounts/account_firestore_mapper.dart'
+    show LegacyAccountSerialization;
+import 'package:split_ex/app/auth/providers/auth_provider.dart';
+import 'package:split_ex/shared/providers/connectivity_provider.dart';
+import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
+import 'package:split_ex/modules/personal/dependencies.dart';
+import 'package:split_ex/modules/personal/presentation/accounts/screens/personal_accounts_screen.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_personal_account_repository.dart';
 
 class _User extends Fake implements User {
   @override
@@ -43,10 +47,13 @@ void main() {
       ProviderScope(
         overrides: [
           authStateProvider.overrideWith((ref) => Stream.value(_User())),
+          personalUserIdProvider.overrideWith(
+            (ref) => const AsyncData('alice'),
+          ),
           connectivityProvider.overrideWith((ref) => _Online()),
           unreadCountProvider.overrideWith((ref) => Stream.value(0)),
-          personalAccountServiceProvider.overrideWith(
-            (ref) => PersonalAccountService(firestore: db),
+          personalAccountRepositoryProvider.overrideWith(
+            (ref) => FirestorePersonalAccountRepository(firestore: db),
           ),
         ],
         child: MaterialApp(

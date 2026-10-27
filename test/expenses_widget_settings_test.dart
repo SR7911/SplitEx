@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/providers/expenses_widget_settings_provider.dart';
-import 'package:split_ex/screens/settings/expenses_widget_settings_screen.dart';
-import 'package:split_ex/widgets/dot_matrix_label.dart';
+import 'package:split_ex/modules/settings/providers/expenses_widget_settings_provider.dart';
+import 'package:split_ex/modules/settings/screens/expenses_widget_settings_screen.dart';
+import 'package:split_ex/modules/settings/widgets/dot_matrix_label.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
