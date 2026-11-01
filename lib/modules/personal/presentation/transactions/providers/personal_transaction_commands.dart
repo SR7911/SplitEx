@@ -4,6 +4,7 @@ import 'package:split_ex/modules/personal/domain/use_cases/transactions/create_p
 import 'package:split_ex/modules/personal/domain/use_cases/transactions/edit_personal_transaction.dart';
 import 'package:split_ex/modules/personal/domain/use_cases/transactions/delete_personal_transaction.dart';
 import 'package:split_ex/modules/personal/domain/use_cases/debts/settle_personal_debt.dart';
+import 'package:split_ex/modules/personal/domain/use_cases/debts/tally_personal_debts.dart';
 
 final createPersonalTransactionProvider = Provider<CreatePersonalTransaction>(
   (ref) => CreatePersonalTransaction(
@@ -24,4 +25,8 @@ final deletePersonalTransactionProvider = Provider<DeletePersonalTransaction>(
 
 final settlePersonalDebtProvider = Provider<SettlePersonalDebt>(
   (ref) => SettlePersonalDebt(ref.watch(personalTransactionRepositoryProvider)),
+);
+
+final tallyPersonalDebtsProvider = Provider<TallyPersonalDebts>(
+  (ref) => TallyPersonalDebts(ref.watch(personalTransactionRepositoryProvider)),
 );

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
-import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_auto_record.dart';
 
 void main() {
   final parser = BankSmsParser();
@@ -115,7 +115,7 @@ void main() {
     () {
       final sms = parse(debit)!;
       expect(
-        BankSmsService.shouldAutoRecord(
+        shouldAutoRecordBankSms(
           sms,
           automatic: true,
           trusted: {'TESTBK'},
@@ -124,7 +124,7 @@ void main() {
         isTrue,
       );
       expect(
-        BankSmsService.shouldAutoRecord(
+        shouldAutoRecordBankSms(
           sms,
           automatic: true,
           trusted: {},
@@ -133,7 +133,7 @@ void main() {
         isFalse,
       );
       expect(
-        BankSmsService.shouldAutoRecord(
+        shouldAutoRecordBankSms(
           sms,
           automatic: false,
           trusted: {'TESTBK'},
@@ -142,7 +142,7 @@ void main() {
         isFalse,
       );
       expect(
-        BankSmsService.shouldAutoRecord(
+        shouldAutoRecordBankSms(
           sms,
           automatic: true,
           trusted: {'TESTBK'},

@@ -18,4 +18,12 @@ abstract class PersonalTransactionRepository {
     String id,
     DebtSettlementCommand command,
   );
+
+  /// Offsets opposing debts with one person without recording a cash movement.
+  Future<void> tallyDebts(
+    String userId,
+    String personName, {
+    int? expectedOffsetCents,
+    int? expectedNetCents,
+  });
 }

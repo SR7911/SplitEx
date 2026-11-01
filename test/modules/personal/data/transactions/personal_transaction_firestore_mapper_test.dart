@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../../../../support/personal_transaction_fixture.dart';
-import 'package:split_ex/modules/personal/data/mappers/transactions/personal_transaction_firestore_mapper.dart';
+import 'package:split_ex/modules/personal/data/models/personal_transaction_firestore_model.dart';
 
 void main() {
   test('reads existing debt fields and legacy defaults', () {

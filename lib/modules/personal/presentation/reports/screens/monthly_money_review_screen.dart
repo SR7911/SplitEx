@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/modules/personal/presentation/reports/models/monthly_money_review.dart';
+import 'package:split_ex/modules/personal/domain/projections/reports/monthly_money_review.dart';
 import 'package:split_ex/modules/personal/presentation/reports/providers/monthly_money_review_provider.dart';
 import 'package:split_ex/modules/personal/presentation/budgets/providers/personal_budget_providers.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
@@ -16,6 +16,10 @@ String _money(double n) => NumberFormat.currency(
   symbol: '₹',
   decimalDigits: n == n.roundToDouble() ? 0 : 2,
 ).format(n);
+
+String _comparisonLabel(MonthlyMoneyReview review) => review.inProgress
+    ? 'Compared with 1–${review.previousEnd.day} ${DateFormat('MMM').format(review.previousEnd)}'
+    : 'Compared with ${DateFormat('MMMM').format(review.previousEnd)}';
 
 /// Personal month-on-month money review.
 class MonthlyMoneyReviewScreen extends ConsumerStatefulWidget {
@@ -144,7 +148,7 @@ class _MonthlyMoneyReviewScreenState
       children: [
         _section(context, data.inProgress ? 'Month So Far' : 'Month Summary', [
           Text(
-            '${data.comparisonLabel}${data.inProgress ? ' · Through ${DateFormat('d MMM').format(data.currentEnd)}' : ''}',
+            '${_comparisonLabel(data)}${data.inProgress ? ' · Through ${DateFormat('d MMM').format(data.currentEnd)}' : ''}',
             style: AppTextStyles.caption(context),
           ),
           const SizedBox(height: 12),

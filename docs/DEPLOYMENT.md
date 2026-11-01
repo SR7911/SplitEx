@@ -46,6 +46,7 @@ Updated 2026-10-21 for the recent personal finance and Android SMS features. Imp
 
 - [ ] Rebuild and install the Android app after native changes; hot reload does not install the receiver, job service or MethodChannel code
 - [ ] Verify the manifest's `RECEIVE_SMS` and `RECEIVE_BOOT_COMPLETED` permissions, SMS receiver and background job service
+- [ ] Verify the opt-in Google Messages notification listener and text share target on a physical Android device; notification access is broader than SMS access and RCS alerts must remain review-only
 - [ ] Keep capture opt-in, with the in-app disclosure before requesting SMS permission; the feature does not request `READ_SMS`/`SEND_SMS` or scan message history
 - [ ] Preserve the `splitex_bank_sms` exclusions in `backup_rules.xml` and `data_extraction_rules.xml`, referenced by the manifest
 - [ ] Review the current [Google Play SMS permissions requirements](https://support.google.com/googleplay/android-developer/answer/10208820) and complete the applicable permissions declaration/review before publishing
@@ -78,6 +79,7 @@ See [Bank SMS recording](../BANK_SMS_RECORDING.md) for capture, sender trust, qu
 
 - [ ] Cancel disclosure, deny/grant/revoke permission, disable capture and verify existing personal finance remains usable
 - [ ] Deliver a real supported multipart alert; verify untrusted sender review and explicit sender trust
+- [ ] Deliver a verified business RCS payment from Google Messages; verify opt-in notification capture, manual review, notification dismissal after capture, and sharing an older message into Review
 - [ ] Trusted clear debit → one personal expense; credit/refund/transfer/uncertain alert → review
 - [ ] Retry/duplicate delivery → no duplicate; link an existing manual/EMI/settlement entry or own-account transfer
 - [ ] Same ending on multiple accounts → no automatic account assignment; unique active ending → correct assignment
@@ -233,3 +235,16 @@ flutter build apk --debug --no-pub
 The optional preview flag generates fixture screenshots under ignored `build/previews/`, including calendar light/dark views, Monthly Money Review, Savings Goals/detail, merchant rules and the Personal tools entry points. The debug APK is `build/app/outputs/flutter-apk/app-debug.apk`. Targeted analysis had no errors or warnings, with style information remaining; this is not a claim that whole-project analysis is clean.
 
 Feature behavior and test scope are detailed in [personal finance additions](../PERSONAL_FINANCE_FEATURES.md). Complete the checklists above before a production release.
+
+
+In personal module section
+debt dashboard - quick actions (monthly view and view all buttons not blend with splitex ui, they having same design and colors in icon and text)
+personal dashboard - below quick actions sms review, savings goals, accounts and wallets, payment calender, monthly money review cards are having the same colored ui, which needs to blends to the dashboard ui. additionally their respective 5 screens and widget editor screen, sms recording settings screen, marchant category rules screen in settings screen also have the same plain ui.
+- add, view, edit expenses botomsheets are also need to blend with the ui.
+
+- need a expense split function during add expense and edit expense that includes adding multiple person to split the expense equally and also a option for manuall expense split with the spent amount, that expense should reflect in the debt section.
+- in the debt section, if lent amount and borrowed amount includes same person, then we need a option for tally the expenses between us(if i borrowed 200 from person A, then later i lent 100 to person A, then the tally should be like , i don't know how the implementation will takes place in the ui and functionally feasible. but make it proper detailed ui like other functions.
+
+Implemented in Personal: add/edit expense supports equal and manual shares. Manual entries are limited to two decimal places and the combined shares cannot exceed the expense total; the owner's share is the remainder. Split shares appear as linked lent debts and are excluded from monthly cash transactions. Edits/deletion refuse to erase a share with recorded settlements. All Debts and Debt Dashboard offer a preview and confirmation to tally opposing balances with the same person; the tally updates debt histories without creating a cash transaction. Verify both flows on a physical device before release, including an expense split with a partially repaid share.
+
+Debt transaction follow-up: verify on a device that a borrowed/lent transaction shows its live debt status, "View debt" opens and highlights the correct Lent/Borrowed/Settled card, and a repayment appears under that debt's history rather than as an independent expense row. When selecting a payment account, confirm its balance changes and income/spending reports exclude debt principal and repayments. Existing historical repayments with no account assignment need manual review; the app cannot infer which account paid them.

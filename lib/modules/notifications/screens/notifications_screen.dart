@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/modules/notifications/models/notification_model.dart';
 import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
-import 'package:split_ex/modules/room/providers/room_provider.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
+import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});

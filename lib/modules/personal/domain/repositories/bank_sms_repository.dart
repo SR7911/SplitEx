@@ -1,4 +1,5 @@
 import '../policies/sms/bank_sms_parser.dart';
+import '../entities/transactions/personal_transaction.dart';
 
 class BankSmsMatch {
   final String id, title;
@@ -16,10 +17,32 @@ class BankSmsMatch {
 
 enum BankSmsSaveResult { recorded, duplicate }
 
+/// One portion of a reviewed bank payment applied to an existing debt.
+class BankSmsDebtAllocation {
+  final String debtId;
+  final int amountMinor;
+
+  const BankSmsDebtAllocation({
+    required this.debtId,
+    required this.amountMinor,
+  });
+}
+
 abstract class PersonalBankSmsRepository {
   Future<bool> wasRecorded(String uid, ParsedBankSms sms);
   Future<String?> suggestedCategory(String uid, ParsedBankSms sms);
   Future<List<BankSmsMatch>> possibleMatches(String uid, ParsedBankSms sms);
+  Future<List<PersonalTransaction>> openDebtsForSms(
+    String uid,
+    ParsedBankSms sms,
+  );
+  Future<BankSmsSaveResult> saveDebtSettlement(
+    String uid,
+    ParsedBankSms sms, {
+    required List<BankSmsDebtAllocation> allocations,
+    String? accountId,
+    DateTime? date,
+  });
   Future<BankSmsSaveResult> saveTransfer(
     String uid,
     ParsedBankSms sms, {

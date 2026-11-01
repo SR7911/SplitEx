@@ -8,6 +8,7 @@ import 'package:split_ex/modules/personal/presentation/transactions/providers/pe
 import 'package:split_ex/modules/personal/presentation/debts/screens/add_debt_sheet.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_widgets.dart';
 import 'package:split_ex/modules/personal/presentation/debts/screens/personal_debts_screen.dart';
+import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_tally_section.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
@@ -91,6 +92,7 @@ class _DashboardBody extends StatelessWidget {
           netBalance: netBalance,
           activeCount: activeCount,
         ),
+        DebtTallySection(debts: allDebts),
         const SizedBox(height: 16),
         _QuickActions(allDebts: allDebts),
         const SizedBox(height: 20),
@@ -976,9 +978,7 @@ Widget _categoryRow(
   );
 }
 
-List<List<PersonalTransaction>> _groupPeople(
-  List<PersonalTransaction> debts,
-) {
+List<List<PersonalTransaction>> _groupPeople(List<PersonalTransaction> debts) {
   final groups = <String, List<PersonalTransaction>>{};
   for (final debt in debts) {
     groups.putIfAbsent(debt.personName ?? 'Unknown', () => []).add(debt);

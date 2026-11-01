@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction_edit.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_commands.dart';
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
@@ -9,6 +11,7 @@ import 'package:split_ex/modules/personal/presentation/transactions/screens/add_
 import 'package:split_ex/modules/personal/presentation/accounts/providers/personal_account_providers.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_due_date_picker.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/widgets/expense_split_editor.dart';
 
 void showPersonalTransactionDetail(
   BuildContext context,
@@ -44,6 +47,8 @@ class _TransactionDetailSheetState
   late DateTime _date;
   bool _saving = false;
   late bool _involvesPerson;
+  late bool _splitExpense;
+  final _splitEditorKey = GlobalKey<ExpenseSplitEditorState>();
   late DebtType _debtType;
   String? _accountId;
   DateTime? _dueDate;
@@ -61,6 +66,7 @@ class _TransactionDetailSheetState
     _accountId = widget.txn.accountId;
     _dueDate = widget.txn.dueDate;
     _involvesPerson = widget.txn.hasDebt;
+    _splitExpense = widget.txn.split != null;
     _debtType = widget.txn.debtType ?? DebtType.lent;
   }
 
@@ -79,9 +85,17 @@ class _TransactionDetailSheetState
     final amount = double.tryParse(_amountCtrl.text.trim());
     if (amount == null || !amount.isFinite || amount <= 0) return;
 
-    setState(() => _saving = true);
+    ExpenseSplit? split;
+    try {
+      split = _splitExpense ? _splitEditorKey.currentState!.buildSplit() : null;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
+
     final userId = ref.read(authStateProvider).valueOrNull?.uid;
     if (userId == null) return;
+    setState(() => _saving = true);
 
     try {
       await ref.read(editPersonalTransactionProvider)(
@@ -102,7 +116,8 @@ class _TransactionDetailSheetState
           personName: _involvesPerson ? _personCtrl.text.trim() : null,
           isSettled: _involvesPerson ? widget.txn.isSettled : false,
           accountId: _accountId,
-          dueDate: _involvesPerson ? _dueDate : null,
+          dueDate: _involvesPerson || _splitExpense ? _dueDate : null,
+          split: split,
         ),
       );
 
@@ -144,7 +159,16 @@ class _TransactionDetailSheetState
 
     final userId = ref.read(authStateProvider).valueOrNull?.uid;
     if (userId == null) return;
-    await ref.read(deletePersonalTransactionProvider)(userId, widget.txn.id);
+    try {
+      await ref.read(deletePersonalTransactionProvider)(userId, widget.txn.id);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+      return;
+    }
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(
@@ -155,8 +179,18 @@ class _TransactionDetailSheetState
 
   @override
   Widget build(BuildContext context) {
-    final isIncome = _type == TransactionType.income;
-    final color = isIncome ? Colors.green : Colors.red;
+    final isNeutralLent =
+        !_editing &&
+        widget.txn.debtType == DebtType.lent &&
+        widget.txn.isSettled;
+    final isIncome =
+        _type == TransactionType.income &&
+        (_editing || widget.txn.debtType != DebtType.borrowed);
+    final color = isNeutralLent
+        ? Colors.blueGrey
+        : isIncome
+        ? Colors.green
+        : Colors.red;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -197,7 +231,9 @@ class _TransactionDetailSheetState
                     ),
                   ),
                 ),
-                if (!_editing) ...[
+                if (!_editing &&
+                    widget.txn.splitSourceId == null &&
+                    widget.txn.debtSourceId == null) ...[
                   IconButton(
                     onPressed: () => setState(() => _editing = true),
                     icon: const Icon(Icons.edit_outlined),
@@ -231,9 +267,17 @@ class _TransactionDetailSheetState
                     valueColor: color,
                   ),
                   _DetailRow(
-                    icon: isIncome ? Icons.arrow_downward : Icons.arrow_upward,
+                    icon: isNeutralLent
+                        ? Icons.handshake_outlined
+                        : isIncome
+                        ? Icons.arrow_downward
+                        : Icons.arrow_upward,
                     label: 'Type',
-                    value: _type.name.toUpperCase(),
+                    value: widget.txn.debtType == DebtType.lent
+                        ? 'LENT DEBT'
+                        : widget.txn.debtType == DebtType.borrowed
+                        ? 'BORROWED DEBT'
+                        : _type.name.toUpperCase(),
                   ),
                   _DetailRow(
                     icon: Icons.category,
@@ -286,10 +330,51 @@ class _TransactionDetailSheetState
                     ),
                     _DetailRow(
                       icon: Icons.check_circle_outline,
-                      label: 'Settled',
-                      value: widget.txn.isSettled ? 'Yes' : 'No',
+                      label: 'Debt status',
+                      value: widget.txn.isSettled
+                          ? (widget.txn.writtenOffAmount > 0
+                                ? 'Closed'
+                                : 'Settled')
+                          : widget.txn.settledAmount > 0 ||
+                                widget.txn.writtenOffAmount > 0
+                          ? 'Partially settled · ₹${widget.txn.remainingAmount.toStringAsFixed(2)} remaining'
+                          : 'Outstanding · ₹${widget.txn.remainingAmount.toStringAsFixed(2)} remaining',
                     ),
                   ],
+                  if (widget.txn.split != null) ...[
+                    _DetailRow(
+                      icon: Icons.call_split_rounded,
+                      label: 'Split',
+                      value: widget.txn.split!.mode == ExpenseSplitMode.equal
+                          ? 'Equal with ${widget.txn.split!.shares.length} people'
+                          : 'Manual with ${widget.txn.split!.shares.length} people',
+                    ),
+                    for (final share in widget.txn.split!.shares)
+                      _DetailRow(
+                        icon: Icons.person_outline,
+                        label: share.personName,
+                        value:
+                            '₹${share.amount.toStringAsFixed(2)} owed to you',
+                      ),
+                    _DetailRow(
+                      icon: Icons.account_circle_outlined,
+                      label: 'Your share',
+                      value:
+                          '₹${(widget.txn.split!.ownShareCents(widget.txn.amount) / 100).toStringAsFixed(2)}',
+                    ),
+                  ],
+                  if (widget.txn.splitSourceId != null)
+                    const _DetailRow(
+                      icon: Icons.link_rounded,
+                      label: 'Split share',
+                      value: 'Edit the original expense to change this share',
+                    ),
+                  if (widget.txn.debtSourceId != null)
+                    const _DetailRow(
+                      icon: Icons.handshake_outlined,
+                      label: 'Debt payment',
+                      value: 'Recorded in the related debt history',
+                    ),
                   if (widget.txn.notes != null && widget.txn.notes!.isNotEmpty)
                     _DetailRow(
                       icon: Icons.notes,
@@ -298,6 +383,21 @@ class _TransactionDetailSheetState
                     ),
                 ],
               ),
+              if (widget.txn.hasDebt || widget.txn.debtSourceId != null) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () {
+                    final debtId = widget.txn.debtSourceId ?? widget.txn.id;
+                    final router = GoRouter.of(context);
+                    Navigator.pop(context);
+                    router.push(
+                      '/personal/debts?debtId=${Uri.encodeComponent(debtId)}',
+                    );
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('View debt and settlement history'),
+                ),
+              ],
             ] else ...[
               // Edit mode
               SegmentedButton<TransactionType>(
@@ -314,11 +414,15 @@ class _TransactionDetailSheetState
                   ),
                 ],
                 selected: {_type},
-                onSelectionChanged: (s) => setState(() => _type = s.first),
+                onSelectionChanged: (s) => setState(() {
+                  _type = s.first;
+                  if (_type != TransactionType.expense) _splitExpense = false;
+                }),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _amountCtrl,
+                onChanged: (_) => setState(() {}),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
@@ -462,12 +566,17 @@ class _TransactionDetailSheetState
               PersonalAccountPicker(
                 value: _accountId,
                 enabled: !_saving,
+                label: 'Account (optional)',
+                showHelperText: false,
                 onChanged: (v) => setState(() => _accountId = v),
               ),
               const SizedBox(height: 16),
               SwitchListTile(
                 value: _involvesPerson,
-                onChanged: (v) => setState(() => _involvesPerson = v),
+                onChanged: (v) => setState(() {
+                  _involvesPerson = v;
+                  if (v) _splitExpense = false;
+                }),
                 title: const Text(
                   'Involves someone else?',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
@@ -528,6 +637,31 @@ class _TransactionDetailSheetState
                     ),
                   ),
                 ),
+              ],
+              if (_type == TransactionType.expense && !_involvesPerson) ...[
+                SwitchListTile(
+                  value: _splitExpense,
+                  onChanged: (value) => setState(() => _splitExpense = value),
+                  title: const Text('Split with people'),
+                  subtitle: const Text('Their shares become debts owed to you'),
+                  secondary: const Icon(Icons.call_split_rounded),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
+                if (_splitExpense) ...[
+                  ExpenseSplitEditor(
+                    key: _splitEditorKey,
+                    totalText: _amountCtrl.text,
+                    initialSplit: widget.txn.split,
+                    enabled: !_saving,
+                  ),
+                  const SizedBox(height: 12),
+                  DebtDueDatePicker(
+                    value: _dueDate,
+                    debtDate: _date,
+                    enabled: !_saving,
+                    onChanged: (value) => setState(() => _dueDate = value),
+                  ),
+                ],
               ],
               const SizedBox(height: 24),
               Row(
@@ -628,13 +762,17 @@ class _DetailRow extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: valueColor,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              softWrap: true,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: valueColor,
+              ),
             ),
           ),
         ],

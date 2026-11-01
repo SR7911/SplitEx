@@ -2,10 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:split_ex/shared/services/usage_tracker.dart';
 import '../../domain/entities/budgets/personal_budget.dart';
 import '../../domain/repositories/personal_budget_repository.dart';
-import '../mappers/budgets/personal_budget_firestore_mapper.dart';
+import '../models/personal_budget_firestore_model.dart';
+import '../datasources/personal_firestore_data_source.dart';
 
 class FirestorePersonalBudgetRepository implements PersonalBudgetRepository {
   final FirebaseFirestore _db;
+  late final PersonalFirestoreDataSource _source = PersonalFirestoreDataSource(
+    _db,
+  );
   final UsageTracker _tracker;
 
   FirestorePersonalBudgetRepository({
@@ -15,7 +19,7 @@ class FirestorePersonalBudgetRepository implements PersonalBudgetRepository {
        _tracker = tracker ?? UsageTracker.instance;
 
   CollectionReference<Map<String, dynamic>> _budgets(String userId) =>
-      _db.collection('users').doc(userId).collection('personal_budgets');
+      _source.budgets(userId);
 
   @override
   Stream<List<PersonalBudget>> budgetsForMonth(String userId, String month) {

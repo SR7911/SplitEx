@@ -4,18 +4,22 @@ import '../../domain/entities/accounts/personal_transfer.dart';
 import '../../domain/entities/transactions/personal_transaction.dart';
 import '../../domain/policies/accounts/account_validation.dart';
 import '../../domain/repositories/personal_account_repository.dart';
-import '../mappers/accounts/account_firestore_mapper.dart';
-import '../mappers/transactions/personal_transaction_firestore_mapper.dart';
+import '../models/account_firestore_models.dart';
+import '../models/personal_transaction_firestore_model.dart';
+import '../datasources/personal_firestore_data_source.dart';
 
 class FirestorePersonalAccountRepository implements PersonalAccountRepository {
   final FirebaseFirestore _db;
+  late final PersonalFirestoreDataSource _source = PersonalFirestoreDataSource(
+    _db,
+  );
   FirestorePersonalAccountRepository({required FirebaseFirestore firestore})
     : _db = firestore;
 
   CollectionReference<Map<String, dynamic>> _accounts(String uid) =>
-      _db.collection('users').doc(uid).collection('personal_accounts');
+      _source.accounts(uid);
   CollectionReference<Map<String, dynamic>> _transfers(String uid) =>
-      _db.collection('users').doc(uid).collection('personal_transfers');
+      _source.transfers(uid);
 
   @override
   Stream<List<PersonalAccount>> accounts(String userId) =>
@@ -44,22 +48,21 @@ class FirestorePersonalAccountRepository implements PersonalAccountRepository {
       );
 
   @override
-  Stream<List<PersonalTransaction>> assignedTransactions(String userId) => _db
-      .collection('users')
-      .doc(userId)
-      .collection('personal_transactions')
-      .where('accountId', isGreaterThan: '')
-      .snapshots()
-      .map(
-        (snapshot) => snapshot.docs
-            .map(
-              (doc) => PersonalTransactionFirestoreMapper.fromMap(
-                doc.data(),
-                doc.id,
-              ),
-            )
-            .toList(),
-      );
+  Stream<List<PersonalTransaction>> assignedTransactions(String userId) =>
+      _source
+          .transactions(userId)
+          .where('accountId', isGreaterThan: '')
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map(
+                  (doc) => PersonalTransactionFirestoreMapper.fromMap(
+                    doc.data(),
+                    doc.id,
+                  ),
+                )
+                .toList(),
+          );
 
   @override
   Future<void> saveAccount(String userId, PersonalAccount account) async {
@@ -85,27 +88,16 @@ class FirestorePersonalAccountRepository implements PersonalAccountRepository {
   @override
   Future<void> saveTransfer(String userId, PersonalTransfer transfer) async {
     validatePersonalTransfer(transfer);
-    final target = transfer.id.isEmpty
-        ? _transfers(userId).doc()
-        : _transfers(userId).doc(transfer.id);
-    await _db.runTransaction((transaction) async {
-      final from = await transaction.get(
-        _accounts(userId).doc(transfer.fromAccountId),
-      );
-      final to = await transaction.get(
-        _accounts(userId).doc(transfer.toAccountId),
-      );
-      if (!from.exists ||
-          !to.exists ||
-          from.data()?['archived'] == true ||
-          to.data()?['archived'] == true) {
-        throw StateError('Both accounts must be available and active.');
-      }
-      transaction.set(target, {
+    await _source.saveTransfer(
+      userId,
+      transfer.id,
+      transfer.fromAccountId,
+      transfer.toAccountId,
+      {
         ...TransferFirestoreMapper.toMap(transfer),
         'amount': (transfer.amount * 100).round() / 100,
-      });
-    });
+      },
+    );
   }
 
   @override

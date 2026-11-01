@@ -1,23 +1,23 @@
 import 'dart:io';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:split_ex/modules/personal/presentation/reports/models/monthly_money_review.dart';
+import 'package:split_ex/modules/personal/domain/projections/reports/monthly_money_review.dart';
 import 'support/personal_transaction_fixture.dart';
 import 'package:split_ex/modules/personal/domain/entities/savings/savings_goal.dart';
 import 'package:split_ex/modules/personal/data/repositories/firestore_savings_goal_repository.dart';
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
-import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
-import 'package:split_ex/modules/personal/data/repositories/merchant_category_service.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_merchant_category_repository.dart';
 import 'package:split_ex/modules/personal/presentation/savings/providers/savings_goal_providers.dart';
 
 void main() {
   late FakeFirebaseFirestore db;
   late FirestoreSavingsGoalRepository savings;
-  late MerchantCategoryService rules;
+  late FirestoreMerchantCategoryRepository rules;
   setUp(() {
     db = FakeFirebaseFirestore();
     savings = FirestoreSavingsGoalRepository(firestore: db);
-    rules = MerchantCategoryService(firestore: db);
+    rules = FirestoreMerchantCategoryRepository(firestore: db);
   });
   final now = DateTime(2026, 10, 21);
   const goal = SavingsGoal(id: 'trip', title: 'Trip', targetMinor: 100000);
@@ -66,7 +66,7 @@ void main() {
   test(
     'remembering a reviewed category is atomic and applies only when requested for later imports',
     () async {
-      final repo = BankSmsRepository(firestore: db);
+      final repo = FirestoreBankSmsRepository(firestore: db);
       await repo.save('alice', sms(), category: 'Food', rememberCategory: true);
       expect(await rules.suggestion('alice', sms()), 'Food');
       final second = sms(reference: '629300123457');
@@ -94,7 +94,7 @@ void main() {
   test(
     'failed imports do not leave a merchant rule or receipt behind',
     () async {
-      final repo = BankSmsRepository(firestore: db);
+      final repo = FirestoreBankSmsRepository(firestore: db);
       await expectLater(
         repo.save(
           'alice',
@@ -112,7 +112,7 @@ void main() {
   test(
     'remember category cannot turn credit reviews into automatic expense rules',
     () async {
-      await BankSmsRepository(firestore: db).save(
+      await FirestoreBankSmsRepository(firestore: db).save(
         'alice',
         sms(credit: true),
         category: 'Salary',

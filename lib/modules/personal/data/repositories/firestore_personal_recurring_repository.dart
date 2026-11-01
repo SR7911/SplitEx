@@ -3,11 +3,15 @@ import 'package:split_ex/shared/services/usage_tracker.dart';
 import '../../domain/entities/recurring/personal_recurring_edit.dart';
 import '../../domain/entities/recurring/personal_recurring_entry.dart';
 import '../../domain/repositories/personal_recurring_repository.dart';
-import '../mappers/recurring/personal_recurring_firestore_mapper.dart';
+import '../models/personal_recurring_firestore_model.dart';
+import '../datasources/personal_firestore_data_source.dart';
 
 class FirestorePersonalRecurringRepository
     implements PersonalRecurringRepository {
   final FirebaseFirestore _db;
+  late final PersonalFirestoreDataSource _source = PersonalFirestoreDataSource(
+    _db,
+  );
   final UsageTracker _tracker;
 
   FirestorePersonalRecurringRepository({
@@ -17,7 +21,7 @@ class FirestorePersonalRecurringRepository
        _tracker = tracker ?? UsageTracker.instance;
 
   CollectionReference<Map<String, dynamic>> _entries(String userId) =>
-      _db.collection('users').doc(userId).collection('personal_recurring');
+      _source.recurring(userId);
 
   @override
   Stream<List<PersonalRecurringEntry>> entries(String userId) {

@@ -5,6 +5,23 @@ The review inbox is also available directly from **Personal → SMS Review Inbox
 The app shows a disclosure before requesting `RECEIVE_SMS`. It does not request
 `READ_SMS` or `SEND_SMS`, scan the inbox, or send messages.
 
+## Verified business RCS payments
+
+Google Messages may deliver bank alerts as verified RCS chats. RCS does not produce
+the Android `SMS_RECEIVED` broadcast, so the SMS-only capture path cannot see it.
+For future alerts, enable **Review Google Messages alerts** in Bank SMS Recording,
+then grant SplitEx Android notification access. Android grants access to all
+notifications; SplitEx filters locally to Google Messages and payment-like text.
+RCS alerts always require review and are never auto-recorded. Notification content
+may be hidden or shortened by Android or Google Messages, so capture is not
+guaranteed. Clearing or marking a notification as read after it was posted does
+not remove an already captured review item.
+
+For an existing RCS message, use Google Messages' **Share** action on the message
+and choose SplitEx. Shared payment text opens the review inbox. Unsupported text
+shows a message there; you can enter the payment manually in Personal Transactions.
+Sharing does not require notification access. Neither path scans RCS history.
+
 New senders require review. After recording or linking a verified alert, select
 **Trust this sender for future clear expenses** to enable automatic recording for
 that sender. Credits, absent payees/references/account endings, potential linked
@@ -20,6 +37,8 @@ or bypassing review safeguards. Manage rules in the SMS settings screen.
 - Raw messages and review items stay in the app-private `splitex_bank_sms`
   preferences, excluded from Android cloud and device-transfer backups.
 - Signing out or switching users clears this device's captured/review SMS data.
+- RCS notification and shared-message candidates use the same device-local review
+  storage. They are never automatically trusted or recorded.
 - Disabling capture clears unprocessed SMS; existing review items can be dismissed.
 - Durable import receipts prevent duplicate writes after retries, edits, or deletion.
 - A same-amount transaction near the payment date goes to Review. Link the original

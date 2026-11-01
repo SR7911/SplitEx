@@ -5,6 +5,7 @@ enum BankSmsDirection { debit, credit }
 
 class ParsedBankSms {
   final String messageId, sender, body;
+  final String source;
   final int amountMinor;
   final BankSmsDirection direction;
   final DateTime date;
@@ -14,6 +15,7 @@ class ParsedBankSms {
     required this.messageId,
     required this.sender,
     required this.body,
+    this.source = 'sms',
     required this.amountMinor,
     required this.direction,
     required this.date,
@@ -34,6 +36,7 @@ class ParsedBankSms {
     'messageId': messageId,
     'sender': sender,
     'body': body,
+    'source': source,
     'amountMinor': amountMinor,
     'direction': direction.name,
     'date': date.millisecondsSinceEpoch,
@@ -46,6 +49,7 @@ class ParsedBankSms {
     messageId: data['messageId'] as String,
     sender: data['sender'] as String,
     body: data['body'] as String,
+    source: data['source'] as String? ?? 'sms',
     amountMinor: (data['amountMinor'] as num).toInt(),
     direction: BankSmsDirection.values.byName(data['direction'] as String),
     date: DateTime.fromMillisecondsSinceEpoch((data['date'] as num).toInt()),

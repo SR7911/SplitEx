@@ -56,7 +56,13 @@ final personalDomainMonthlySummaryProvider =
     Provider.family<PersonalMonthlySummary, String>((ref, month) {
       final transactions =
           ref.watch(personalMonthTransactionsProvider(month)).valueOrNull ?? [];
-      return calculatePersonalMonthlySummary(transactions);
+      final debts =
+          ref.watch(personalDebtTransactionsProvider).valueOrNull ?? [];
+      return calculatePersonalMonthlySummary(
+        transactions,
+        debts: debts,
+        month: month,
+      );
     });
 
 final personalDomainCategorySpendingProvider =

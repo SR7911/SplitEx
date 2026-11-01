@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/modules/notifications/models/notification_model.dart';
-import 'package:split_ex/modules/room/providers/room_provider.dart';
 import 'package:split_ex/modules/notifications/services/notification_service.dart';
+import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 final notificationServiceProvider =
     Provider<NotificationService>((ref) => NotificationService());

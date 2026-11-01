@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:split_ex/shared/ui/theme.dart';
-import 'package:split_ex/modules/personal/presentation/reports/models/monthly_money_review.dart';
+import 'package:split_ex/modules/personal/domain/projections/reports/monthly_money_review.dart';
 import 'package:split_ex/modules/personal/domain/entities/accounts/personal_account.dart';
 import 'package:split_ex/modules/personal/domain/entities/accounts/personal_transfer.dart';
 import 'package:split_ex/modules/personal/domain/policies/accounts/account_balance_calculator.dart';
@@ -28,12 +28,13 @@ import 'package:split_ex/modules/personal/presentation/sms/screens/merchant_cate
 import 'package:split_ex/modules/personal/presentation/savings/screens/savings_goals_screen.dart';
 import 'package:split_ex/modules/personal/presentation/dashboard/widgets/personal_tools_section.dart';
 import 'package:split_ex/modules/personal/presentation/sms/screens/bank_sms_settings_screen.dart';
-import 'package:split_ex/modules/personal/data/repositories/merchant_category_service.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_merchant_category_repository.dart';
 import 'package:split_ex/modules/personal/presentation/savings/providers/savings_goal_providers.dart';
-import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_bank_sms_repository.dart';
 import 'package:split_ex/modules/personal/presentation/sms/providers/bank_sms_providers.dart';
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
-import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_controller.dart';
+import 'package:split_ex/modules/personal/data/datasources/method_channel_bank_sms_data_source.dart';
 
 class _User extends Fake implements User {
   @override
@@ -48,9 +49,9 @@ class _Online extends StateNotifier<ConnectivityStatus>
 void main() {
   late FakeFirebaseFirestore db;
   late FirestoreSavingsGoalRepository savings;
-  late MerchantCategoryService rules;
-  late BankSmsRepository repo;
-  late BankSmsService smsService;
+  late FirestoreMerchantCategoryRepository rules;
+  late FirestoreBankSmsRepository repo;
+  late BankSmsController smsService;
   late Map<String, dynamic> native;
   final previewBoundary = GlobalKey();
   final now = DateTime(2026, 10, 21);
@@ -58,9 +59,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     db = FakeFirebaseFirestore();
     savings = FirestoreSavingsGoalRepository(firestore: db);
-    rules = MerchantCategoryService(firestore: db);
-    repo = BankSmsRepository(firestore: db);
-    smsService = BankSmsService(repository: repo)..userId = 'alice';
+    rules = FirestoreMerchantCategoryRepository(firestore: db);
+    repo = FirestoreBankSmsRepository(firestore: db);
+    smsService = BankSmsController(
+      repository: repo,
+      device: MethodChannelBankSmsDataSource(),
+    )..userId = 'alice';
     native = {
       'owner': 'alice',
       'enabled': false,
@@ -72,7 +76,9 @@ void main() {
       'lastError': '',
     };
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(BankSmsService.channel, (call) async {
+        .setMockMethodCallHandler(MethodChannelBankSmsDataSource.channel, (
+          call,
+        ) async {
           if (call.method == 'status') return jsonEncode(native);
           if (call.method == 'deleteReview') {
             (native['reviews'] as List).removeWhere(
@@ -84,7 +90,7 @@ void main() {
   });
   tearDown(
     () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(BankSmsService.channel, null),
+        .setMockMethodCallHandler(MethodChannelBankSmsDataSource.channel, null),
   );
   PersonalTransactionModel entry(
     String id,
@@ -191,7 +197,7 @@ void main() {
           ),
           savingsGoalRepositoryProvider.overrideWith((ref) => savings),
           merchantCategoryServiceProvider.overrideWith((ref) => rules),
-          bankSmsServiceProvider.overrideWith((ref) => smsService),
+          bankSmsControllerProvider.overrideWith((ref) => smsService),
           bankSmsRepositoryProvider.overrideWith((ref) => repo),
           monthlyMoneyReviewProvider.overrideWith(
             (ref, month) => AsyncData(fixture(month)),

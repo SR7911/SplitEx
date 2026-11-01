@@ -1,3 +1,5 @@
+import 'expense_split.dart';
+
 enum TransactionType { expense, income }
 
 enum DebtType { lent, borrowed }
@@ -8,12 +10,24 @@ class DebtSettlement {
   final DateTime? date;
   final String note;
   final bool isWriteOff;
+  final bool isTally;
+
+  /// New settlements stored on the debt itself instead of a payment transaction.
+  final bool isCashEntry;
+  final String? repaymentId;
+  final String? accountId;
+  final String? bankSmsReceiptId;
 
   const DebtSettlement({
     required this.amount,
     required this.date,
     required this.note,
     required this.isWriteOff,
+    this.isTally = false,
+    this.isCashEntry = false,
+    this.repaymentId,
+    this.accountId,
+    this.bankSmsReceiptId,
   });
 }
 
@@ -38,6 +52,9 @@ class PersonalTransaction {
   final double settledAmount;
   final double writtenOffAmount;
   final List<DebtSettlement> settlements;
+  final ExpenseSplit? split;
+  final String? splitSourceId;
+  final String? debtSourceId;
 
   const PersonalTransaction({
     required this.id,
@@ -58,6 +75,9 @@ class PersonalTransaction {
     this.settledAmount = 0,
     this.writtenOffAmount = 0,
     this.settlements = const [],
+    this.split,
+    this.splitSourceId,
+    this.debtSourceId,
   });
 
   bool get hasDebt =>
@@ -66,4 +86,8 @@ class PersonalTransaction {
       (amount - settledAmount - writtenOffAmount).clamp(0.0, double.infinity);
   bool get isExpense => type == TransactionType.expense;
   bool get isIncome => type == TransactionType.income;
+  bool get isDebtCashFlow =>
+      debtType != null || debtSourceId != null || splitSourceId != null;
+  bool get countsAsSpending => isExpense && !isDebtCashFlow;
+  bool get countsAsIncome => isIncome && !isDebtCashFlow;
 }

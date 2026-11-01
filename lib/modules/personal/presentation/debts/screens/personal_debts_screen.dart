@@ -8,14 +8,17 @@ import 'package:split_ex/modules/personal/presentation/transactions/providers/pe
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
 import 'package:split_ex/modules/personal/presentation/debts/screens/add_debt_sheet.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_widgets.dart';
+import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_tally_section.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/screens/view_personal_transaction_sheet.dart';
+import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 /// All-time personal debt list backed by the domain debt stream.
 class PersonalDebtsScreen extends ConsumerWidget {
   final int initialTab;
-  const PersonalDebtsScreen({super.key, this.initialTab = 0});
+  final String? focusDebtId;
+  const PersonalDebtsScreen({super.key, this.initialTab = 0, this.focusDebtId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
@@ -37,12 +40,13 @@ class PersonalDebtsScreen extends ConsumerWidget {
             error: (e, _) => Center(child: Text('Could not load debts: $e')),
             data: (debts) => DefaultTabController(
               length: 3,
-              initialIndex: initialTab,
+              initialIndex: _tabForFocusedDebt(debts),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: Column(
                   children: [
                     DebtBalanceSummary(debts: debts),
+                    DebtTallySection(debts: debts),
                     const SizedBox(height: 16),
                     Container(
                       decoration: debtCardDecoration(context),
@@ -60,6 +64,7 @@ class PersonalDebtsScreen extends ConsumerWidget {
                         children: [
                           for (final tab in [0, 1, 2])
                             _DebtTab(
+                              focusDebtId: focusDebtId,
                               debts: debts
                                   .where(
                                     (t) => tab == 2
@@ -82,6 +87,13 @@ class PersonalDebtsScreen extends ConsumerWidget {
           ),
     ),
   );
+
+  int _tabForFocusedDebt(List<PersonalTransaction> debts) {
+    final target = debts.where((debt) => debt.id == focusDebtId).firstOrNull;
+    if (target == null) return initialTab;
+    if (target.isSettled) return 2;
+    return target.debtType == DebtType.lent ? 0 : 1;
+  }
 }
 
 class DebtBalanceSummary extends StatelessWidget {
@@ -114,7 +126,8 @@ class DebtBalanceSummary extends StatelessWidget {
 
 class _DebtTab extends StatelessWidget {
   final List<PersonalTransaction> debts;
-  const _DebtTab({required this.debts});
+  final String? focusDebtId;
+  const _DebtTab({required this.debts, this.focusDebtId});
   @override
   Widget build(BuildContext context) {
     final sorted = [...debts]
@@ -122,6 +135,8 @@ class _DebtTab extends StatelessWidget {
         final type = a.debtType!.index.compareTo(b.debtType!.index);
         return type != 0 ? type : b.date.compareTo(a.date);
       });
+    final targetIndex = sorted.indexWhere((debt) => debt.id == focusDebtId);
+    if (targetIndex > 0) sorted.insert(0, sorted.removeAt(targetIndex));
     if (sorted.isEmpty) {
       return const AppEmptyState(
         icon: Icons.handshake_outlined,
@@ -131,7 +146,8 @@ class _DebtTab extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 100),
       itemCount: sorted.length,
-      itemBuilder: (_, i) => DebtTile(txn: sorted[i]),
+      itemBuilder: (_, i) =>
+          DebtTile(txn: sorted[i], highlighted: sorted[i].id == focusDebtId),
     );
   }
 }
@@ -140,11 +156,13 @@ class DebtTile extends StatelessWidget {
   final PersonalTransaction txn;
   final bool showActions;
   final bool embedded;
+  final bool highlighted;
   const DebtTile({
     super.key,
     required this.txn,
     this.showActions = true,
     this.embedded = false,
+    this.highlighted = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -174,11 +192,25 @@ class DebtTile extends StatelessWidget {
             decoration: BoxDecoration(
               color: color.withValues(alpha: dark ? .07 : .04),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: color.withValues(alpha: .12)),
+              border: Border.all(
+                color: highlighted ? cs.primary : color.withValues(alpha: .12),
+                width: highlighted ? 2 : 1,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (highlighted)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Selected debt',
+                      style: TextStyle(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 Row(
                   children: [
                     Container(
@@ -402,11 +434,14 @@ class _DebtSettlementHistory extends StatelessWidget {
             Builder(
               builder: (context) {
                 final writtenOff = entry.isWriteOff;
+                final tallied = entry.isTally;
                 final color = writtenOff ? AppColors.warning(context) : accent;
                 final date = entry.date;
                 final note = entry.note;
                 final label = writtenOff
                     ? 'Written off'
+                    : tallied
+                    ? 'Tallied (no payment)'
                     : lent
                     ? 'Received'
                     : 'Repaid';
@@ -554,11 +589,13 @@ class _SettlementSheetState extends ConsumerState<_SettlementSheet> {
   final _note = TextEditingController();
   late DateTime _date;
   bool _busy = false;
+  String? _accountId;
   String? _error;
   @override
   void initState() {
     super.initState();
     _date = DateTime.now();
+    _accountId = widget.txn.accountId;
   }
 
   @override
@@ -601,6 +638,7 @@ class _SettlementSheetState extends ConsumerState<_SettlementSheet> {
           date: _date,
           amount: widget.close || full ? null : amount,
           note: _note.text.trim(),
+          accountId: widget.close ? null : _accountId,
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -786,6 +824,13 @@ class _SettlementSheetState extends ConsumerState<_SettlementSheet> {
                 controller: _note,
                 enabled: !_busy,
                 decoration: field('Note (optional)'),
+              ),
+              const SizedBox(height: 14),
+              PersonalAccountPicker(
+                value: _accountId,
+                enabled: !_busy,
+                label: lent ? 'Receive into account' : 'Pay from account',
+                onChanged: (value) => setState(() => _accountId = value),
               ),
               const SizedBox(height: 14),
               Container(

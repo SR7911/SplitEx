@@ -1,14 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:split_ex/modules/personal/data/mappers/savings/savings_goal_firestore_mapper.dart';
+import 'package:split_ex/modules/personal/data/models/savings_goal_firestore_model.dart';
 import 'package:split_ex/modules/personal/domain/entities/savings/savings_goal.dart';
 import 'package:split_ex/modules/personal/domain/repositories/savings_goal_repository.dart';
+import 'package:split_ex/modules/personal/data/datasources/personal_firestore_data_source.dart';
 
 class FirestoreSavingsGoalRepository implements SavingsGoalRepository {
   final FirebaseFirestore db;
+  late final PersonalFirestoreDataSource source = PersonalFirestoreDataSource(
+    db,
+  );
   FirestoreSavingsGoalRepository({FirebaseFirestore? firestore})
     : db = firestore ?? FirebaseFirestore.instance;
   CollectionReference<Map<String, dynamic>> goals(String uid) =>
-      db.collection('users').doc(uid).collection('personal_savings_goals');
+      source.savingsGoals(uid);
   @override
   Stream<List<SavingsGoal>> watch(String uid) => goals(uid).snapshots().map(
     (s) => s.docs.map((d) => savingsGoalFromFirestore(d.data(), d.id)).toList()
@@ -21,7 +25,9 @@ class FirestoreSavingsGoalRepository implements SavingsGoalRepository {
       .snapshots()
       .map(
         (s) =>
-            s.docs.map((d) => savingsEntryFromFirestore(d.data(), d.id)).toList()
+            s.docs
+                .map((d) => savingsEntryFromFirestore(d.data(), d.id))
+                .toList()
               ..sort((a, b) => b.date.compareTo(a.date)),
       );
   @override
@@ -33,13 +39,7 @@ class FirestoreSavingsGoalRepository implements SavingsGoalRepository {
       final current = await tx.get(target);
       if (goal.accountId != null &&
           goal.accountId != current.data()?['accountId']) {
-        final account = await tx.get(
-          db
-              .collection('users')
-              .doc(uid)
-              .collection('personal_accounts')
-              .doc(goal.accountId),
-        );
+        final account = await tx.get(source.accounts(uid).doc(goal.accountId));
         if (!account.exists || account.data()?['archived'] == true)
           throw StateError('Choose an active account.');
       }

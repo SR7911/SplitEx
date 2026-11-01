@@ -313,6 +313,7 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
 
                 // Notes
                 PersonalAccountPicker(value: _accountId, enabled: !_saving, onChanged: (v) => setState(() => _accountId = v)),
+                const SizedBox(height: 12),
                 DebtDueDatePicker(value: _dueDate, debtDate: _date, enabled: !_saving, onChanged: (v) => setState(() => _dueDate = v)),
                 const SizedBox(height: 12),
                 TextFormField(

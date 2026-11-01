@@ -12,8 +12,13 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/app.dart';
 import 'package:split_ex/app/composition/personal_dependencies.dart';
+import 'package:split_ex/app/composition/room_dependencies.dart';
+import 'package:split_ex/app/composition/shared_dependencies.dart';
+import 'package:split_ex/app/composition/group_dependencies.dart';
+import 'package:split_ex/app/composition/project_dependencies.dart';
 import 'package:split_ex/modules/notifications/services/fcm_service.dart';
-import 'package:split_ex/modules/notifications/services/notification_listener.dart' as nl;
+import 'package:split_ex/modules/notifications/services/notification_listener.dart'
+    as nl;
 import 'package:split_ex/modules/notifications/services/notification_service.dart';
 
 /// Background message handler (must be top-level function).
@@ -68,7 +73,13 @@ void main() async {
 
   runApp(
     ProviderScope(
-      overrides: personalDependencyOverrides(),
+      overrides: [
+        ...personalDependencyOverrides(),
+        ...roomDependencyOverrides(),
+        ...sharedDependencyOverrides(),
+        ...groupDependencyOverrides(),
+        ...projectDependencyOverrides(),
+      ],
       child: const SplitExApp(),
     ),
   );

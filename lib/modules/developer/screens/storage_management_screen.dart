@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/modules/room/providers/room_provider.dart';
 import 'package:split_ex/modules/developer/services/storage_management_service.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 class StorageManagementScreen extends ConsumerStatefulWidget {
   final String roomId;

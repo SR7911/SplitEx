@@ -33,8 +33,9 @@ class _PersonalReportsSheet extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final summary = ref.watch(personalDomainMonthlySummaryProvider(monthKey));
     final spending = ref.watch(personalDomainCategorySpendingProvider(monthKey));
-    final txns =
-        ref.watch(personalMonthTransactionsProvider(monthKey)).valueOrNull ?? [];
+    final txns = (ref.watch(personalMonthTransactionsProvider(monthKey)).valueOrNull ?? <PersonalTransaction>[])
+        .where((entry) => entry.countsAsIncome || entry.countsAsSpending)
+        .toList();
     final entries = spending.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final totalExpense = summary.expenses;
     final net = summary.income - summary.expenses;

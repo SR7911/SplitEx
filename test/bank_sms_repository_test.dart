@@ -3,11 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
-import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_bank_sms_repository.dart';
 
 void main() {
   late FakeFirebaseFirestore db;
-  late BankSmsRepository repo;
+  late FirestoreBankSmsRepository repo;
   final sms = BankSmsParser().parse(
     id: 'sms-one',
     sender: 'VM-TESTBK',
@@ -17,7 +17,7 @@ void main() {
   )!;
   setUp(() {
     db = FakeFirebaseFirestore();
-    repo = BankSmsRepository(firestore: db);
+    repo = FirestoreBankSmsRepository(firestore: db);
   });
 
   test(
@@ -49,6 +49,237 @@ void main() {
       1,
     );
   });
+  test(
+    'debit SMS partially settles a borrowed debt without another transaction',
+    () async {
+      final debt = db.doc('users/alice/personal_transactions/borrowed');
+      await debt.set({
+        'title': 'Borrowed from Alex',
+        'amount': 700,
+        'type': 'income',
+        'debtType': 'borrowed',
+        'personName': 'Alex',
+        'date': Timestamp.fromDate(DateTime(2026, 10, 1)),
+        'settledAmount': 0,
+        'isSettled': false,
+        'partialSettlements': [],
+      });
+      await db.doc('users/alice/personal_accounts/bank').set({
+        'archived': false,
+      });
+
+      final candidates = await repo.openDebtsForSms('alice', sms);
+      expect(candidates.map((item) => item.id), ['borrowed']);
+      expect(
+        await repo.saveDebtSettlement(
+          'alice',
+          sms,
+          allocations: [
+            BankSmsDebtAllocation(
+              debtId: 'borrowed',
+              amountMinor: sms.amountMinor,
+            ),
+          ],
+          accountId: 'bank',
+        ),
+        BankSmsSaveResult.recorded,
+      );
+      final saved = (await debt.get()).data()!;
+      expect(saved['settledAmount'], 500);
+      expect(saved['isSettled'], isFalse);
+      expect((saved['partialSettlements'] as List).single['cashEntry'], isTrue);
+      expect((saved['partialSettlements'] as List).single['accountId'], 'bank');
+      expect(await repo.wasRecorded('alice', sms), isTrue);
+      expect(
+        (await db.collection('users/alice/personal_transactions').get()).docs,
+        hasLength(1),
+      );
+      expect(
+        await repo.saveDebtSettlement(
+          'alice',
+          sms,
+          allocations: [
+            BankSmsDebtAllocation(
+              debtId: 'borrowed',
+              amountMinor: sms.amountMinor,
+            ),
+          ],
+        ),
+        BankSmsSaveResult.duplicate,
+      );
+      expect(
+        ((await debt.get()).data()!['partialSettlements'] as List),
+        hasLength(1),
+      );
+    },
+  );
+
+  test(
+    'credit SMS fully settles a lent debt without another transaction',
+    () async {
+      final credit = BankSmsParser().parse(
+        id: 'lent-repayment',
+        sender: 'VM-TESTBK',
+        body:
+            'INR 300 credited to A/c XX1234 from ALEX on 20/10/2026 UPI Ref 629300123457.',
+        receivedAt: DateTime(2026, 10, 20, 12),
+      )!;
+      expect(credit.direction, BankSmsDirection.credit);
+      final debt = db.doc('users/alice/personal_transactions/lent');
+      await debt.set({
+        'title': 'Lent to Alex',
+        'amount': 300,
+        'type': 'expense',
+        'debtType': 'lent',
+        'personName': 'Alex',
+        'date': Timestamp.fromDate(DateTime(2026, 10, 1)),
+        'settledAmount': 0,
+        'isSettled': false,
+        'partialSettlements': [],
+      });
+      expect((await repo.openDebtsForSms('alice', credit)).single.id, 'lent');
+      expect(
+        await repo.saveDebtSettlement(
+          'alice',
+          credit,
+          allocations: [
+            BankSmsDebtAllocation(
+              debtId: 'lent',
+              amountMinor: credit.amountMinor,
+            ),
+          ],
+        ),
+        BankSmsSaveResult.recorded,
+      );
+      final saved = (await debt.get()).data()!;
+      expect(saved['settledAmount'], 300);
+      expect(saved['isSettled'], isTrue);
+      expect(
+        (saved['partialSettlements'] as List).single['bankSmsReceiptId'],
+        credit.transactionId,
+      );
+      expect(
+        (await db.collection('users/alice/personal_transactions').get()).docs,
+        hasLength(1),
+      );
+      expect(await repo.wasRecorded('alice', credit), isTrue);
+    },
+  );
+  test('invalid debt link leaves the debt and SMS review untouched', () async {
+    final debt = db.doc('users/alice/personal_transactions/lent');
+    await debt.set({
+      'title': 'Lent to Alex',
+      'amount': 300,
+      'type': 'expense',
+      'debtType': 'lent',
+      'personName': 'Alex',
+      'date': Timestamp.fromDate(DateTime(2026, 10, 1)),
+      'settledAmount': 0,
+      'isSettled': false,
+      'partialSettlements': [],
+    });
+    await expectLater(
+      repo.saveDebtSettlement(
+        'alice',
+        sms,
+        allocations: [
+          BankSmsDebtAllocation(debtId: 'lent', amountMinor: sms.amountMinor),
+        ],
+      ),
+      throwsStateError,
+    );
+    expect((await debt.get()).data()!['settledAmount'], 0);
+    expect(await repo.wasRecorded('alice', sms), isFalse);
+
+    await debt.update({'debtType': 'borrowed'});
+    await expectLater(
+      repo.saveDebtSettlement(
+        'alice',
+        sms,
+        allocations: [
+          BankSmsDebtAllocation(debtId: 'lent', amountMinor: sms.amountMinor),
+        ],
+      ),
+      throwsStateError,
+    );
+    expect((await debt.get()).data()!['settledAmount'], 0);
+    expect(await repo.wasRecorded('alice', sms), isFalse);
+  });
+  test(
+    'one credit SMS closes a preferred debt and partially pays the next',
+    () async {
+      final credit = BankSmsParser().parse(
+        id: 'combined-repayment',
+        sender: 'VM-TESTBK',
+        body: 'INR 500 credited to A/c XX1234 from ALEX UPI Ref 629300123458.',
+        receivedAt: DateTime(2026, 10, 20),
+      )!;
+      final preferred = db.doc('users/alice/personal_transactions/preferred');
+      final other = db.doc('users/alice/personal_transactions/other');
+      for (final item in [(preferred, 200, 'Alex'), (other, 400, ' alex ')]) {
+        await item.$1.set({
+          'title': 'Lent',
+          'amount': item.$2,
+          'type': 'expense',
+          'debtType': 'lent',
+          'personName': item.$3,
+          'date': Timestamp.fromDate(DateTime(2026, 10, 1)),
+          'settledAmount': 0,
+          'isSettled': false,
+          'partialSettlements': [],
+        });
+      }
+      final allocations = [
+        const BankSmsDebtAllocation(debtId: 'preferred', amountMinor: 20000),
+        const BankSmsDebtAllocation(debtId: 'other', amountMinor: 30000),
+      ];
+      await expectLater(
+        repo.saveDebtSettlement(
+          'alice',
+          credit,
+          allocations: const [
+            BankSmsDebtAllocation(debtId: 'preferred', amountMinor: 20000),
+          ],
+        ),
+        throwsStateError,
+      );
+      expect((await preferred.get()).data()!['settledAmount'], 0);
+      expect(await repo.wasRecorded('alice', credit), isFalse);
+      expect(
+        await repo.saveDebtSettlement(
+          'alice',
+          credit,
+          allocations: allocations,
+        ),
+        BankSmsSaveResult.recorded,
+      );
+      expect((await preferred.get()).data()!['isSettled'], isTrue);
+      expect((await other.get()).data()!['isSettled'], isFalse);
+      expect((await other.get()).data()!['settledAmount'], 300);
+      expect(
+        ((await preferred.get()).data()!['partialSettlements'] as List)
+            .single['bankSmsReceiptId'],
+        credit.transactionId,
+      );
+      final receipt = await db
+          .doc('users/alice/bank_sms_receipts/${credit.transactionId}')
+          .get();
+      expect((receipt.data()!['allocations'] as List), hasLength(2));
+      expect(
+        (await db.collection('users/alice/personal_transactions').get()).docs,
+        hasLength(2),
+      );
+      expect(
+        await repo.saveDebtSettlement(
+          'alice',
+          credit,
+          allocations: allocations,
+        ),
+        BankSmsSaveResult.duplicate,
+      );
+      expect((await other.get()).data()!['settledAmount'], 300);
+    },
+  );
   test(
     'user edits and deletes are respected when the same SMS is redelivered',
     () async {

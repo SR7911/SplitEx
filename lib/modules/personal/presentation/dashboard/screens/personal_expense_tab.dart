@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/policies/transactions/monthly_transaction_summary.dart';
 import 'package:split_ex/modules/personal/domain/entities/recurring/personal_recurring_entry.dart';
 import 'package:split_ex/modules/personal/presentation/recurring/providers/personal_recurring_providers.dart';
 import 'package:split_ex/modules/personal/domain/entities/budgets/personal_budget.dart';
@@ -79,7 +80,7 @@ class _PersonalExpenseTabState extends ConsumerState<PersonalExpenseTab> {
         _SpendingPieChart(spending: categorySpending),
         const SizedBox(height: 20),
       ],
-      _RecentTransactionsSection(transactions: txns.take(5).toList(), monthKey: _monthKey),
+      _RecentTransactionsSection(transactions: txns.where((txn) => txn.debtSourceId == null).take(5).toList(), monthKey: _monthKey),
       const SizedBox(height: 20),
       const _DebtsSummarySection(),
       const SizedBox(height: 20),
@@ -97,11 +98,19 @@ class _PersonalExpenseTabState extends ConsumerState<PersonalExpenseTab> {
           children: [
             _GreetingHeader(userName: userName),
             const SizedBox(height: 20),
-            _FinancialStatusCard(
+            PersonalFinancialStatusCard(
               summary: summary, selectedMonth: _selectedMonth,
               isCurrentMonth: _isCurrentMonth, onPrev: _prevMonth, onNext: _nextMonth,
             ),
             const SizedBox(height: 16),
+            Text(
+              'Income and spending below exclude debt transfers',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(height: 8),
             _IncomeExpensePills(summary: summary),
             const SizedBox(height: 16),
             _BudgetUsageCard(summary: summary),
@@ -220,13 +229,14 @@ class _GreetingHeader extends StatelessWidget {
 
 // -- _FinancialStatusCard --------------------------------------------------
 
-class _FinancialStatusCard extends StatelessWidget {
-  final dynamic summary;
+class PersonalFinancialStatusCard extends StatelessWidget {
+  final PersonalMonthlySummary summary;
   final DateTime selectedMonth;
   final bool isCurrentMonth;
   final VoidCallback onPrev;
   final VoidCallback onNext;
-  const _FinancialStatusCard({
+  const PersonalFinancialStatusCard({
+    super.key,
     required this.summary,
     required this.selectedMonth,
     required this.isCurrentMonth,
@@ -236,13 +246,11 @@ class _FinancialStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final remaining   = summary.remaining as double;
-    final income      = summary.income as double;
-    final expenses    = summary.expenses as double;
-    final isPositive  = remaining >= 0;
+    final cashMovement = summary.cashMovement;
+    final cashIncome = summary.cashIncome;
+    final cashExpenses = summary.cashExpenses;
+    final isPositive  = cashMovement >= 0;
     final isDark      = Theme.of(context).brightness == Brightness.dark;
-    final spendRatio  = income > 0 ? (expenses / income).clamp(0.0, 1.0) : 0.0;
-    final savingsRate = income > 0 ? ((remaining / income) * 100).clamp(-999.0, 100.0) : 0.0;
 
     // Gradient palette: green-teal when healthy, red-orange when overspent
     final gradientColors = AppTheme.financialHeroColors(isPositive: isPositive, isDark: isDark);
@@ -331,16 +339,20 @@ class _FinancialStatusCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // -- Balance label --
+                  // -- Monthly net cash movement --
                   Text(
-                    isPositive ? 'Remaining Balance' : 'Overspent By',
+                    cashMovement == 0
+                        ? 'Money in matched money out'
+                        : isPositive
+                        ? 'More money came in than went out'
+                        : 'More money went out than came in',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: onCardMuted, letterSpacing: 0.3),
                   ),
                   const SizedBox(height: 6),
 
                   // -- Big balance number --
                   TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: remaining.abs()),
+                    tween: Tween<double>(begin: 0, end: cashMovement.abs()),
                     duration: const Duration(milliseconds: 800),
                     curve: Curves.easeOutCubic,
                     builder: (context, value, _) => Text(
@@ -354,80 +366,33 @@ class _FinancialStatusCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Includes money lent, borrowed, and repaid',
+                    style: TextStyle(fontSize: 11, color: onCardMuted),
+                  ),
                   const SizedBox(height: 20),
 
-                  // -- Income / Expense inline chips --
+                  // -- All recorded money in and out --
                   Row(
                     children: [
                       _HeroChip(
                         icon: Icons.south_rounded,
-                        label: 'Income',
-                        value: '₹${_fmt(income)}',
+                        label: 'Money in',
+                        value: '₹${_fmt(cashIncome)}',
                         onCard: onCard,
                         onCardMuted: onCardMuted,
                       ),
                       const SizedBox(width: 10),
                       _HeroChip(
                         icon: Icons.north_rounded,
-                        label: 'Spent',
-                        value: '₹${_fmt(expenses)}',
+                        label: 'Money out',
+                        value: '₹${_fmt(cashExpenses)}',
                         onCard: onCard,
                         onCardMuted: onCardMuted,
                       ),
-                      const Spacer(),
-                      // Savings badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isPositive ? Icons.savings_rounded : Icons.warning_amber_rounded,
-                              size: 16, color: onCard,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              income > 0 ? '${savingsRate.toInt()}%' : '—',
-                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: onCard),
-                            ),
-                            Text('saved', style: TextStyle(fontSize: 9, color: onCardMuted)),
-                          ],
-                        ),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 18),
-
-                  // -- Spend progress bar --
-                  if (income > 0) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${(spendRatio * 100).toInt()}% of income spent',
-                          style: TextStyle(fontSize: 10, color: onCardMuted),
-                        ),
-                        Text(
-                          '₹${_fmt(remaining.abs())} ${isPositive ? 'left' : 'over'}',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: onCard),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: spendRatio,
-                        minHeight: 7,
-                        backgroundColor: Colors.white.withValues(alpha: 0.18),
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.9)),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -438,9 +403,6 @@ class _FinancialStatusCard extends StatelessWidget {
   }
 
   String _fmt(double v) => v.toStringAsFixed(0);
-
-
-
 
 }
 
@@ -524,7 +486,6 @@ class _IncomeExpensePills extends StatelessWidget {
   Widget build(BuildContext context) {
     final income   = summary.income as double;
     final expenses = summary.expenses as double;
-    final net      = income - expenses;
     final cs       = Theme.of(context).colorScheme;
     final isDark   = Theme.of(context).brightness == Brightness.dark;
 
@@ -533,8 +494,6 @@ class _IncomeExpensePills extends StatelessWidget {
         Expanded(child: _MiniStatCard(label: 'Income',   value: income,        icon: Icons.south_rounded,          color: _kGreen,                    isDark: isDark, cs: cs, fmt: _fmt)),
         const SizedBox(width: 10),
         Expanded(child: _MiniStatCard(label: 'Expenses', value: expenses,      icon: Icons.north_rounded,          color: _kRed,                      isDark: isDark, cs: cs, fmt: _fmt)),
-        const SizedBox(width: 10),
-        Expanded(child: _MiniStatCard(label: net >= 0 ? 'Saved' : 'Deficit', value: net.abs(), icon: net >= 0 ? Icons.savings_rounded : Icons.trending_down_rounded, color: net >= 0 ? _kTeal : _kAmber, isDark: isDark, cs: cs, fmt: _fmt)),
       ],
     );
   }
@@ -960,6 +919,13 @@ class _RecentTransactionsSection extends StatelessWidget {
                                 '${txn.category} • ${DateFormat('dd MMM').format(txn.date)}',
                                 style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
                               ),
+                              if (txn.hasDebt)
+                                Text(
+                                  txn.isSettled
+                                      ? (txn.writtenOffAmount > 0 ? 'Debt closed' : 'Debt settled')
+                                      : 'Debt · ₹${txn.remainingAmount.toStringAsFixed(2)} remaining',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.primary),
+                                ),
                             ],
                           ),
                         ),
@@ -1264,7 +1230,7 @@ class _WeeklyExpenseSummaryCard extends ConsumerWidget {
 
     final weekRanges = [(1, 7), (8, 14), (15, 21), (22, daysInMonth)];
     final weekExpenses = weekRanges.map((r) {
-      return txns.where((t) => t.isExpense && t.date.day >= r.$1 && t.date.day <= r.$2)
+      return txns.where((t) => t.countsAsSpending && t.date.day >= r.$1 && t.date.day <= r.$2)
           .fold<double>(0, (s, t) => s + t.amount);
     }).toList();
 

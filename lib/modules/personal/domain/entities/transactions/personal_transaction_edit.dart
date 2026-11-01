@@ -1,4 +1,5 @@
 import 'personal_transaction.dart';
+import 'expense_split.dart';
 
 /// Values supplied by the transaction editor. Nullable fields are cleared when null.
 class PersonalTransactionEdit {
@@ -13,6 +14,7 @@ class PersonalTransactionEdit {
   final DebtType? debtType;
   final String? personName;
   final bool isSettled;
+  final ExpenseSplit? split;
 
   const PersonalTransactionEdit({
     required this.title,
@@ -26,5 +28,6 @@ class PersonalTransactionEdit {
     this.dueDate,
     this.debtType,
     this.personName,
+    this.split,
   });
 }

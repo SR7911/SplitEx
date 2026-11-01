@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:split_ex/modules/personal/data/processors/firestore_personal_recurring_processor.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_personal_recurring_processor.dart';
 import 'package:split_ex/modules/personal/data/repositories/firestore_personal_transaction_repository.dart';
 
 void main() {

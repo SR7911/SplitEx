@@ -5,11 +5,13 @@ class DebtSettlementCommand {
   final DateTime? date;
   final double? amount;
   final String? note;
+  final String? accountId;
 
   const DebtSettlementCommand({
     required this.action,
     this.date,
     this.amount,
     this.note,
+    this.accountId,
   });
 }

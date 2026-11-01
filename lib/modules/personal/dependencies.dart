@@ -8,6 +8,7 @@ import 'domain/repositories/personal_loan_repository.dart';
 import 'domain/repositories/savings_goal_repository.dart';
 import 'domain/repositories/bank_sms_repository.dart';
 import 'domain/repositories/merchant_category_repository.dart';
+import 'domain/repositories/bank_sms_device_gateway.dart';
 
 /// Configured by the app composition root, or overridden by a test.
 final personalAccountRepositoryProvider = Provider<PersonalAccountRepository>(
@@ -45,6 +46,10 @@ final savingsGoalRepositoryProvider = Provider<SavingsGoalRepository>(
 
 final bankSmsRepositoryProvider = Provider<PersonalBankSmsRepository>(
   (ref) => throw StateError('Bank SMS repository is not configured.'),
+);
+
+final bankSmsDeviceGatewayProvider = Provider<BankSmsDeviceGateway>(
+  (ref) => throw StateError('Bank SMS device gateway is not configured.'),
 );
 
 final merchantCategoryServiceProvider = Provider<MerchantCategoryRepository>(

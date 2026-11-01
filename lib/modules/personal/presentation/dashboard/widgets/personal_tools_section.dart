@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_controller.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 class PersonalToolsSection extends ConsumerWidget {
@@ -11,7 +11,7 @@ class PersonalToolsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final sms = ref.watch(bankSmsServiceProvider);
+    final sms = ref.watch(bankSmsControllerProvider);
     Widget tool(
       IconData icon,
       String title,
@@ -105,7 +105,7 @@ class PersonalToolsSection extends ConsumerWidget {
             ],
           ),
         ),
-        if (BankSmsService.supported) ...[
+        if (sms.supported) ...[
           const SizedBox(height: 12),
           Container(
             decoration: appCardDecoration(context),

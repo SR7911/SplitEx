@@ -2,6 +2,7 @@ package com.splitex.`in`.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.Notification
 import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler
@@ -11,10 +12,15 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.provider.Settings
+import android.service.notification.NotificationListenerService
+import android.service.notification.StatusBarNotification
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
@@ -33,13 +39,18 @@ object BankSmsStore {
     var foregroundChannel: MethodChannel? = null
     var pendingPermission: MethodChannel.Result? = null
     var jobRunning = false
+    var pendingSharedText: String? = null
     private fun prefs(context: Context) = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
     fun hasPermission(context: Context) = ContextCompat.checkSelfPermission(context, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
     fun isEnabled(context: Context) = prefs(context).getBoolean("enabled", false) && hasPermission(context)
+    fun hasNotificationAccess(context: Context) =
+        NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+    fun isRcsEnabled(context: Context) = prefs(context).getBoolean("rcsEnabled", false) && hasNotificationAccess(context)
 
     @Synchronized fun bindUser(context: Context, owner: String?) {
         val p = prefs(context)
         if (p.getString("owner", null) == owner) return
+        if (p.getString("owner", null) != null) pendingSharedText = null
         p.edit().clear().apply { if (owner != null) putString("owner", owner) }.commit()
         (context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler).cancel(JOB_ID)
     }
@@ -50,6 +61,8 @@ object BankSmsStore {
             .put("owner", p.getString("owner", ""))
             .put("autoRecord", p.getBoolean("autoRecord", true))
             .put("permission", hasPermission(context))
+            .put("rcsEnabled", p.getBoolean("rcsEnabled", false))
+            .put("rcsPermission", hasNotificationAccess(context))
             .put("pendingCount", JSONArray(p.getString("queue", "[]")).length())
             .put("reviews", JSONArray(p.getString("reviews", "[]")))
             .put("trustedSenders", JSONArray((p.getStringSet("trusted", emptySet()) ?: emptySet()).toList()))
@@ -60,13 +73,25 @@ object BankSmsStore {
         val p = prefs(context)
         require(!enabled || (hasPermission(context) && !p.getString("owner", null).isNullOrEmpty())) { "SMS permission and sign-in are required." }
         p.edit().putBoolean("enabled", enabled).putBoolean("autoRecord", autoRecord)
-            .apply { if (!enabled) putString("queue", "[]") }.commit()
-        if (!enabled) (context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler).cancel(JOB_ID)
+            .apply { if (!enabled && !p.getBoolean("rcsEnabled", false)) putString("queue", "[]") }.commit()
+        if (!enabled && !p.getBoolean("rcsEnabled", false))
+            (context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler).cancel(JOB_ID)
     }
 
     @Synchronized fun capture(context: Context, sender: String, body: String, timestamp: Long) {
+        captureCandidate(context, sender, body, timestamp, "sms")
+    }
+
+    @Synchronized fun captureRcsNotification(context: Context, title: String, body: String, timestamp: Long) {
+        if (!isRcsEnabled(context)) return
+        val sender = "RCS-" + title.uppercase().replace(Regex("[^A-Z0-9]"), "").take(20)
+        if (sender.length < 7 || sender == "RCS-MESSAGES" || sender == "RCS-GOOGLEMESSAGES") return
+        captureCandidate(context, sender, body, timestamp, "rcs")
+    }
+
+    private fun captureCandidate(context: Context, sender: String, body: String, timestamp: Long, source: String) {
         val p = prefs(context)
-        if (!p.getBoolean("enabled", false) || !hasPermission(context)) return
+        if (source == "sms" && (!p.getBoolean("enabled", false) || !hasPermission(context))) return
         val owner = p.getString("owner", null) ?: return
         if (!Regex("^[A-Za-z][A-Za-z0-9-]{2,24}$").matches(sender)) return
         if (!Regex("(?:INR|Rs\\.?|₹)\\s*[0-9]", RegexOption.IGNORE_CASE).containsMatchIn(body)) return
@@ -74,14 +99,18 @@ object BankSmsStore {
         if (!Regex("\\b(?:a\\s*/?c|account|acct|card|upi|bank)\\b", RegexOption.IGNORE_CASE).containsMatchIn(body)) return
         if (Regex("\\b(?:otp|one.time password|verification code|failed|declined|unsuccessful|collect request|payment request|will be debited|scheduled)\\b", RegexOption.IGNORE_CASE).containsMatchIn(body)) return
         val id = MessageDigest.getInstance("SHA-256").digest("$owner|$sender|$timestamp|$body".toByteArray()).joinToString("") { "%02x".format(it) }
+        val bodyHash = MessageDigest.getInstance("SHA-256").digest(body.trim().toByteArray()).joinToString("") { "%02x".format(it) }
+        if (p.getString("lastCaptureHash", null) == bodyHash &&
+            System.currentTimeMillis() - p.getLong("lastCaptureAt", 0) < 120000L) return
         val queue = JSONArray(p.getString("queue", "[]"))
         for (i in 0 until queue.length()) if (queue.getJSONObject(i).getString("id") == id) return
         if (queue.length() >= 500) {
             p.edit().putString("error", "SMS queue is full. Open SplitEx to process pending messages; the latest message was not captured.").commit()
             return
         }
-        queue.put(JSONObject().put("id", id).put("sender", sender).put("body", body.take(6000)).put("timestamp", timestamp).put("owner", owner))
-        p.edit().putString("queue", queue.toString()).commit()
+        queue.put(JSONObject().put("id", id).put("sender", sender).put("body", body.take(6000)).put("timestamp", timestamp).put("owner", owner).put("source", source))
+        p.edit().putString("queue", queue.toString()).putString("lastCaptureHash", bodyHash)
+            .putString("lastCaptureSource", source).putLong("lastCaptureAt", System.currentTimeMillis()).commit()
         Handler(Looper.getMainLooper()).post { foregroundChannel?.invokeMethod("queueChanged", null) }
         schedule(context)
     }
@@ -117,6 +146,19 @@ object BankSmsStore {
         if (trusted) set.add(sender) else set.remove(sender)
         p.edit().putStringSet("trusted", set).commit()
     }
+    @Synchronized fun setRcsEnabled(context: Context, enabled: Boolean) {
+        val p = prefs(context)
+        require(!enabled || !p.getString("owner", null).isNullOrEmpty())
+        p.edit().putBoolean("rcsEnabled", enabled)
+            .apply { if (!enabled && !p.getBoolean("enabled", false)) putString("queue", "[]") }.commit()
+        if (!enabled && !p.getBoolean("enabled", false))
+            (context.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler).cancel(JOB_ID)
+    }
+    @Synchronized fun queueShare(text: String?) {
+        pendingSharedText = text?.trim()?.take(6000)?.takeIf { it.isNotEmpty() }
+        Handler(Looper.getMainLooper()).post { foregroundChannel?.invokeMethod("shareAvailable", null) }
+    }
+    @Synchronized fun consumeShare(): String? = pendingSharedText.also { pendingSharedText = null }
     fun schedule(context: Context) {
         if (jobRunning) return
         val job = JobInfo.Builder(JOB_ID, ComponentName(context, BankSmsJobService::class.java))
@@ -149,6 +191,12 @@ object BankSmsStore {
                     "putReview" -> { requireOwner(context, call.argument<String>("userId")); putReview(context, call.argument<String>("json")!!); result.success(null) }
                     "deleteReview" -> { requireOwner(context, call.argument<String>("userId")); deleteReview(context, call.argument<String>("id")!!); result.success(null) }
                     "trust" -> { requireOwner(context, call.argument<String>("userId")); trust(context, call.argument<String>("sender")!!, call.argument<Boolean>("trusted") == true); result.success(null) }
+                    "setRcsEnabled" -> { requireOwner(context, call.argument<String>("userId")); setRcsEnabled(context, call.argument<Boolean>("enabled") == true); result.success(null) }
+                    "requestRcsAccess" -> {
+                        if (activity == null) result.success(false)
+                        else { activity.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)); result.success(true) }
+                    }
+                    "consumeShare" -> { requireOwner(context, call.argument<String>("userId")); result.success(consumeShare()) }
                     "backgroundComplete" -> { result.success(null); Handler(Looper.getMainLooper()).post { complete?.invoke(call.argument<Boolean>("retry") == true) } }
                     else -> result.notImplemented()
                 }
@@ -161,6 +209,22 @@ object BankSmsStore {
 
     private fun requireOwner(context: Context, owner: String?) {
         require(!owner.isNullOrEmpty() && prefs(context).getString("owner", null) == owner)
+    }
+}
+
+class BankRcsNotificationListener : NotificationListenerService() {
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (sbn.packageName != "com.google.android.apps.messaging" || !BankSmsStore.isRcsEnabled(this)) return
+        val extras = sbn.notification.extras
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return
+        val messageText = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            extras.getParcelableArray(Notification.EXTRA_MESSAGES)
+                ?.let { Notification.MessagingStyle.Message.getMessagesFromBundleArray(it) }
+                ?.lastOrNull()?.text?.toString()
+        } else null
+        val body = messageText ?: (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString() ?: return
+        BankSmsStore.captureRcsNotification(this, title, body, sbn.postTime)
     }
 }
 

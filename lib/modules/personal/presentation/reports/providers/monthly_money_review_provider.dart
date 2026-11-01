@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:split_ex/modules/personal/presentation/reports/models/monthly_money_review.dart';
+import 'package:split_ex/modules/personal/domain/projections/reports/monthly_money_review.dart';
 import 'package:split_ex/modules/personal/presentation/budgets/providers/personal_budget_providers.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
 

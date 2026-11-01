@@ -6,7 +6,7 @@ import 'package:split_ex/app/navigation/router.dart';
 import 'package:split_ex/shared/ui/theme.dart';
 import 'package:split_ex/modules/settings/providers/theme_provider.dart';
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
-import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_controller.dart';
 import 'package:split_ex/modules/settings/services/expenses_widget_sync.dart';
 
 class SplitExApp extends ConsumerStatefulWidget {
@@ -18,21 +18,33 @@ class SplitExApp extends ConsumerStatefulWidget {
 
 class _SplitExAppState extends ConsumerState<SplitExApp>
     with WidgetsBindingObserver {
+  int _lastSharedImportCount = 0;
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    ref.read(bankSmsServiceProvider).start();
+    ref.read(bankSmsControllerProvider).start();
+    ref.listenManual(bankSmsControllerProvider, (_, service) {
+      if (service.sharedImportCount <= _lastSharedImportCount) return;
+      _lastSharedImportCount = service.sharedImportCount;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(routerProvider).go('/personal/sms-review');
+      });
+    });
     ref.listenManual(authStateProvider, (_, next) {
       if (!next.isLoading) unawaited(_syncSms(next.valueOrNull?.uid));
     }, fireImmediately: true);
   }
 
   Future<void> _syncSms(String? uid) async {
-    final service = ref.read(bankSmsServiceProvider);
+    final service = ref.read(bankSmsControllerProvider);
     try {
       await service.bindUser(uid);
-      if (uid != null && service.enabled) await service.process();
+      if (uid != null &&
+          ((service.enabled && service.permission) ||
+              (service.rcsEnabled && service.rcsPermission))) {
+        await service.process();
+      }
     } catch (_) {
       // SMS capture is optional and must never block app startup or sign-in.
     }

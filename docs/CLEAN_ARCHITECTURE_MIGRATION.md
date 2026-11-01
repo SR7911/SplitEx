@@ -20,6 +20,28 @@ Flutter's [architecture recommendations](https://docs.flutter.dev/app-architectu
 
 The three-folder layout is a Flutter convention chosen for this project, not a globally mandated directory standard. The essential rule is that source dependencies point inward toward business rules, as described in the [original Clean Architecture article](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html). Use cases remain independent of Firebase and UI details regardless of folder naming.
 
+Within a migrated feature, use this concrete layout:
+
+```text
+feature/
+  domain/
+    entities/          # pure business values
+    repositories/      # interfaces used by use cases and presentation
+    use_cases/         # workflows with business decisions
+    policies/          # pure calculations, when needed
+  data/
+    models/            # Firestore/transport schema conversion
+    datasources/       # raw Firebase, local or platform operations
+    repositories/      # implementations that map models to domain entities
+  presentation/
+    screens/           # Flutter pages and sheets
+    providers/         # Riverpod state/controllers
+    widgets/           # feature UI components, when needed
+  dependencies.dart    # provider declarations; concrete bindings in app/composition/
+```
+
+The `screens/` folder is the project's existing name for pages. A data model represents an external schema; a domain entity must not know Firestore. A repository implementation maps between the two and calls a data source. Do not add empty folders or one-method use cases merely to fill the diagram. Group and Project now use this layout for their Firestore workflows; Room and Personal still have legacy service/mapper arrangements to complete.
+
 ## 2. Evidence behind the decision
 
 The working tree was clean before this document was added. The repository contains 159 Dart files under `lib/`, with 43,587 lines including blanks, and 12 Dart test files directly under `test/`.
@@ -109,13 +131,9 @@ lib/
           merchant_rules/
           reports/
       data/
-        repositories/            # concrete implementations, grouped by subfeature as needed
-        mappers/                 # Firestore/platform values <-> domain values
-        models/                  # storage/transport models where useful
-        datasources/             # separate only when useful
-          remote/
-          local/
-          native/                # SMS MethodChannel adapter
+        repositories/            # concrete Personal contracts and recurring processor
+        models/                  # Firestore document conversion by subfeature
+        datasources/             # user-scoped Firestore paths and atomic transfer write
       presentation/
         dashboard/
         accounts/                # screens, widgets, providers/controllers as needed
@@ -131,18 +149,18 @@ lib/
       dependencies.dart          # contract-based Riverpod dependency declarations
     group/
       domain/                    # entities/, repositories/, policies/, use_cases/
-      data/
-      presentation/              # membership, expenses, settlements, dashboard/reports
+      data/                      # models/, datasources/, repositories/
+      presentation/              # screens/, providers/, widgets/ as needed
       dependencies.dart
     room/
       domain/                    # entities/, repositories/, policies/, use_cases/
-      data/
-      presentation/              # membership, expenses, bills, settlements, analytics
+      data/                      # models/, datasources/, repositories/
+      presentation/              # screens/, providers/, widgets/
       dependencies.dart
     project/
       domain/                    # entities/, repositories/, policies/, use_cases/
-      data/
-      presentation/              # tracking, expenses, debts, dashboard/reports
+      data/                      # models/, datasources/, repositories/
+      presentation/              # screens/, providers/, widgets/ as needed
       dependencies.dart
   common/
     settings/

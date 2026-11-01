@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
-import 'package:split_ex/modules/room/providers/room_provider.dart';
-import 'package:split_ex/modules/group/screens/groups_list_screen.dart';
+import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
+import 'package:split_ex/modules/group/presentation/screens/groups_list_screen.dart';
 import 'package:split_ex/modules/personal/presentation/dashboard/screens/personal_expense_tab.dart';
-import 'package:split_ex/modules/project/screens/projects_list_screen.dart';
-import 'package:split_ex/modules/room/screens/home/room_tab.dart';
+import 'package:split_ex/modules/project/presentation/screens/projects_list_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/home/room_tab.dart';
 import 'package:split_ex/modules/personal/dependencies.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
+import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});

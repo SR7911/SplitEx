@@ -11,6 +11,14 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        receiveSharedText(intent)
+    }
+
+    private fun receiveSharedText(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && intent.type == "text/plain") {
+            BankSmsStore.queueShare(intent.getStringExtra(Intent.EXTRA_TEXT))
+            intent.removeExtra(Intent.EXTRA_TEXT)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -56,6 +64,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
         BankSmsStore.foregroundChannel = BankSmsStore.attach(this, flutterEngine, this)
+        receiveSharedText(intent)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.splitex.in.app/install")
             .setMethodCallHandler { call, result ->
                 if (call.method == "installApk") {

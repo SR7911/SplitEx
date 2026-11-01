@@ -5,12 +5,16 @@ import '../../domain/entities/loans/personal_loan.dart';
 import '../../domain/entities/loans/personal_loan_payment.dart';
 import '../../domain/entities/loans/personal_loan_changes.dart';
 import '../../domain/repositories/personal_loan_repository.dart';
-import '../mappers/loans/personal_loan_firestore_mapper.dart';
-import '../mappers/transactions/personal_transaction_firestore_mapper.dart';
+import '../models/personal_loan_firestore_model.dart';
+import '../models/personal_transaction_firestore_model.dart';
 import '../../domain/entities/transactions/personal_transaction.dart';
+import '../datasources/personal_firestore_data_source.dart';
 
 class FirestorePersonalLoanRepository implements PersonalLoanRepository {
   final FirebaseFirestore _db;
+  late final PersonalFirestoreDataSource _source = PersonalFirestoreDataSource(
+    _db,
+  );
   final UsageTracker _tracker;
 
   FirestorePersonalLoanRepository({
@@ -20,7 +24,7 @@ class FirestorePersonalLoanRepository implements PersonalLoanRepository {
        _tracker = tracker ?? UsageTracker.instance;
 
   CollectionReference<Map<String, dynamic>> _loans(String userId) =>
-      _db.collection('users').doc(userId).collection('loans');
+      _source.loans(userId);
 
   @override
   Stream<List<PersonalLoan>> loans(String userId) => _loans(userId)
@@ -101,15 +105,10 @@ class FirestorePersonalLoanRepository implements PersonalLoanRepository {
     await _tracker.trackWrites(1);
 
     if (loan.recurringId != null) {
-      await _db
-          .collection('users')
-          .doc(userId)
-          .collection('personal_recurring')
-          .doc(loan.recurringId)
-          .update({
-            'amount': recurringAmount,
-            if (changes.emiDueDay != null) 'dayOfMonth': changes.emiDueDay,
-          });
+      await _source.recurring(userId).doc(loan.recurringId).update({
+        'amount': recurringAmount,
+        if (changes.emiDueDay != null) 'dayOfMonth': changes.emiDueDay,
+      });
       await _tracker.trackWrites(1);
     }
   }
@@ -136,10 +135,8 @@ class FirestorePersonalLoanRepository implements PersonalLoanRepository {
     final paymentRef = _loans(
       userId,
     ).doc(loan.id).collection('payments').doc('emi_$day');
-    final expenseRef = _db
-        .collection('users')
-        .doc(userId)
-        .collection('personal_transactions')
+    final expenseRef = _source
+        .transactions(userId)
         .doc('loan_${loan.id}_emi_$day');
 
     await _db.runTransaction((transaction) async {
@@ -186,15 +183,10 @@ class FirestorePersonalLoanRepository implements PersonalLoanRepository {
     await _loans(userId).doc(loan.id).update({'status': status.name});
     await _tracker.trackWrites(1);
     if (loan.recurringId != null) {
-      await _db
-          .collection('users')
-          .doc(userId)
-          .collection('personal_recurring')
-          .doc(loan.recurringId)
-          .update({
-            'active': false,
-            'endDate': Timestamp.fromDate(DateTime.now()),
-          });
+      await _source.recurring(userId).doc(loan.recurringId).update({
+        'active': false,
+        'endDate': Timestamp.fromDate(DateTime.now()),
+      });
       await _tracker.trackWrites(1);
     }
   }
@@ -247,10 +239,7 @@ class FirestorePersonalLoanRepository implements PersonalLoanRepository {
     String label,
   ) async {
     final month = DateFormat('yyyy-MM').format(date);
-    final transactions = _db
-        .collection('users')
-        .doc(userId)
-        .collection('personal_transactions');
+    final transactions = _source.transactions(userId);
     final existing = await transactions
         .where('loanSourceId', isEqualTo: loan.id)
         .where('month', isEqualTo: month)
@@ -301,12 +290,7 @@ class FirestorePersonalLoanRepository implements PersonalLoanRepository {
     String recurringId,
     double amount,
   ) async {
-    await _db
-        .collection('users')
-        .doc(userId)
-        .collection('personal_recurring')
-        .doc(recurringId)
-        .update({'amount': amount});
+    await _source.recurring(userId).doc(recurringId).update({'amount': amount});
     await _tracker.trackWrites(1);
   }
 }

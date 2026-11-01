@@ -6,14 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:split_ex/modules/personal/domain/entities/accounts/personal_account.dart';
 import 'package:split_ex/modules/personal/domain/entities/accounts/personal_transfer.dart';
 import 'package:split_ex/modules/personal/domain/policies/accounts/account_balance_calculator.dart';
-import 'package:split_ex/modules/personal/data/mappers/accounts/account_firestore_mapper.dart'
+import 'package:split_ex/modules/personal/data/models/account_firestore_models.dart'
     show LegacyAccountSerialization;
 import 'support/personal_transaction_fixture.dart';
 import 'package:split_ex/modules/personal/data/repositories/firestore_personal_account_repository.dart';
 import 'package:split_ex/modules/personal/data/repositories/firestore_personal_transaction_repository.dart';
 import 'package:split_ex/modules/personal/domain/use_cases/transactions/create_personal_transaction.dart';
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
-import 'package:split_ex/modules/personal/data/repositories/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/data/repositories/firestore_bank_sms_repository.dart';
 
 void main() {
   final date = DateTime(2026, 10, 20);
@@ -340,7 +340,7 @@ void main() {
     },
   );
   test('automatic SMS assigns a unique active account ending', () async {
-    final repo = BankSmsRepository(firestore: db);
+    final repo = FirestoreBankSmsRepository(firestore: db);
     await repo.save('alice', sms, matchAccount: true);
     expect(
       (await db
@@ -355,7 +355,7 @@ void main() {
       ...accounts.first.toMap(),
       'name': 'Other bank',
     });
-    await BankSmsRepository(
+    await FirestoreBankSmsRepository(
       firestore: db,
     ).save('alice', sms, matchAccount: true);
     expect(
@@ -370,7 +370,7 @@ void main() {
   test(
     'reviewed SMS transfers create no expense and retain duplicate protection',
     () async {
-      final repo = BankSmsRepository(firestore: db);
+      final repo = FirestoreBankSmsRepository(firestore: db);
       await repo.saveTransfer(
         'alice',
         sms,
@@ -415,7 +415,7 @@ void main() {
   test(
     'opposite SMS alerts can link the same transfer without double-counting',
     () async {
-      final repo = BankSmsRepository(firestore: db);
+      final repo = FirestoreBankSmsRepository(firestore: db);
       await service.saveTransfer(
         'alice',
         PersonalTransfer(
@@ -459,7 +459,7 @@ void main() {
           date: date,
         ),
       );
-      final repo = BankSmsRepository(firestore: db);
+      final repo = FirestoreBankSmsRepository(firestore: db);
       await expectLater(
         repo.saveTransfer('alice', sms, existingId: 'changed'),
         throwsStateError,

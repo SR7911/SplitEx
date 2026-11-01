@@ -8,7 +8,7 @@ import 'package:split_ex/shared/ui/theme.dart';
 import 'package:split_ex/modules/personal/domain/entities/accounts/personal_account.dart';
 import 'package:split_ex/modules/personal/domain/entities/accounts/personal_transfer.dart';
 import 'package:split_ex/modules/personal/domain/policies/accounts/account_balance_calculator.dart';
-import 'package:split_ex/modules/personal/data/mappers/accounts/account_firestore_mapper.dart'
+import 'package:split_ex/modules/personal/data/models/account_firestore_models.dart'
     show LegacyAccountSerialization;
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
 import 'package:split_ex/shared/providers/connectivity_provider.dart';

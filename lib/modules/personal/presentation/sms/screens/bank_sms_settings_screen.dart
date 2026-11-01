@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/screens/add_personal_transaction_screen.dart'
     show personalCategories;
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
+import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_debt_allocation.dart';
 import 'package:split_ex/modules/personal/domain/repositories/bank_sms_repository.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
 import 'package:split_ex/modules/personal/presentation/sms/providers/bank_sms_providers.dart';
-import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_service.dart';
+import 'package:split_ex/modules/personal/presentation/sms/controllers/bank_sms_controller.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
@@ -21,17 +23,63 @@ class BankSmsSettingsScreen extends ConsumerStatefulWidget {
       _BankSmsSettingsScreenState();
 }
 
-class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
+class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
+    with WidgetsBindingObserver {
   bool _working = false;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       if (!mounted) return;
-      final service = ref.read(bankSmsServiceProvider);
+      final service = ref.read(bankSmsControllerProvider);
       await service.refresh();
-      if (widget.reviewOnly && service.enabled) await service.process();
+      if (widget.reviewOnly &&
+          ((service.enabled && service.permission) ||
+              (service.rcsEnabled && service.rcsPermission))) {
+        await service.process();
+      }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(bankSmsControllerProvider).refresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _enableRcs(BankSmsController service, bool enabled) async {
+    if (enabled) {
+      final consent = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Review Google Messages payment alerts?'),
+          content: const Text(
+            'Android notification access can expose notifications from every app. SplitEx will only process payment-like alerts posted by Google Messages and keep them on this device for your review. It will not scan old RCS chats. You can turn this off at any time.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (consent != true || !mounted) return;
+    }
+    await service.setRcsEnabled(enabled);
+    if (enabled && !service.rcsPermission) await service.requestRcsAccess();
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -52,7 +100,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
     }
   }
 
-  Future<void> _enable(BankSmsService service, bool enabled) async {
+  Future<void> _enable(BankSmsController service, bool enabled) async {
     if (enabled) {
       final consent = await showDialog<bool>(
         context: context,
@@ -96,7 +144,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final service = ref.watch(bankSmsServiceProvider);
+    final service = ref.watch(bankSmsControllerProvider);
     final cs = Theme.of(context).colorScheme;
     final busy = _working || service.busy;
     return Scaffold(
@@ -106,7 +154,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
         showNotification: false,
       ),
       body: GradientBody(
-        child: !BankSmsService.supported
+        child: !service.supported
             ? const Center(
                 child: Text('Bank SMS recording is available on Android.'),
               )
@@ -165,6 +213,23 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    Container(
+                      decoration: appCardDecoration(context),
+                      child: SwitchListTile.adaptive(
+                        secondary: const Icon(Icons.mark_chat_read_outlined),
+                        title: const Text('Review Google Messages alerts'),
+                        subtitle: Text(
+                          service.rcsEnabled && !service.rcsPermission
+                              ? 'Allow SplitEx notification access in Android settings to capture future RCS payment alerts.'
+                              : 'Capture future payment alerts from Google Messages RCS chats for manual review.',
+                        ),
+                        value: service.rcsEnabled,
+                        onChanged: busy || service.userId == null
+                            ? null
+                            : (value) => _run(() => _enableRcs(service, value)),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                   ] else ...[
                     Container(
                       decoration: appCardDecoration(context),
@@ -172,9 +237,9 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
                       child: AppFinanceTile(
                         icon: Icons.mark_email_read_outlined,
                         title: 'Detected Payments',
-                        subtitle: service.enabled
+                        subtitle: service.enabled || service.rcsEnabled
                             ? 'Approve, edit, link or dismiss detected payments.'
-                            : 'Enable bank SMS capture to receive new payment alerts.',
+                            : 'Enable SMS or Google Messages alert capture to receive new payments.',
                         action: IconButton(
                           tooltip: 'SMS settings',
                           onPressed: () => context.push('/settings/bank-sms'),
@@ -185,7 +250,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
                     const SizedBox(height: 12),
                   ],
                   Text(
-                    'Background recording needs an internet connection and may be delayed by Android. Pending messages are also checked when you reopen SplitEx.',
+                    'SMS and Google Messages RCS are separate. Clearing an RCS notification does not import it later. You can share a saved RCS message to SplitEx from Google Messages. Background processing needs internet and may be delayed by Android.',
                     style: TextStyle(
                       fontSize: 11,
                       height: 1.5,
@@ -198,6 +263,21 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
                       child: Text(
                         'SMS permission is off. Allow it in Android app settings, or disable capture here.',
                         style: TextStyle(color: cs.error),
+                      ),
+                    ),
+                  if (service.rcsEnabled && !service.rcsPermission)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: TextButton.icon(
+                        onPressed: busy ? null : service.requestRcsAccess,
+                        icon: Icon(
+                          Icons.notification_important_outlined,
+                          color: cs.error,
+                        ),
+                        label: Text(
+                          'Grant notification access for Google Messages alerts',
+                          style: TextStyle(color: cs.error),
+                        ),
                       ),
                     ),
                   if (service.error != null)
@@ -237,7 +317,11 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
                           ),
                           minimumSize: const Size(0, 32),
                         ),
-                        onPressed: busy || !service.enabled
+                        onPressed:
+                            busy ||
+                                !((service.enabled && service.permission) ||
+                                    (service.rcsEnabled &&
+                                        service.rcsPermission))
                             ? null
                             : () => _run(service.process),
                         icon: const Icon(Icons.refresh_rounded, size: 16),
@@ -281,7 +365,11 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen> {
                             : Icons.call_received_rounded,
                         title: sms.title,
                         subtitle:
-                            '${sms.sender} · ${DateFormat('dd MMM').format(sms.date)}',
+                            '${sms.source == 'sms'
+                                ? sms.sender
+                                : sms.source == 'rcs'
+                                ? 'Google Messages alert'
+                                : 'Shared message'} · ${DateFormat('dd MMM').format(sms.date)}',
                         value:
                             '₹${NumberFormat('#,##0.##').format(sms.amount)}',
                         detail: debit ? 'Debit' : 'Credit',
@@ -366,11 +454,14 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
   String? _accountId;
   String? _fromAccountId, _toAccountId;
   bool _asTransfer = false;
+  bool _settleDebt = false;
+  final List<String> _selectedDebtIds = [];
   bool _rememberCategory = false;
   String? _suggestedCategory;
   bool _trust = false, _saving = false, _loading = true;
   String? _decision, _error;
   List<BankSmsMatch> _matches = [];
+  List<PersonalTransaction> _debts = [];
   @override
   void initState() {
     super.initState();
@@ -382,15 +473,17 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
   }
 
   Future<void> _loadMatches() async {
-    final uid = ref.read(bankSmsServiceProvider).userId;
+    final uid = ref.read(bankSmsControllerProvider).userId;
     try {
       if (uid == null) throw StateError('Sign in to record this payment.');
       final repo = ref.read(bankSmsRepositoryProvider);
       final matches = await repo.possibleMatches(uid, widget.sms);
       final suggestion = await repo.suggestedCategory(uid, widget.sms);
+      final debts = await repo.openDebtsForSms(uid, widget.sms);
       if (!mounted) return;
       setState(() {
         _matches = matches;
+        _debts = debts;
         _suggestedCategory = suggestion;
         if (suggestion != null) _category = suggestion;
         _decision = matches.isEmpty ? 'new' : null;
@@ -415,7 +508,22 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
 
   Future<void> _save() async {
     final amount = double.tryParse(_amount.text);
-    if (_asTransfer &&
+    List<BankSmsDebtAllocation>? debtAllocations;
+    if (_settleDebt) {
+      try {
+        debtAllocations = allocateBankSmsDebtPayment(
+          _selectedDebtIds.map(
+            (id) => _debts.firstWhere((item) => item.id == id),
+          ),
+          widget.sms.amountMinor,
+        );
+      } on StateError catch (error) {
+        setState(() => _error = error.message.toString());
+        return;
+      }
+    }
+    if (!_settleDebt &&
+        _asTransfer &&
         _decision == 'new' &&
         (_fromAccountId == null ||
             _toAccountId == null ||
@@ -425,7 +533,7 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
       );
       return;
     }
-    if (_decision == null ||
+    if ((!_settleDebt && _decision == null) ||
         amount == null ||
         !amount.isFinite ||
         amount <= 0 ||
@@ -442,24 +550,26 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
     });
     try {
       final result = await ref
-          .read(bankSmsServiceProvider)
+          .read(bankSmsControllerProvider)
           .approve(
             widget.sms,
-            title: _title.text.trim(),
-            amount: amount,
+            title: _settleDebt ? widget.sms.title : _title.text.trim(),
+            amount: _settleDebt ? widget.sms.amount : amount,
             category: _category,
             date: _date,
-            direction: _direction,
+            direction: _settleDebt ? widget.sms.direction : _direction,
+            debtAllocations: debtAllocations,
             accountId: _accountId,
-            asTransfer: _asTransfer,
+            asTransfer: !_settleDebt && _asTransfer,
             fromAccountId: _fromAccountId,
             toAccountId: _toAccountId,
-            existingId: _decision == 'new'
+            existingId: _settleDebt || _decision == 'new'
                 ? null
                 : _decision?.replaceFirst(RegExp(r'^transfer:'), ''),
             trustSender: _trust,
             rememberCategory:
                 _rememberCategory &&
+                !_settleDebt &&
                 !_asTransfer &&
                 _decision == 'new' &&
                 _direction == BankSmsDirection.debit,
@@ -471,6 +581,10 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
           content: Text(
             result == BankSmsSaveResult.duplicate
                 ? 'Already recorded. No duplicate was added.'
+                : _settleDebt
+                ? debtAllocations!.length == 1
+                      ? 'Debt payment recorded from bank SMS'
+                      : '${debtAllocations.length} debt payments recorded from bank SMS'
                 : _decision == 'new'
                 ? 'Payment recorded'
                 : 'Linked to the existing transaction',
@@ -491,7 +605,35 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
   Widget build(BuildContext context) {
     final sms = widget.sms;
     final cs = Theme.of(context).colorScheme;
-    final linked = _decision != null && _decision != 'new';
+    final linked = !_settleDebt && _decision != null && _decision != 'new';
+    final selectedDebts = _selectedDebtIds
+        .map((id) => _debts.firstWhere((item) => item.id == id))
+        .toList();
+    final selectedPerson = selectedDebts.isEmpty
+        ? null
+        : normalizedDebtPerson(selectedDebts.first.personName);
+    List<BankSmsDebtAllocation> previewAllocations = [];
+    String? allocationError;
+    final previewAmounts = <String, int>{};
+    var unallocatedMinor = sms.amountMinor;
+    for (final debt in selectedDebts) {
+      final available = (debt.remainingAmount * 100).round();
+      final applied = unallocatedMinor < available
+          ? unallocatedMinor
+          : available;
+      previewAmounts[debt.id] = applied;
+      unallocatedMinor -= applied;
+    }
+    if (_settleDebt && selectedDebts.isNotEmpty) {
+      try {
+        previewAllocations = allocateBankSmsDebtPayment(
+          selectedDebts,
+          sms.amountMinor,
+        );
+      } on StateError catch (error) {
+        allocationError = error.message.toString();
+      }
+    }
     return PersonalFormSheet(
       title: 'Review bank payment',
       icon: Icons.fact_check_outlined,
@@ -538,7 +680,139 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
             ],
           ),
           if (_loading) const LinearProgressIndicator(),
-          if (_matches.isNotEmpty) ...[
+          if (_debts.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _settleDebt,
+              onChanged: _saving || _loading
+                  ? null
+                  : (value) => setState(() {
+                      _settleDebt = value;
+                      if (value) {
+                        _asTransfer = false;
+                        _direction = sms.direction;
+                        _amount.text = sms.amount.toStringAsFixed(2);
+                        _selectedDebtIds.clear();
+                      }
+                    }),
+              title: const Text(
+                'Apply payment to an existing debt',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text(
+                'Updates the debt and its payment history without another transaction.',
+                style: TextStyle(fontSize: 11),
+              ),
+              secondary: Icon(Icons.handshake_outlined, color: cs.primary),
+            ),
+          ],
+          if (_settleDebt) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Select debts for the same person. The payment closes them in priority order; the last may be paid partially.',
+              style: AppTextStyles.caption(context),
+            ),
+            const SizedBox(height: 8),
+            ...[
+              ...selectedDebts,
+              ..._debts.where((debt) => !_selectedDebtIds.contains(debt.id)),
+            ].map((debt) {
+              final selected = _selectedDebtIds.contains(debt.id);
+              final samePerson =
+                  selectedPerson == null ||
+                  normalizedDebtPerson(debt.personName) == selectedPerson;
+              final position = _selectedDebtIds.indexOf(debt.id);
+              final applied = previewAmounts[debt.id] ?? 0;
+              return Column(
+                key: ValueKey('sms-debt-${debt.id}'),
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: selected,
+                    onChanged: _saving || !samePerson
+                        ? null
+                        : (value) => setState(() {
+                            if (value == true) {
+                              _selectedDebtIds.add(debt.id);
+                            } else {
+                              _selectedDebtIds.remove(debt.id);
+                            }
+                          }),
+                    title: Text(
+                      '${selected ? '${position + 1}. ' : ''}${debt.personName} · ${debt.title}',
+                    ),
+                    subtitle: Text(
+                      '₹${debt.remainingAmount.toStringAsFixed(2)} remaining · ${DateFormat('dd MMM yyyy').format(debt.date)}',
+                    ),
+                  ),
+                  if (selected)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              applied == 0
+                                  ? 'No payment left for this debt'
+                                  : 'Apply ₹${(applied / 100).toStringAsFixed(2)} · ₹${(debt.remainingAmount - applied / 100).toStringAsFixed(2)} left',
+                              style: AppTextStyles.caption(context),
+                            ),
+                          ),
+                          IconButton(
+                            key: ValueKey('sms-debt-up-${debt.id}'),
+                            tooltip: 'Pay this debt earlier',
+                            onPressed: _saving || position == 0
+                                ? null
+                                : () => setState(() {
+                                    _selectedDebtIds.removeAt(position);
+                                    _selectedDebtIds.insert(
+                                      position - 1,
+                                      debt.id,
+                                    );
+                                  }),
+                            icon: const Icon(Icons.arrow_upward_rounded),
+                          ),
+                          IconButton(
+                            key: ValueKey('sms-debt-down-${debt.id}'),
+                            tooltip: 'Pay this debt later',
+                            onPressed:
+                                _saving ||
+                                    position == _selectedDebtIds.length - 1
+                                ? null
+                                : () => setState(() {
+                                    _selectedDebtIds.removeAt(position);
+                                    _selectedDebtIds.insert(
+                                      position + 1,
+                                      debt.id,
+                                    );
+                                  }),
+                            icon: const Icon(Icons.arrow_downward_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            }),
+            if (selectedPerson != null)
+              Text(
+                'Only debts for ${selectedDebts.first.personName} can share this payment.',
+                style: AppTextStyles.caption(context),
+              ),
+            if (allocationError != null)
+              Text(
+                allocationError,
+                style: TextStyle(color: cs.error, fontSize: 12),
+              ),
+            if (selectedDebts.isNotEmpty)
+              Text(
+                'Allocated ₹${((sms.amountMinor - unallocatedMinor) / 100).toStringAsFixed(2)} of ₹${sms.amount.toStringAsFixed(2)}',
+                style: AppTextStyles.label(context),
+              ),
+          ],
+          if (!_settleDebt && _matches.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Text(
               'A similar payment exists. Link it to avoid counting it twice.',
@@ -584,13 +858,13 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
           const SizedBox(height: 14),
           TextField(
             controller: _title,
-            enabled: !_saving && !linked,
+            enabled: !_saving && !linked && !_settleDebt,
             decoration: const InputDecoration(labelText: 'Title'),
           ),
           const SizedBox(height: 14),
           TextField(
             controller: _amount,
-            enabled: !_saving && !linked,
+            enabled: !_saving && !linked && !_settleDebt,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Amount',
@@ -601,6 +875,11 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
           if (!linked && !_asTransfer) ...[
             PersonalAccountPicker(
               value: _accountId,
+              label: _settleDebt
+                  ? sms.direction == BankSmsDirection.credit
+                        ? 'Receive into account'
+                        : 'Pay from account'
+                  : 'Account',
               enabled: !_saving,
               onChanged: (v) => setState(() => _accountId = v),
             ),
@@ -629,31 +908,32 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
             ),
             const SizedBox(height: 14),
           ],
-          DropdownButtonFormField<String>(
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontSize: 14),
-            key: ValueKey('direction-$_decision'),
-            isExpanded: true,
-            initialValue: _asTransfer ? 'transfer' : _direction.name,
-            items: const [
-              DropdownMenuItem(value: 'debit', child: Text('Expense')),
-              DropdownMenuItem(value: 'credit', child: Text('Income')),
-              DropdownMenuItem(
-                value: 'transfer',
-                child: Text('Transfer between my accounts'),
-              ),
-            ],
-            onChanged: _saving || linked
-                ? null
-                : (value) => setState(() {
-                    _asTransfer = value == 'transfer';
-                    if (!_asTransfer)
-                      _direction = BankSmsDirection.values.byName(value!);
-                  }),
-          ),
+          if (!_settleDebt)
+            DropdownButtonFormField<String>(
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontSize: 14),
+              key: ValueKey('direction-$_decision'),
+              isExpanded: true,
+              initialValue: _asTransfer ? 'transfer' : _direction.name,
+              items: const [
+                DropdownMenuItem(value: 'debit', child: Text('Expense')),
+                DropdownMenuItem(value: 'credit', child: Text('Income')),
+                DropdownMenuItem(
+                  value: 'transfer',
+                  child: Text('Transfer between my accounts'),
+                ),
+              ],
+              onChanged: _saving || linked
+                  ? null
+                  : (value) => setState(() {
+                      _asTransfer = value == 'transfer';
+                      if (!_asTransfer)
+                        _direction = BankSmsDirection.values.byName(value!);
+                    }),
+            ),
           const SizedBox(height: 14),
-          if (!_asTransfer)
+          if (!_asTransfer && !_settleDebt)
             DropdownButtonFormField<String>(
               key: ValueKey('merchant-category-$_suggestedCategory'),
               isExpanded: true,
@@ -670,7 +950,9 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
                   ? null
                   : (value) => setState(() => _category = value!),
             ),
-          if (!_asTransfer &&
+          if (sms.source == 'sms' &&
+              !_settleDebt &&
+              !_asTransfer &&
               !linked &&
               _direction == BankSmsDirection.debit &&
               sms.merchant != null) ...[
@@ -723,29 +1005,39 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
                     if (date != null && mounted) setState(() => _date = date);
                   },
           ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(
-              'Trust this sender for future clear expenses',
-              style: TextStyle(fontSize: 13),
+          if (sms.source == 'sms')
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Trust this sender for future clear expenses',
+                style: TextStyle(fontSize: 13),
+              ),
+              subtitle: const Text(
+                'Credits, possible transfers and duplicate matches still need review.',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: _trust,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() => _trust = value == true),
             ),
-            subtitle: const Text(
-              'Credits, possible transfers and duplicate matches still need review.',
-              style: TextStyle(fontSize: 11),
-            ),
-            value: _trust,
-            onChanged: _saving
-                ? null
-                : (value) => setState(() => _trust = value == true),
-          ),
           if (_error != null)
             Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: _saving || _loading || _decision == null ? null : _save,
+            onPressed:
+                _saving ||
+                    _loading ||
+                    (_settleDebt
+                        ? previewAllocations.isEmpty || allocationError != null
+                        : _decision == null)
+                ? null
+                : _save,
             child: Text(
               _saving
                   ? 'Saving…'
+                  : _settleDebt
+                  ? 'Apply SMS Payment to Debt'
                   : linked
                   ? 'Link Existing Transaction'
                   : 'Record Transaction',

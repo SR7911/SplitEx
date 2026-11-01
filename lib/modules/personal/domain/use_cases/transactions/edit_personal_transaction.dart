@@ -1,4 +1,6 @@
 import '../../entities/transactions/personal_transaction_edit.dart';
+import '../../entities/transactions/personal_transaction.dart';
+import '../../entities/transactions/expense_split.dart';
 import '../../repositories/personal_transaction_repository.dart';
 
 class EditPersonalTransaction {
@@ -12,6 +14,13 @@ class EditPersonalTransaction {
   ) async {
     if (!edit.amount.isFinite || edit.amount <= 0) {
       throw StateError('Enter a valid positive amount.');
+    }
+    moneyCents(edit.amount);
+    if (edit.split != null) {
+      if (edit.type != TransactionType.expense || edit.debtType != null) {
+        throw StateError('Only a regular expense can be split.');
+      }
+      edit.split!.validate(edit.amount);
     }
     final due = edit.dueDate;
     if (due != null &&

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_commands.dart';
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_due_date_picker.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/widgets/expense_split_editor.dart';
 
 const personalCategories = [
   'Food',
@@ -42,10 +44,12 @@ class _AddPersonalTransactionSheet extends ConsumerStatefulWidget {
   const _AddPersonalTransactionSheet();
 
   @override
-  ConsumerState<_AddPersonalTransactionSheet> createState() => _AddPersonalTransactionSheetState();
+  ConsumerState<_AddPersonalTransactionSheet> createState() =>
+      _AddPersonalTransactionSheetState();
 }
 
-class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransactionSheet> {
+class _AddPersonalTransactionSheetState
+    extends ConsumerState<_AddPersonalTransactionSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
@@ -57,6 +61,8 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
   DateTime _date = DateTime.now();
   bool _saving = false;
   bool _involvesPerson = false;
+  bool _splitExpense = false;
+  final _splitEditorKey = GlobalKey<ExpenseSplitEditorState>();
   DebtType _debtType = DebtType.lent;
   String? _accountId;
   DateTime? _dueDate;
@@ -72,16 +78,26 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
-
+    ExpenseSplit? split;
+    try {
+      split = _splitExpense ? _splitEditorKey.currentState!.buildSplit() : null;
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      return;
+    }
     final userId = ref.read(authStateProvider).valueOrNull?.uid;
     if (userId == null) return;
+    setState(() => _saving = true);
 
     final txn = PersonalTransaction(
       id: '',
       title: _titleCtrl.text.trim(),
       amount: double.parse(_amountCtrl.text.trim()),
-      type: _involvesPerson ? (_debtType == DebtType.lent ? TransactionType.expense : TransactionType.income) : _type,
+      type: _involvesPerson
+          ? (_debtType == DebtType.lent
+                ? TransactionType.expense
+                : TransactionType.income)
+          : _type,
       category: _category,
       date: _date,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
@@ -89,27 +105,64 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
       month: DateFormat('yyyy-MM').format(_date),
       createdAt: DateTime.now(),
       accountId: _accountId,
-      dueDate: _involvesPerson ? _dueDate : null,
+      dueDate: _involvesPerson || _splitExpense ? _dueDate : null,
       debtType: _involvesPerson ? _debtType : null,
       personName: _involvesPerson ? _personCtrl.text.trim() : null,
+      split: split,
     );
 
     try {
       await ref.read(createPersonalTransactionProvider)(userId, txn);
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save. Check your account, amount and repayment date, then retry.')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not save: $e')));
       }
       return;
     }
 
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Transaction added')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Transaction added')));
     }
+  }
+
+  Widget _optionSwitch({
+    required String title,
+    String? subtitle,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return SwitchListTile(
+      value: value,
+      onChanged: _saving ? null : onChanged,
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: .6),
+              ),
+            ),
+      secondary: Icon(
+        icon,
+        size: 20,
+        color: cs.onSurface.withValues(alpha: .5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      dense: true,
+    );
   }
 
   @override
@@ -134,19 +187,34 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                 // Drag handle
                 Center(
                   child: Container(
-                    width: 48, height: 5,
+                    width: 48,
+                    height: 5,
                     margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
                 // Header
                 Row(
                   children: [
-                    Icon(Icons.add_circle_outline, color: Theme.of(context).colorScheme.primary, size: 24),
+                    Icon(
+                      Icons.add_circle_outline,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
                     const SizedBox(width: 10),
-                    Text(
-                      'Add Transaction',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary),
+                    Expanded(
+                      child: Text(
+                        'Add Transaction',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -155,29 +223,54 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                 // Type toggle
                 SegmentedButton<TransactionType>(
                   segments: const [
-                    ButtonSegment(value: TransactionType.expense, label: Text('Expense'), icon: Icon(Icons.arrow_upward, size: 16)),
-                    ButtonSegment(value: TransactionType.income, label: Text('Income'), icon: Icon(Icons.arrow_downward, size: 16)),
+                    ButtonSegment(
+                      value: TransactionType.expense,
+                      label: Text('Expense'),
+                      icon: Icon(Icons.arrow_upward, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: TransactionType.income,
+                      label: Text('Income'),
+                      icon: Icon(Icons.arrow_downward, size: 16),
+                    ),
                   ],
                   selected: {_type},
-                  onSelectionChanged: (s) => setState(() => _type = s.first),
+                  onSelectionChanged: (s) => setState(() {
+                    _type = s.first;
+                    if (_type != TransactionType.expense) _splitExpense = false;
+                  }),
                 ),
                 const SizedBox(height: 16),
 
                 // Amount
                 TextFormField(
                   controller: _amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) => setState(() {}),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Amount (₹)',
-                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    prefixIcon: Icon(
+                      Icons.currency_rupee,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.5),
+                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                   autofocus: true,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Required';
-                    if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter valid amount';
+                    if (double.tryParse(v) == null || double.parse(v) <= 0)
+                      return 'Enter valid amount';
                     return null;
                   },
                 ),
@@ -189,12 +282,23 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                   decoration: InputDecoration(
                     labelText: 'Title',
                     hintText: 'e.g. Dinner, Uber, Salary',
-                    prefixIcon: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    prefixIcon: Icon(
+                      Icons.receipt_long,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.5),
+                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'Required' : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -206,13 +310,37 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                         value: _category,
                         decoration: InputDecoration(
                           labelText: 'Category',
-                          prefixIcon: Icon(Icons.category, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                          prefixIcon: Icon(
+                            Icons.category,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.5),
+                          ),
                           filled: true,
-                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          fillColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withOpacity(0.5),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
-                        items: personalCategories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+                        items: personalCategories
+                            .map(
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(
+                                  c,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (v) => setState(() => _category = v!),
                         isExpanded: true,
                       ),
@@ -220,22 +348,42 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                     const SizedBox(width: 12),
                     InkWell(
                       onTap: () async {
-                        final picked = await showDatePicker(context: context, initialDate: _date, firstDate: DateTime(2020), lastDate: DateTime.now());
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _date,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now(),
+                        );
                         if (picked != null) setState(() => _date = picked);
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withOpacity(0.5),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+                            Icon(
+                              Icons.calendar_today,
+                              size: 18,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.6),
+                            ),
                             const SizedBox(width: 8),
-                            Text(DateFormat('dd MMM').format(_date), style: const TextStyle(fontSize: 14)),
+                            Text(
+                              DateFormat('dd MMM').format(_date),
+                              style: const TextStyle(fontSize: 14),
+                            ),
                           ],
                         ),
                       ),
@@ -245,27 +393,49 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                 const SizedBox(height: 16),
 
                 // Debt toggle
-                PersonalAccountPicker(value: _accountId, enabled: !_saving, onChanged: (v) => setState(() => _accountId = v)),
+                PersonalAccountPicker(
+                  value: _accountId,
+                  enabled: !_saving,
+                  label: 'Account (optional)',
+                  showHelperText: false,
+                  onChanged: (v) => setState(() => _accountId = v),
+                ),
                 const SizedBox(height: 16),
-                SwitchListTile(
+                _optionSwitch(
+                  title: 'Involves someone else?',
+                  icon: Icons.people_outline,
                   value: _involvesPerson,
-                  onChanged: (v) => setState(() => _involvesPerson = v),
-                  title: const Text('Involves someone else?', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  secondary: Icon(Icons.people_outline, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  dense: true,
+                  onChanged: (v) => setState(() {
+                    _involvesPerson = v;
+                    if (v) _splitExpense = false;
+                  }),
                 ),
 
                 if (_involvesPerson) ...[
-                  DebtDueDatePicker(value: _dueDate, debtDate: _date, enabled: !_saving, onChanged: (v) => setState(() => _dueDate = v)),
+                  const SizedBox(height: 8),
+                  DebtDueDatePicker(
+                    value: _dueDate,
+                    debtDate: _date,
+                    enabled: !_saving,
+                    onChanged: (v) => setState(() => _dueDate = v),
+                  ),
                   const SizedBox(height: 12),
                   SegmentedButton<DebtType>(
                     segments: const [
-                      ButtonSegment(value: DebtType.lent, label: Text('I Lent'), icon: Icon(Icons.call_made, size: 16)),
-                      ButtonSegment(value: DebtType.borrowed, label: Text('I Borrowed'), icon: Icon(Icons.call_received, size: 16)),
+                      ButtonSegment(
+                        value: DebtType.lent,
+                        label: Text('I Lent'),
+                        icon: Icon(Icons.call_made, size: 16),
+                      ),
+                      ButtonSegment(
+                        value: DebtType.borrowed,
+                        label: Text('I Borrowed'),
+                        icon: Icon(Icons.call_received, size: 16),
+                      ),
                     ],
                     selected: {_debtType},
-                    onSelectionChanged: (s) => setState(() => _debtType = s.first),
+                    onSelectionChanged: (s) =>
+                        setState(() => _debtType = s.first),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -273,13 +443,50 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                     decoration: InputDecoration(
                       labelText: 'Person\'s name',
                       hintText: 'e.g. John, Sarah',
-                      prefixIcon: Icon(Icons.person_outline, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                      prefixIcon: Icon(
+                        Icons.person_outline,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.5),
+                      ),
                       filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                      fillColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
                     ),
-                    validator: (v) => _involvesPerson && (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        _involvesPerson && (v == null || v.trim().isEmpty)
+                        ? 'Required'
+                        : null,
                   ),
+                ],
+                if (_type == TransactionType.expense && !_involvesPerson) ...[
+                  _optionSwitch(
+                    title: 'Split with people',
+                    subtitle: 'Their shares become debts owed to you',
+                    icon: Icons.call_split_rounded,
+                    value: _splitExpense,
+                    onChanged: (value) => setState(() => _splitExpense = value),
+                  ),
+                  if (_splitExpense) ...[
+                    const SizedBox(height: 8),
+                    ExpenseSplitEditor(
+                      key: _splitEditorKey,
+                      totalText: _amountCtrl.text,
+                      enabled: !_saving,
+                    ),
+                    const SizedBox(height: 12),
+                    DebtDueDatePicker(
+                      value: _dueDate,
+                      debtDate: _date,
+                      enabled: !_saving,
+                      onChanged: (value) => setState(() => _dueDate = value),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 16),
 
@@ -288,10 +495,20 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                   controller: _notesCtrl,
                   decoration: InputDecoration(
                     labelText: 'Notes (optional)',
-                    prefixIcon: Icon(Icons.notes, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                    prefixIcon: Icon(
+                      Icons.notes,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.5),
+                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                   maxLines: 2,
                 ),
@@ -302,11 +519,23 @@ class _AddPersonalTransactionSheetState extends ConsumerState<_AddPersonalTransa
                   onPressed: _saving ? null : _save,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
                   child: _saving
-                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Save Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Save Transaction',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ],
             ),

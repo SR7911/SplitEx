@@ -4,6 +4,7 @@ import '../../../domain/entities/accounts/personal_account.dart';
 import '../../../domain/entities/accounts/personal_transfer.dart';
 import '../../../domain/entities/transactions/personal_transaction.dart';
 import '../../../domain/policies/accounts/account_balance_calculator.dart';
+import '../../transactions/providers/personal_transaction_reads.dart';
 
 final personalAccountsProvider = StreamProvider<List<PersonalAccount>>((ref) {
   final uid = ref.watch(personalUserIdProvider).valueOrNull;
@@ -33,7 +34,8 @@ final personalAccountBalancesProvider =
       final accounts = ref.watch(personalAccountsProvider);
       final transfers = ref.watch(personalTransfersProvider);
       final transactions = ref.watch(accountTransactionsProvider);
-      for (final state in [accounts, transfers, transactions]) {
+      final debts = ref.watch(personalDebtTransactionsProvider);
+      for (final state in [accounts, transfers, transactions, debts]) {
         if (state.hasError) {
           return AsyncError(
             state.error!,
@@ -47,6 +49,7 @@ final personalAccountBalancesProvider =
           accounts.requireValue,
           transactions.requireValue,
           transfers.requireValue,
+          debts: debts.requireValue,
         ),
       );
     });

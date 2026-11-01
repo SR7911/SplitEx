@@ -1,5 +1,5 @@
-import 'package:split_ex/modules/personal/data/mappers/transactions/personal_transaction_firestore_mapper.dart';
-import 'package:split_ex/modules/personal/data/mappers/budgets/personal_budget_firestore_mapper.dart';
+import 'package:split_ex/modules/personal/data/models/personal_transaction_firestore_model.dart';
+import 'package:split_ex/modules/personal/data/models/personal_budget_firestore_model.dart';
 import 'package:split_ex/modules/personal/domain/entities/budgets/personal_budget.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
 

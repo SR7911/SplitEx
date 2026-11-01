@@ -16,6 +16,7 @@ class PersonalAccountPicker extends ConsumerWidget {
   final bool enabled;
   final String label;
   final bool requiredAccount;
+  final bool showHelperText;
   const PersonalAccountPicker({
     super.key,
     required this.value,
@@ -23,6 +24,7 @@ class PersonalAccountPicker extends ConsumerWidget {
     this.enabled = true,
     this.label = 'Account',
     this.requiredAccount = false,
+    this.showHelperText = true,
   });
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,14 +46,21 @@ class PersonalAccountPicker extends ConsumerWidget {
         ),
         helperStyle: AppTextStyles.caption(context),
         helperMaxLines: 2,
-        labelStyle: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(fontSize: 14),
         helperText: data.hasError
             ? 'Accounts unavailable. Retry from Accounts & Wallets.'
+            : !showHelperText
+            ? null
             : requiredAccount
             ? 'Choose an account for this transfer'
             : 'Optional · manage accounts in Personal',
+        filled: true,
+        fillColor: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: .5),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
       ),
       items: [
         const DropdownMenuItem(value: '', child: Text('Unassigned')),

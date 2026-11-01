@@ -7,13 +7,13 @@ import 'package:split_ex/app/auth/screens/login_screen.dart';
 import 'package:split_ex/app/auth/screens/register_screen.dart';
 import 'package:split_ex/app/presentation/home/home_screen.dart';
 import 'package:split_ex/app/auth/screens/profile_setup_screen.dart';
-import 'package:split_ex/modules/room/screens/room/create_room_screen.dart';
-import 'package:split_ex/modules/room/screens/room/join_room_screen.dart';
-import 'package:split_ex/modules/room/screens/room/room_detail_screen.dart';
-import 'package:split_ex/modules/room/screens/room/room_settings_screen.dart';
-import 'package:split_ex/modules/room/screens/analytics/analytics_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/room/create_room_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/room/join_room_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/room/room_detail_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/room/room_settings_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/analytics/analytics_screen.dart';
 import 'package:split_ex/modules/notifications/screens/notifications_screen.dart';
-import 'package:split_ex/modules/room/screens/activity/activity_screen.dart';
+import 'package:split_ex/modules/room/presentation/screens/activity/activity_screen.dart';
 import 'package:split_ex/modules/developer/screens/storage_management_screen.dart';
 import 'package:split_ex/modules/personal/presentation/budgets/screens/personal_budgets_screen.dart';
 import 'package:split_ex/modules/personal/presentation/debts/screens/personal_debts_screen.dart';
@@ -33,15 +33,15 @@ import 'package:split_ex/modules/settings/screens/edit_profile_screen.dart';
 import 'package:split_ex/modules/settings/screens/change_password_screen.dart';
 import 'package:split_ex/modules/settings/screens/notification_preferences_screen.dart';
 import 'package:split_ex/app/bootstrap/splash_screen.dart';
-import 'package:split_ex/modules/group/screens/groups_list_screen.dart';
-import 'package:split_ex/modules/group/screens/create_group_screen.dart';
-import 'package:split_ex/modules/group/screens/join_group_screen.dart';
-import 'package:split_ex/modules/group/screens/group_dashboard_screen.dart';
-import 'package:split_ex/modules/project/screens/projects_list_screen.dart';
-import 'package:split_ex/modules/project/screens/create_project_screen.dart';
-import 'package:split_ex/modules/project/screens/project_dashboard_screen.dart';
-import 'package:split_ex/modules/project/screens/project_debts_screen.dart';
-import 'package:split_ex/modules/project/screens/project_expenses_screen.dart';
+import 'package:split_ex/modules/group/presentation/screens/groups_list_screen.dart';
+import 'package:split_ex/modules/group/presentation/screens/create_group_screen.dart';
+import 'package:split_ex/modules/group/presentation/screens/join_group_screen.dart';
+import 'package:split_ex/modules/group/presentation/screens/group_dashboard_screen.dart';
+import 'package:split_ex/modules/project/presentation/screens/projects_list_screen.dart';
+import 'package:split_ex/modules/project/presentation/screens/create_project_screen.dart';
+import 'package:split_ex/modules/project/presentation/screens/project_dashboard_screen.dart';
+import 'package:split_ex/modules/project/presentation/screens/project_debts_screen.dart';
+import 'package:split_ex/modules/project/presentation/screens/project_expenses_screen.dart';
 import 'package:split_ex/modules/personal/presentation/loans/screens/loan_list_screen.dart';
 import 'package:split_ex/modules/personal/presentation/loans/screens/loan_detail_screen.dart';
 import 'package:split_ex/modules/personal/presentation/loans/screens/loan_reports_screen.dart';
@@ -50,12 +50,14 @@ import 'package:split_ex/modules/personal/presentation/loans/screens/loan_report
 class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
   RouterNotifier(this._ref) {
-    _ref.listen(authStateProvider, (_, __) => notifyListeners());
-    _ref.listen(profileExistsProvider, (_, __) => notifyListeners());
+    _ref.listen(authStateProvider, (_, _) => notifyListeners());
+    _ref.listen(profileExistsProvider, (_, _) => notifyListeners());
   }
 }
 
-final routerNotifierProvider = Provider<RouterNotifier>((ref) => RouterNotifier(ref));
+final routerNotifierProvider = Provider<RouterNotifier>(
+  (ref) => RouterNotifier(ref),
+);
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Use read here to prevent the GoRouter instance from being recreated
@@ -74,9 +76,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final user = authState.valueOrNull;
       final isLoggedIn = user != null;
       final matchedLocation = state.matchedLocation;
-      
+
       final isSplash = matchedLocation == '/splash';
-      final isAuthRoute = matchedLocation == '/login' || matchedLocation == '/register';
+      final isAuthRoute =
+          matchedLocation == '/login' || matchedLocation == '/register';
       final isProfileSetup = matchedLocation == '/profile-setup';
 
       if (!isLoggedIn) {
@@ -85,7 +88,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // If logged in but profile existence is still being determined
       if (profileExists.isLoading) return null;
-      
+
       final hasProfile = profileExists.valueOrNull ?? false;
 
       // Let splash screen handle its own navigation
@@ -100,7 +103,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!hasProfile && !isProfileSetup) {
         return '/profile-setup';
       }
-      
+
       // Ensure user with profile doesn't stay on setup
       if (hasProfile && isProfileSetup) {
         return '/';
@@ -113,14 +116,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const HomeScreen(),
-      ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
@@ -145,7 +142,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/room/:roomId',
         builder: (context, state) {
           final tabParam = state.uri.queryParameters['tab'];
-          final selectedMonthInHome = state.extra as DateTime? ?? DateTime.now();
+          final selectedMonthInHome =
+              state.extra as DateTime? ?? DateTime.now();
           var initialTabIndex = 0;
           if (tabParam != null) {
             switch (tabParam) {
@@ -162,62 +160,97 @@ final routerProvider = Provider<GoRouter>((ref) {
           return RoomDetailScreen(
             roomId: state.pathParameters['roomId']!,
             initialTabIndex: initialTabIndex,
-            selectedMonthInHome: selectedMonthInHome
+            selectedMonthInHome: selectedMonthInHome,
           );
         },
       ),
       GoRoute(
         path: '/room/:roomId/activity',
-        builder: (context, state) => ActivityScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
+        builder: (context, state) =>
+            ActivityScreen(roomId: state.pathParameters['roomId']!),
       ),
       GoRoute(
         path: '/room/:roomId/storage',
-        builder: (context, state) => StorageManagementScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
+        builder: (context, state) =>
+            StorageManagementScreen(roomId: state.pathParameters['roomId']!),
       ),
       GoRoute(
         path: '/room/:roomId/analytics',
-        builder: (context, state) => AnalyticsScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
+        builder: (context, state) =>
+            AnalyticsScreen(roomId: state.pathParameters['roomId']!),
       ),
       GoRoute(
         path: '/room/:roomId/settings',
-        builder: (context, state) => RoomSettingsScreen(
-          roomId: state.pathParameters['roomId']!,
-        ),
+        builder: (context, state) =>
+            RoomSettingsScreen(roomId: state.pathParameters['roomId']!),
       ),
       // ─── Personal Expense Routes ───
       GoRoute(
         path: '/personal/transactions',
         builder: (context, state) {
-          final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
-            return PersonalTransactionsScreen(key: ValueKey(state.uri.toString()), monthKey: monthKey, openAddOnStart: state.uri.queryParameters['add'] == 'true');
+          final monthKey =
+              state.extra as String? ??
+              DateFormat('yyyy-MM').format(DateTime.now());
+          return PersonalTransactionsScreen(
+            key: ValueKey(state.uri.toString()),
+            monthKey: monthKey,
+            openAddOnStart: state.uri.queryParameters['add'] == 'true',
+          );
         },
       ),
-      GoRoute(path: '/personal/accounts', builder: (context, state) => const PersonalAccountsScreen()),
-      GoRoute(path: '/personal/money-review', builder: (context, state) => MonthlyMoneyReviewScreen(initialMonth: DateTime.tryParse('${state.extra ?? DateFormat('yyyy-MM').format(DateTime.now())}-01'))),
-      GoRoute(path: '/personal/goals', builder: (context, state) => const SavingsGoalsScreen()),
-      GoRoute(path: '/personal/goals/:goalId', builder: (context, state) => SavingsGoalDetailScreen(goalId: state.pathParameters['goalId']!)),
-      GoRoute(path: '/personal/merchant-rules', builder: (context, state) => const MerchantCategoryRulesScreen()),
-      GoRoute(path: '/personal/calendar', builder: (context, state) => const PaymentCalendarScreen()),
-      GoRoute(path: '/personal/sms-review', builder: (context, state) => const BankSmsSettingsScreen(reviewOnly: true)),
+      GoRoute(
+        path: '/personal/accounts',
+        builder: (context, state) => const PersonalAccountsScreen(),
+      ),
+      GoRoute(
+        path: '/personal/money-review',
+        builder: (context, state) => MonthlyMoneyReviewScreen(
+          initialMonth: DateTime.tryParse(
+            '${state.extra ?? DateFormat('yyyy-MM').format(DateTime.now())}-01',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/personal/goals',
+        builder: (context, state) => const SavingsGoalsScreen(),
+      ),
+      GoRoute(
+        path: '/personal/goals/:goalId',
+        builder: (context, state) =>
+            SavingsGoalDetailScreen(goalId: state.pathParameters['goalId']!),
+      ),
+      GoRoute(
+        path: '/personal/merchant-rules',
+        builder: (context, state) => const MerchantCategoryRulesScreen(),
+      ),
+      GoRoute(
+        path: '/personal/calendar',
+        builder: (context, state) => const PaymentCalendarScreen(),
+      ),
+      GoRoute(
+        path: '/personal/sms-review',
+        builder: (context, state) =>
+            const BankSmsSettingsScreen(reviewOnly: true),
+      ),
       GoRoute(
         path: '/personal/transactions/category',
         builder: (context, state) {
           final extra = state.extra as Map<String, String>? ?? {};
-          final monthKey = extra['monthKey'] ?? DateFormat('yyyy-MM').format(DateTime.now());
+          final monthKey =
+              extra['monthKey'] ?? DateFormat('yyyy-MM').format(DateTime.now());
           final category = extra['category'];
-          return PersonalTransactionsScreen(monthKey: monthKey, initialCategory: category);
+          return PersonalTransactionsScreen(
+            monthKey: monthKey,
+            initialCategory: category,
+          );
         },
       ),
       GoRoute(
         path: '/personal/budgets',
         builder: (context, state) {
-          final monthKey = state.extra as String? ?? DateFormat('yyyy-MM').format(DateTime.now());
+          final monthKey =
+              state.extra as String? ??
+              DateFormat('yyyy-MM').format(DateTime.now());
           return PersonalBudgetsScreen(monthKey: monthKey);
         },
       ),
@@ -227,7 +260,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/personal/debts',
-        builder: (context, state) => PersonalDebtsScreen(initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '')?.clamp(0, 2) ?? 0),
+        builder: (context, state) => PersonalDebtsScreen(
+          initialTab:
+              int.tryParse(
+                state.uri.queryParameters['tab'] ?? '',
+              )?.clamp(0, 2) ??
+              0,
+          focusDebtId: state.uri.queryParameters['debtId'],
+        ),
       ),
       GoRoute(
         path: '/personal/debt-dashboard',
@@ -248,15 +288,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/personal/loans/:loanId',
-        builder: (context, state) => LoanDetailScreen(
-          loanId: state.pathParameters['loanId']!,
-        ),
+        builder: (context, state) =>
+            LoanDetailScreen(loanId: state.pathParameters['loanId']!),
       ),
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
       ),
-      GoRoute(path: '/settings/widget', builder: (context, state) => const ExpensesWidgetSettingsScreen()),
+      GoRoute(
+        path: '/settings/widget',
+        builder: (context, state) => const ExpensesWidgetSettingsScreen(),
+      ),
       GoRoute(
         path: '/settings/bank-sms',
         builder: (context, state) => const BankSmsSettingsScreen(),
@@ -288,9 +330,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/groups/:groupId',
-        builder: (context, state) => GroupDashboardScreen(
-          groupId: state.pathParameters['groupId']!,
-        ),
+        builder: (context, state) =>
+            GroupDashboardScreen(groupId: state.pathParameters['groupId']!),
       ),
       // ─── Projects Routes ───
       GoRoute(
@@ -309,9 +350,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/projects/:projectId/debts',
-        builder: (context, state) => ProjectDebtsScreen(
-          projectId: state.pathParameters['projectId']!,
-        ),
+        builder: (context, state) =>
+            ProjectDebtsScreen(projectId: state.pathParameters['projectId']!),
       ),
       GoRoute(
         path: '/projects/:projectId/expenses',

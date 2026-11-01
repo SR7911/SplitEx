@@ -66,7 +66,7 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 
 ## App, Room, and shared configuration
 
-### `lib/app/constants.dart` and `lib/modules/room/config/room_constants.dart`
+### `lib/app/constants.dart` and `lib/modules/room/presentation/config/room_constants.dart`
 - **What:** App name and Room expense categories, icons, and limits, respectively.
 - **Why:** Keeps Room settings with Room while the app name stays with the app shell.
 
@@ -86,15 +86,67 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 
 ## Models by owner
 
-### `lib/modules/group/models/group_model.dart`
+### `lib/modules/group/domain/entities/group_model.dart`
 - **What:** GroupModel data class — id, name, description, startDate, endDate, currency, inviteCode, createdBy, memberIds, status (active/archived), createdAt. Helpers: isArchived, isMember, isAdmin, copyWith.
 - **Why:** Represents a shared group for expense splitting outside of rooms. Supports any group type (friends, family, trips).
 
-### `lib/modules/group/models/group_expense_model.dart`
+### `lib/modules/group/domain/entities/group_expense_update.dart`
+- **What:** Typed values for editing a Group expense.
+- **Why:** The edit screen passes business values while the data mapper converts dates and fields for Firestore.
+
+### `lib/modules/group/domain/repositories/` and `lib/modules/group/dependencies.dart`
+- **What:** Group membership, expense and settlement contracts plus provider declarations.
+- **Why:** Group presentation depends on contracts bound to Firestore services in app composition.
+
+### `lib/modules/group/presentation/ports/group_reminder_sender.dart` and `group_payee_lookup.dart`
+- **What:** Interfaces for reminder sending and payee UPI lookup requested by the settlement screen.
+- **Why:** These interactions belong to presentation; app composition supplies their implementations without Group importing Notifications or auth services.
+
+### `lib/modules/group/data/models/group_firestore_models.dart`
+- **What:** Group and expense document conversion, including custom split amounts and timestamps.
+- **Why:** The Group domain entities remain independent of Firestore.
+
+### `lib/modules/group/data/datasources/group_firestore_data_source.dart`
+- **What:** Raw Group, expense and settlement Firestore queries and writes.
+- **Why:** Repository implementations can map documents without owning database paths.
+
+### `lib/modules/group/data/repositories/firestore_group_repositories.dart`
+- **What:** Group, expense and settlement repository implementations.
+- **Why:** Converts Firestore documents to domain entities for the provider contracts.
+
+### `lib/modules/group/domain/policies/group_balance_calculator.dart`
+- **What:** Pure Group balance calculation using each expense's share rule.
+- **Why:** Keeps financial calculation separate from Firestore persistence.
+
+### `lib/modules/group/domain/entities/group_expense_model.dart`
 - **What:** GroupExpenseModel — id, groupId, title, amount, category, notes, paidBy, splitType (GroupSplitType enum: equal/select), splitAmong, customSplits, date, createdBy, createdAt, updatedAt. Has shareFor() and toUpdateMap().
 - **Why:** Core data unit for group expenses. Supports equal split across all members or selective split among chosen members.
 
-### `lib/modules/project/models/project_model.dart`
+### `lib/modules/group/domain/use_cases/`
+- **What:** Join, expense save and settlement recording workflows.
+- **Why:** Group widgets pass typed values to domain operations instead of handling their write decisions.
+
+### `lib/modules/project/domain/entities/project_update.dart`, `project_expense_update.dart` and `project_partial_settlement.dart`
+- **What:** Typed project edits, expense edits and debt payment history.
+- **Why:** Project screens and domain values stay independent of Firestore maps and timestamps.
+
+### `lib/modules/project/domain/repositories/`, `domain/use_cases/` and `dependencies.dart`
+- **What:** Project/expense contracts, debt payment use cases and their provider declarations.
+- **Why:** Project presentation depends on contracts; app composition binds Firestore implementations.
+
+### `lib/modules/project/data/models/project_firestore_models.dart`
+- **What:** Firestore conversion for projects, expenses and ISO-string debt payment entries.
+- **Why:** Preserves the existing user-scoped document schema outside the domain.
+
+### `lib/modules/project/data/datasources/project_firestore_data_source.dart`
+- **What:** Raw project/expense Firestore access and atomic debt payment writes.
+- **Why:** Keeps collection paths and transaction calls in the data source.
+
+### `lib/modules/project/data/repositories/firestore_project_repositories.dart`
+- **What:** Project and expense repository implementations.
+- **Why:** Maps persisted documents into domain entities for the UI and use cases.
+
+### `lib/modules/project/domain/entities/project_model.dart`
 - **What:** ProjectModel (id, name, description, projectType, estimatedBudget, startDate, targetEndDate, status, createdBy, createdAt) and ProjectExpenseModel (adds vendor, notes, paymentMethod: cash/upi/card/bankTransfer).
 - **Why:** Represents a personal project with a budget envelope. ProjectExpenseModel tracks individual spend items against that budget.
 
@@ -114,9 +166,17 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Read-only monthly events projected from loan EMIs, recurring schedules and dated debts, including recorded/overdue/scheduled state.
 - **Why:** Centralizes date clamping, log matching and duplicate-schedule exclusion for the calendar.
 
-### `lib/modules/personal/presentation/reports/models/monthly_money_review.dart`
+### `lib/modules/personal/domain/projections/reports/monthly_money_review.dart`
 - **What:** Monthly totals, category comparisons, budget checks, uncategorized expenses and current outstanding debt summaries.
-- **Why:** Keeps selected-month and equal-elapsed-date comparison logic independent of the UI.
+- **Why:** Keeps selected-month and equal-elapsed-date comparison logic in the pure domain; the screen formats its labels.
+
+### `lib/modules/personal/domain/use_cases/sms/`
+- **What:** Queue processing, shared bank-message import and review approval workflows.
+- **Why:** Parsing and recording decisions run outside the Flutter controller.
+
+### `lib/modules/personal/data/datasources/method_channel_bank_sms_data_source.dart`
+- **What:** Typed access to the Android bank-message channel, including status, queue, permissions and review actions.
+- **Why:** The Personal SMS controller uses a domain gateway instead of invoking a platform channel.
 
 ### `lib/modules/personal/domain/entities/savings/savings_goal.dart`
 - **What:** Savings targets, optional dates/account labels and signed progress entries, with integer-paise amounts and progress helpers.
@@ -126,23 +186,67 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** User data class — uid, name, email, avatarUrl, upiId, rooms list, createdAt.
 - **Why:** Represents a user profile in Firestore. Used for displaying names in rooms and UPI settlements.
 
-### `lib/modules/room/models/room_model.dart`
+### `lib/modules/room/domain/entities/room_model.dart`
 - **What:** Room data class — id, name, inviteCode, adminId, memberIds, currentMonth, isLocked.
 - **Why:** Represents a shared space. Controls who can see/edit data and whether the month's expenses are locked.
 
-### `lib/modules/room/models/expense_model.dart`
+### `lib/modules/room/domain/entities/expense_model.dart`
 - **What:** Expense data class — title, amount, category, date, paidBy, splitType, splitAmong, month.
 - **Why:** Core data unit of the app. Every expense is tracked with who paid, how it's split, and when.
 
-### `lib/modules/room/models/activity_model.dart`
+### `lib/modules/room/domain/entities/activity_model.dart`
 - **What:** Activity log entry — type (added/edited/deleted/settlement), performedBy, description, metadata.
 - **Why:** Audit trail. Users can see who did what and when — builds trust in shared finances.
 
-### `lib/modules/room/models/bill_model.dart`
+### `lib/modules/room/domain/entities/bill_model.dart`
 - **What:** Fixed bill data class — type (rent/electricity/water), amount, paidBy, month, receiptUrl.
 - **Why:** Handles recurring fixed bills separately from ad-hoc expenses (different UI/logic).
 
-### `lib/shared/models/settlement_model.dart`
+### `lib/modules/room/domain/entities/room_expense_update.dart` and `room_bill_update.dart`
+- **What:** Typed values for Room expense and bill edits.
+- **Why:** Edit screens pass plain Dart values; Firestore field conversion stays in data.
+
+### `lib/modules/room/domain/repositories/` and `lib/modules/room/dependencies.dart`
+- **What:** Room membership, expense, bill, and activity contracts and provider declarations.
+- **Why:** Presentation depends on Room contracts; app composition selects Firestore implementations.
+
+### `lib/modules/room/domain/repositories/room_ledger_repository.dart` and `lib/modules/room/data/repositories/firestore_room_ledger_repository.dart`
+- **What:** Typed Room expense, bill and settlement writes paired with activity entries in Firestore batches.
+- **Why:** Both documents commit together; the domain use cases own event content and data owns atomic persistence.
+
+### `lib/modules/room/domain/repositories/room_receipt_storage.dart` and `room_receipt_exporter.dart`
+- **What:** Pure ports for Room receipt upload and PDF export.
+- **Why:** Room widgets call contracts while Firebase Storage, image picking, file writing and sharing stay in data.
+
+### `lib/shared/domain/services/upi_payment_launcher.dart` and `lib/shared/dependencies.dart`
+- **What:** A shared UPI launch contract and provider for Room and Group.
+- **Why:** Payment screens no longer import another feature's service or provider.
+
+### `lib/modules/room/domain/use_cases/`
+- **What:** Room join normalization and expense, bill, and settlement write workflows, including their activity entries.
+- **Why:** Widgets pass values to domain operations instead of coordinating multiple repository calls.
+
+### `lib/shared/data/mappers/settlement_firestore_mapper.dart`
+- **What:** Settlement document conversion shared by Room and Group adapters.
+- **Why:** Keeps Firestore types out of the shared settlement value.
+
+### `lib/modules/room/data/models/room_firestore_models.dart`
+- **What:** Firestore conversion for Room entities and edit values.
+- **Why:** Keeps timestamps and storage field names outside Room domain entities.
+
+### `lib/modules/room/data/datasources/room_firestore_data_source.dart`
+- **What:** Room Firestore paths and atomic room/member writes.
+- **Why:** Repository implementations share one source for collection access and membership transactions.
+
+### `lib/modules/personal/data/datasources/personal_firestore_data_source.dart`
+- **What:** User-scoped Personal collection paths and atomic account-transfer write.
+- **Why:** Personal repositories use one source for the persisted collection layout.
+
+### `lib/modules/personal/data/models/`
+- **What:** Firestore conversion for accounts, transactions, budgets, recurring entries, loans, savings and SMS merchant rules.
+- **Why:** Storage fields and timestamps stay outside Personal domain entities.
+
+### `lib/shared/domain/entities/settlement_model.dart`
 - **What:** Settlement record — fromUserId, toUserId, amount, status (pending/confirmed), upiRef.
 - **Why:** Tracks who paid whom and whether the payment was confirmed. Prevents disputes.
 
@@ -154,14 +258,6 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 
 ## Services by owner
 
-### `lib/modules/group/services/group_service.dart`
-- **What:** GroupService (createGroup with random 6-char invite code, joinByCode, leaveGroup, archiveGroup, restoreGroup, getUserGroupsStream, getGroupStream), GroupExpenseService (addExpense, updateExpense, deleteExpense, getExpensesStream), GroupBalanceService (computeNetBalances delegating to BalanceService.simplifyDebts).
-- **Why:** All Firestore operations for the Groups module. Reuses existing debt simplification logic for consistency.
-
-### `lib/modules/project/services/project_service.dart`
-- **What:** ProjectService (createProject, updateStatus, deleteProject, getProjectsStream, getProjectStream — scoped under `users/{uid}/projects`), ProjectExpenseService (addExpense, deleteExpense, getExpensesStream).
-- **Why:** All Firestore operations for the Project Tracker module. Projects are user-private (not shared).
-
 ### `lib/app/auth/services/auth_service.dart`
 - **What:** Firebase Auth operations — signIn (email/Google), signUp, signOut, resetPassword, deleteAccount.
 - **Why:** Encapsulates all authentication logic. Screens don't talk to Firebase directly.
@@ -170,27 +266,31 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Firestore user CRUD — createUserProfile, getUserProfile, updateUserProfile, userStream.
 - **Why:** Manages the `users` collection. Used by profile setup, edit profile, and member name display.
 
-### `lib/modules/room/services/room_service.dart`
+### `lib/modules/room/data/repositories/firestore_room_repository.dart`
 - **What:** Room CRUD — createRoom (generate invite code), joinRoom, getRoomStream, removeMember.
 - **Why:** Handles room lifecycle. Generates unique invite codes for sharing.
 
-### `lib/modules/room/services/expense_service.dart`
+### `lib/modules/room/data/repositories/firestore_expense_repository.dart`
 - **What:** Expense CRUD — addExpense, updateExpense, deleteExpense, getExpensesStream (with month filter).
 - **Why:** Core service. Every expense operation goes through here, including triggering activity logs.
 
-### `lib/shared/services/balance_service.dart`
-- **What:** Calculates net balances from expenses — who owes whom and how much.
-- **Why:** The heart of a split app. Reads all expenses for a month and computes the debt matrix.
+### `lib/modules/room/domain/policies/balance_service.dart`
+- **What:** Calculates Room net balances from Room expenses and bills, then uses the shared pure debt simplifier.
+- **Why:** Keeps Room model dependencies inside Room while preserving its balance behavior.
 
-### `lib/modules/room/services/settlement_service.dart`
+### `lib/shared/domain/entities/debt.dart` and `lib/shared/domain/policies/debt_simplifier.dart`
+- **What:** Pure debt value and greedy net-balance simplification used by Room and Group.
+- **Why:** Both modules share the same settlement rule without importing one another's financial models.
+
+### `lib/modules/room/data/repositories/firestore_settlement_repository.dart`
 - **What:** Settlement CRUD — createSettlement, confirmSettlement, getSettlementsStream.
 - **Why:** Manages the payment lifecycle (pending → confirmed).
 
-### `lib/modules/room/services/activity_service.dart`
+### `lib/modules/room/data/repositories/firestore_activity_repository.dart`
 - **What:** Writes activity log entries to Firestore when expenses/settlements change.
 - **Why:** Provides transparency. All actions are logged with actor, action, and details.
 
-### `lib/modules/room/services/bill_service.dart`
+### `lib/modules/room/data/repositories/firestore_bill_repository.dart`
 - **What:** Fixed bill CRUD — addBill, getBillsStream (for rent, electricity, water).
 - **Why:** Separate handling for bills that have receipt uploads and different split logic.
 
@@ -218,19 +318,19 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Pure parser for supported INR bank/UPI/card debit/credit alerts, sender normalization, review decisions and stable import identities.
 - **Why:** Rejects non-payment messages and keeps parsing independently testable without Android or Firestore.
 
-### `lib/modules/personal/data/repositories/bank_sms_repository.dart`
+### `lib/modules/personal/data/repositories/firestore_bank_sms_repository.dart`
 - **What:** Reviews duplicate candidates, creates or links personal entries/transfers and stores durable import receipts atomically. Applies merchant categories and can save a rule with an approved new expense.
 - **Why:** Protects retries and existing records without uploading raw SMS bodies.
 
-### `lib/modules/personal/presentation/sms/controllers/bank_sms_service.dart`
-- **What:** Riverpod/ChangeNotifier bridge to the Android MethodChannel, permission/configuration state, local reviews and foreground/background queue processing. The native background entrypoint lives in app composition.
-- **Why:** Coordinates capture/import lifecycle with authentication and Android jobs; account changes clear local SMS state.
+### `lib/modules/personal/presentation/sms/controllers/bank_sms_controller.dart`
+- **What:** Riverpod/ChangeNotifier state for permission settings, reviews and foreground import actions. It calls domain SMS use cases through a device gateway.
+- **Why:** Keeps UI state and feedback in presentation while Android channel calls live in data. The background entrypoint calls the queue use case directly.
 
 ### `lib/modules/personal/data/repositories/firestore_personal_account_repository.dart`
 - **What:** Owner-scoped account CRUD/archive and own-account transfer create/edit/delete operations, with account validation.
 - **Why:** Keeps transfers separate from income/expenses and preserves history when an account is archived.
 
-### `lib/modules/personal/data/repositories/merchant_category_service.dart`
+### `lib/modules/personal/data/repositories/firestore_merchant_category_repository.dart`
 - **What:** Owner-scoped normalized sender/merchant category rules, deterministic IDs, suggestions, CRUD and pause/resume providers.
 - **Why:** Reuses a chosen category for future matching debit alerts without granting sender trust.
 
@@ -238,15 +338,15 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Goal CRUD/archive and atomic contribution/withdrawal/deletion updates with stable entry IDs. Domain values and the repository contract live under Personal domain; streams are exposed by Personal presentation providers.
 - **Why:** Preserves aggregate/history consistency and prevents negative progress without creating personal transactions.
 
-### `lib/modules/room/services/upi_service.dart`
+### `lib/shared/data/services/upi_service.dart`
 - **What:** Constructs UPI intent URLs and launches payment apps (GPay, PhonePe, Paytm).
 - **Why:** Allows one-tap settlement payments with pre-filled receiver ID and amount.
 
-### `lib/modules/room/services/upload_service.dart`
+### `lib/modules/room/data/datasources/receipt_upload_data_source.dart`
 - **What:** Uploads files (receipt images, avatars) to Firebase Storage.
 - **Why:** Generic upload utility used by expense receipts and profile photo features.
 
-### `lib/modules/room/services/receipt_generator.dart`
+### `lib/modules/room/data/datasources/receipt_pdf_data_source.dart`
 - **What:** Generates PDF receipts/reports from expense data.
 - **Why:** Users can export or share expense summaries as PDF documents.
 
@@ -270,11 +370,11 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Month-family provider watching current/previous transactions, budgets and debts.
 - **Why:** Keeps review comparisons reactive with explicit loading/error handling. Savings and merchant-rule providers live under their Personal presentation folders.
 
-### `lib/modules/group/providers/group_provider.dart`
-- **What:** groupServiceProvider, groupExpenseServiceProvider, groupBalanceServiceProvider, userGroupsProvider, groupStreamProvider, groupExpensesProvider, groupNetBalancesProvider, groupSimplifiedDebtsProvider, groupUserBalanceProvider, groupTotalExpenseProvider.
+### `lib/modules/group/presentation/providers/group_provider.dart`
+- **What:** groupServiceProvider, groupExpenseServiceProvider, groupBalanceCalculatorProvider, userGroupsProvider, groupStreamProvider, groupExpensesProvider, groupNetBalancesProvider, groupSimplifiedDebtsProvider, groupUserBalanceProvider, groupTotalExpenseProvider.
 - **Why:** Reactive state for the Groups module. Imports currentUserIdProvider from room_provider.dart.
 
-### `lib/modules/project/providers/project_provider.dart`
+### `lib/modules/project/presentation/providers/project_provider.dart`
 - **What:** projectServiceProvider, projectExpenseServiceProvider, userProjectsProvider, projectStreamProvider, projectExpensesProvider, projectTotalSpentProvider, projectCategoryBreakdownProvider.
 - **Why:** Reactive state for the Project Tracker module. Imports currentUserIdProvider from room_provider.dart.
 
@@ -282,27 +382,27 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Exposes authServiceProvider, userServiceProvider, authStateProvider (stream), userProfileProvider.
 - **Why:** All auth-related state in one place. Screens watch these to react to login/logout.
 
-### `lib/modules/room/providers/room_provider.dart`
+### `lib/modules/room/presentation/providers/room_provider.dart`
 - **What:** userRoomsProvider (stream of user's rooms), currentRoomProvider, roomMembersProvider.
 - **Why:** Provides room data to home screen, drawer, and all room-scoped screens.
 
-### `lib/modules/room/providers/expense_provider.dart`
+### `lib/modules/room/presentation/providers/expense_provider.dart`
 - **What:** expensesStreamProvider, monthExpensesProvider, expense filter/sort state.
 - **Why:** Screens watch these to display expense lists. Month-scoped for billing cycles.
 
-### `lib/modules/room/providers/dashboard_provider.dart`
+### `lib/modules/room/presentation/providers/dashboard_provider.dart`
 - **What:** monthOverallBalanceProvider, currentUserIdProvider, recentActivitiesProvider.
 - **Why:** Powers the home screen — balance card, activity feed, spending summaries.
 
-### `lib/modules/room/providers/activity_provider.dart`
+### `lib/modules/room/presentation/providers/activity_provider.dart`
 - **What:** activitiesStreamProvider (for activity log screen), recentActivitiesProvider (for home screen).
 - **Why:** Real-time activity feed that updates as actions happen.
 
-### `lib/modules/room/providers/settlement_provider.dart`
+### `lib/modules/room/presentation/providers/settlement_provider.dart`
 - **What:** settlementsStreamProvider, debts calculation, settlement state.
 - **Why:** Provides settlement data to the settlement screen and dashboard.
 
-### `lib/modules/room/providers/bill_provider.dart`
+### `lib/modules/room/presentation/providers/bill_provider.dart`
 - **What:** billsStreamProvider for the bills section.
 - **Why:** Streams fixed bills for display and management.
 
@@ -376,65 +476,65 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 
 ### `lib/app/presentation/home/home_screen.dart`
 - **What:** Main app shell with the Personal, Group, Room, and Project tabs, drawer, and bottom navigation.
-- **Why:** Owns navigation across modules; Room-specific dashboard content lives in `lib/modules/room/screens/home/room_tab.dart`.
+- **Why:** Owns navigation across modules; Room-specific dashboard content lives in `lib/modules/room/presentation/screens/home/room_tab.dart`.
 
-### `lib/modules/room/screens/home/room_tab.dart`
+### `lib/modules/room/presentation/screens/home/room_tab.dart`
 - **What:** Room tab content on the main app screen, including Room balances and shortcuts.
 - **Why:** Keeps Room expense UI with the Room module while the shared home shell stays in the app layer.
 
-### `lib/modules/room/screens/room/create_room_screen.dart`
+### `lib/modules/room/presentation/screens/room/create_room_screen.dart`
 - **What:** Form to create a new room (enter name → generates invite code).
 - **Why:** Users need to create a shared space before tracking expenses.
 
-### `lib/modules/room/screens/room/join_room_screen.dart`
+### `lib/modules/room/presentation/screens/room/join_room_screen.dart`
 - **What:** Form to enter an invite code and join an existing room.
 - **Why:** Second user onboarding — roommates join using a code shared by the creator.
 
-### `lib/modules/room/screens/room/room_list_screen.dart`
+### `lib/modules/room/presentation/screens/room/room_list_screen.dart`
 - **What:** Lists all rooms the user belongs to.
 - **Why:** Navigation hub when multi-room support is enabled.
 
-### `lib/modules/room/screens/room/room_detail_screen.dart`
+### `lib/modules/room/presentation/screens/room/room_detail_screen.dart`
 - **What:** Room's main view — tabs for expenses, settlements, members, bills.
 - **Why:** Everything related to a specific room in one place.
 
-### `lib/modules/room/screens/room/room_settings_screen.dart`
+### `lib/modules/room/presentation/screens/room/room_settings_screen.dart`
 - **What:** Room configuration — member list, invite code, admin controls (remove member, lock month).
 - **Why:** Admin needs to manage the room. Members can see who's in the group.
 
-### `lib/modules/room/screens/expense/add_expense_sheet.dart`
+### `lib/modules/room/presentation/screens/expense/add_expense_sheet.dart`
 - **What:** Expense entry bottom sheet with title, amount, category, date, split type, members and receipt attachment.
 - **Why:** Faster UX. Users can add expenses without leaving the home screen.
 
-### `lib/modules/room/screens/expense/view_expense_sheet.dart`
+### `lib/modules/room/presentation/screens/expense/view_expense_sheet.dart`
 - **What:** Expense detail sheet with permitted inline editing, payer and split breakdown. Expense lists are hosted in the room UI.
 - **Why:** Lets authorized users inspect and correct an expense without a separate edit screen.
 
-### `lib/modules/room/screens/bills/add_bill_sheet.dart`
+### `lib/modules/room/presentation/screens/bills/add_bill_sheet.dart`
 - **What:** Bottom sheet version of bill entry.
 - **Why:** Quick bill logging from the room detail screen.
 
-### `lib/modules/room/screens/bills/view_bill_sheet.dart`
+### `lib/modules/room/presentation/screens/bills/view_bill_sheet.dart`
 - **What:** View bill details including receipt image.
 - **Why:** Members can verify bills by seeing the uploaded receipt.
 
-### `lib/modules/room/screens/dashboard/dashboard_screen.dart`
+### `lib/modules/room/presentation/screens/dashboard/dashboard_screen.dart`
 - **What:** Detailed room dashboard — per-member balances, who-owes-whom, charts.
 - **Why:** Deeper analytics beyond the home screen summary.
 
-### `lib/modules/room/screens/analytics/analytics_screen.dart`
+### `lib/modules/room/presentation/screens/analytics/analytics_screen.dart`
 - **What:** Charts screen — spend by person (bar chart), spend by category (pie chart).
 - **Why:** Visual representation helps users understand spending patterns.
 
-### `lib/modules/room/screens/activity/activity_screen.dart`
+### `lib/modules/room/presentation/screens/activity/activity_screen.dart`
 - **What:** Chronological timeline of all room actions — expenses added/edited/deleted, settlements, members joining.
 - **Why:** Transparency and accountability. Everyone can see what happened.
 
-### `lib/modules/room/screens/settlement/settlement_screen.dart`
+### `lib/modules/room/presentation/screens/settlement/settlement_screen.dart`
 - **What:** Shows debts with "Pay via UPI" buttons and settlement confirmation.
 - **Why:** End-of-month flow. Users see what they owe and can pay with one tap.
 
-### `lib/modules/room/screens/settlement/upi_id_dialog.dart`
+### `lib/modules/room/presentation/screens/settlement/upi_id_dialog.dart`
 - **What:** Dialog to set/update user's UPI ID before settlement.
 - **Why:** UPI payments need a receiver ID. This prompts users who haven't set one.
 
@@ -446,39 +546,39 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Admin-only screen showing Firestore document counts and storage usage.
 - **Why:** Helps admins stay within free tier limits and identify cleanup needs.
 
-### `lib/modules/group/screens/groups_list_screen.dart`
+### `lib/modules/group/presentation/screens/groups_list_screen.dart`
 - **What:** Lists all groups the user belongs to. Shows archived badge, FAB to create, action button to join by code.
 - **Why:** Entry point for the Groups module. Navigates to group dashboard on tap.
 
-### `lib/modules/group/screens/create_group_screen.dart`
+### `lib/modules/group/presentation/screens/create_group_screen.dart`
 - **What:** Form to create a new group — name, description, start/end date pickers.
 - **Why:** Users create a shared group before adding expenses.
 
-### `lib/modules/group/screens/join_group_screen.dart`
+### `lib/modules/group/presentation/screens/join_group_screen.dart`
 - **What:** 6-character invite code entry with uppercase enforcement.
 - **Why:** Second user onboarding — join an existing group via shared code.
 
-### `lib/modules/group/screens/group_dashboard_screen.dart`
+### `lib/modules/group/presentation/screens/group_dashboard_screen.dart`
 - **What:** 3-tab screen: Overview (invite code card + balance cards), Expenses (list with long-press delete), Settle Up (simplified debts). Admin gets archive/restore menu; non-admin gets leave button.
 - **Why:** Central hub for a group — all group data and actions in one place.
 
-### `lib/modules/group/screens/group_expense_sheet.dart`
+### `lib/modules/group/presentation/screens/group_expense_sheet.dart`
 - **What:** Bottom sheet for adding group expenses — equal/select split, category dropdown, date picker, member filter chips.
 - **Why:** Quick expense entry within a group context.
 
-### `lib/modules/project/screens/projects_list_screen.dart`
+### `lib/modules/project/presentation/screens/projects_list_screen.dart`
 - **What:** Lists all user projects with budget progress bar and status color badge per project.
 - **Why:** Entry point for the Project Tracker module.
 
-### `lib/modules/project/screens/create_project_screen.dart`
+### `lib/modules/project/presentation/screens/create_project_screen.dart`
 - **What:** Form to create a project — name, description, project type dropdown, estimated budget, start/end dates.
 - **Why:** Users define a project envelope before tracking expenses against it.
 
-### `lib/modules/project/screens/project_dashboard_screen.dart`
+### `lib/modules/project/presentation/screens/project_dashboard_screen.dart`
 - **What:** 2-tab screen: Overview (budget card + category breakdown bars), Expenses (list with long-press delete). Status change via popup menu.
 - **Why:** Central hub for a project — budget tracking and expense history.
 
-### `lib/modules/project/screens/add_project_expense_sheet.dart`
+### `lib/modules/project/presentation/screens/add_project_expense_sheet.dart`
 - **What:** Bottom sheet for adding project expenses — universal categories, vendor field, payment method chips (cash/UPI/card/bank transfer), notes.
 - **Why:** Expense entry scoped to a project with vendor and payment context.
 
@@ -562,7 +662,7 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 
 ## Feature utilities — Utility Functions
 
-### `lib/modules/room/utils/split_calculator.dart`
+### `lib/modules/room/domain/policies/split_calculator.dart`
 - **What:** Pure functions to calculate split amounts — equal split, dynamic split, custom split.
 - **Why:** Reusable math logic separated from UI. Easy to unit test.
 
@@ -586,7 +686,7 @@ Reference to the app's main files, with **What** each does and **Why** it exists
 - **What:** Persistent banner at top of screen when device is offline.
 - **Why:** Users need to know their actions are queued and not yet synced.
 
-### `lib/modules/room/widgets/receipt_picker.dart`
+### `lib/modules/room/presentation/widgets/receipt_picker.dart`
 - **What:** Image picker widget for selecting/capturing receipt photos.
 - **Why:** Reused across expense and bill screens for receipt attachment.
 
