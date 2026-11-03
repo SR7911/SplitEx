@@ -6,6 +6,7 @@ import 'package:split_ex/modules/personal/presentation/budgets/providers/persona
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/screens/add_personal_transaction_screen.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 /// Personal category budgets for one month.
 class PersonalBudgetsScreen extends ConsumerWidget {
@@ -29,7 +30,11 @@ class PersonalBudgetsScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (budgets) {
           if (budgets.isEmpty) {
-            return const Center(child: Text('No budgets set.\nTap + to add category budgets.', textAlign: TextAlign.center));
+            return const AppEmptyState(
+              icon: Icons.pie_chart_outline_rounded,
+              title: 'No budgets set',
+              subtitle: 'Tap + to add category budgets',
+            );
           }
           return ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -39,32 +44,44 @@ class PersonalBudgetsScreen extends ConsumerWidget {
               final spent = spending[b.category] ?? 0;
               final ratio = b.budget > 0 ? spent / b.budget : 0.0;
               final percent = (ratio * 100).toInt();
-              final color = percent <= 70 ? Colors.green : percent <= 100 ? Colors.orange : Colors.red;
+              const kGreen = Color(0xFF22C55E);
+              const kAmber = Color(0xFFF59E0B);
+              const kRed   = Color(0xFFEF4444);
+              final color = percent <= 70 ? kGreen : percent <= 100 ? kAmber : kRed;
 
-              return Card(
-                elevation: 0,
-                child: ListTile(
-                  title: Text(b.category, style: const TextStyle(fontWeight: FontWeight.w500)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                clipBehavior: Clip.antiAlias,
+                decoration: appCardDecoration(context, accentColor: color),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+                  child: Row(
                     children: [
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(value: ratio.clamp(0, 1.5), color: color, minHeight: 6),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(b.category, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(value: ratio.clamp(0, 1.5), color: color, minHeight: 6),
+                            ),
+                            const SizedBox(height: 4),
+                            Text('₹${spent.toStringAsFixed(0)} / ₹${b.budget.toStringAsFixed(0)} ($percent%)', style: TextStyle(fontSize: 11, color: color)),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      Text('₹${spent.toStringAsFixed(0)} / ₹${b.budget.toStringAsFixed(0)} ($percent%)', style: TextStyle(fontSize: 11, color: color)),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        onPressed: () async {
+                          final userId = ref.read(personalUserIdProvider).valueOrNull;
+                          if (userId != null) {
+                            await ref.read(personalBudgetRepositoryProvider).delete(userId, b.id);
+                          }
+                        },
+                      ),
                     ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: () async {
-                      final userId = ref.read(personalUserIdProvider).valueOrNull;
-                      if (userId != null) {
-                        await ref.read(personalBudgetRepositoryProvider).delete(userId, b.id);
-                      }
-                    },
                   ),
                 ),
               );

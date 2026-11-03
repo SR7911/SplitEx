@@ -202,22 +202,30 @@ class _DrawerTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final effectiveColor = color ?? cs.onSurface;
-    return ListTile(
-      dense: true,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-      leading: Icon(icon, size: 20, color: effectiveColor.withValues(alpha: onTap != null ? 0.75 : 0.4)),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: onTap != null ? effectiveColor : effectiveColor.withValues(alpha: 0.4),
-        ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
-      subtitle: subtitle != null
-          ? Text(subtitle!, style: AppTextStyles.caption(context))
-          : null,
-      onTap: onTap,
+      child: ListTile(
+        tileColor: Colors.transparent,
+        dense: true,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+        leading: Icon(icon, size: 20, color: effectiveColor.withValues(alpha: onTap != null ? 0.75 : 0.4)),
+        title: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: onTap != null ? effectiveColor : effectiveColor.withValues(alpha: 0.4),
+          ),
+        ),
+        subtitle: subtitle != null
+            ? Text(subtitle!, style: AppTextStyles.caption(context))
+            : null,
+        onTap: onTap,
+      ),
     );
   }
 }

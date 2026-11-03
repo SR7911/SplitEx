@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-enum AppPalette { purple, blue, teal, emerald, charcoal, rose, orange, indigo, cyan, amber }
+enum AppPalette { purple, blue, teal, emerald, charcoal, rose, orange, indigo, cyan, amber, mint, violet, pink, lime, sky, coral, gold, slate }
 
 enum AppThemeMode { light, dark, deepDark, system }
 
@@ -65,6 +65,46 @@ class AppTheme {
       light: Color(0xFFD97706),
       dark: Color(0xFFFBBF24),
       name: 'Amber',
+    ),
+    AppPalette.mint: _PaletteColors(
+      light: Color(0xFF00C896),
+      dark: Color(0xFF34EEB0),
+      name: 'Mint',
+    ),
+    AppPalette.violet: _PaletteColors(
+      light: Color(0xFF8B5CF6),
+      dark: Color(0xFFC4B5FD),
+      name: 'Violet',
+    ),
+    AppPalette.pink: _PaletteColors(
+      light: Color(0xFFEC4899),
+      dark: Color(0xFFF9A8D4),
+      name: 'Pink',
+    ),
+    AppPalette.lime: _PaletteColors(
+      light: Color(0xFF65A30D),
+      dark: Color(0xFFBEF264),
+      name: 'Lime',
+    ),
+    AppPalette.sky: _PaletteColors(
+      light: Color(0xFF0284C7),
+      dark: Color(0xFF7DD3FC),
+      name: 'Sky',
+    ),
+    AppPalette.coral: _PaletteColors(
+      light: Color(0xFFFF6B6B),
+      dark: Color(0xFFFF9A9A),
+      name: 'Coral',
+    ),
+    AppPalette.gold: _PaletteColors(
+      light: Color(0xFFB7791F),
+      dark: Color(0xFFFCD34D),
+      name: 'Gold',
+    ),
+    AppPalette.slate: _PaletteColors(
+      light: Color(0xFF475569),
+      dark: Color(0xFF94A3B8),
+      name: 'Slate',
     ),
   };
 
@@ -199,6 +239,7 @@ class AppTheme {
       ),
       dividerTheme: DividerThemeData(color: Colors.grey.shade200, thickness: 1),
       listTileTheme: const ListTileThemeData(
+        tileColor: Colors.white,
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         titleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF1A1A2E)),
         subtitleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400, fontSize: 13, color: Color(0xFF6B7280)),
@@ -347,6 +388,7 @@ class AppTheme {
       ),
       dividerTheme: DividerThemeData(color: Colors.white.withValues(alpha: 0.07), thickness: 1),
       listTileTheme: const ListTileThemeData(
+        tileColor: cardColor,
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         titleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
         subtitleTextStyle: TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w400, fontSize: 13, color: Colors.white70),
@@ -393,6 +435,12 @@ class AppTheme {
         ),
       ),
       inputDecorationTheme: base.inputDecorationTheme.copyWith(fillColor: cardColor),
+      listTileTheme: const ListTileThemeData(
+        tileColor: cardColor,
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        titleTextStyle: TextStyle(fontFamily: 'Gilmer', fontWeight: FontWeight.w700, fontSize: 16, color: Colors.white),
+        subtitleTextStyle: TextStyle(fontFamily: 'Gilmer', fontWeight: FontWeight.w400, fontSize: 13, color: Colors.white70),
+      ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),

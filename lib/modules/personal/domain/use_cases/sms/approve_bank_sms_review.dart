@@ -1,6 +1,8 @@
 import '../../policies/sms/bank_sms_parser.dart';
 import '../../repositories/bank_sms_device_gateway.dart';
 import '../../repositories/bank_sms_repository.dart';
+import '../../entities/transactions/expense_split.dart';
+import '../../entities/transactions/personal_transaction.dart';
 
 class ApproveBankSmsReview {
   final PersonalBankSmsRepository repository;
@@ -24,6 +26,11 @@ class ApproveBankSmsReview {
     String? toAccountId,
     bool trustSender = false,
     bool rememberCategory = false,
+    ExpenseSplit? split,
+    DebtType? debtType,
+    String? personName,
+    DateTime? dueDate,
+    String? notes,
   }) async {
     final result = debtAllocations != null
         ? await repository.saveDebtSettlement(
@@ -55,6 +62,11 @@ class ApproveBankSmsReview {
             date: date,
             direction: direction,
             rememberCategory: rememberCategory,
+            split: split,
+            debtType: debtType,
+            personName: personName,
+            dueDate: dueDate,
+            notes: notes,
           );
     if (!isActive()) return result;
     if (trustSender && sms.source == 'sms') {

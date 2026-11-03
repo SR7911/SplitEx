@@ -33,7 +33,7 @@ class _PersonalReportsSheet extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final summary = ref.watch(personalDomainMonthlySummaryProvider(monthKey));
     final spending = ref.watch(personalDomainCategorySpendingProvider(monthKey));
-    final txns = (ref.watch(personalMonthTransactionsProvider(monthKey)).valueOrNull ?? <PersonalTransaction>[])
+    final txns = (ref.watch(personalMonthDisplayTransactionsProvider(monthKey)).valueOrNull ?? <PersonalTransaction>[])
         .where((entry) => entry.countsAsIncome || entry.countsAsSpending)
         .toList();
     final entries = spending.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -293,7 +293,7 @@ class _WeeklyAnalysisSection extends StatelessWidget {
       int txnCount = 0;
       for (final t in transactions) {
         if (t.date.day >= range.$1 && t.date.day <= range.$2) {
-          if (t.isExpense) expense += t.amount;
+          if (t.isExpense) expense += t.spendingAmount;
           else income += t.amount;
           txnCount++;
         }
@@ -466,7 +466,7 @@ class _DailySpendingChart extends StatelessWidget {
 
     final dailyExpense = <int, double>{};
     for (final t in transactions) {
-      if (t.isExpense) dailyExpense[t.date.day] = (dailyExpense[t.date.day] ?? 0) + t.amount;
+      if (t.isExpense) dailyExpense[t.date.day] = (dailyExpense[t.date.day] ?? 0) + t.spendingAmount;
     }
 
     final maxVal = dailyExpense.values.isEmpty ? 100.0 : dailyExpense.values.reduce((a, b) => a > b ? a : b);

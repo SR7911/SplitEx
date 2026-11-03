@@ -12,8 +12,14 @@ import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_tally_
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
-const _kGreen = Color(0xFF22C55E);
-const _kRed = Color(0xFFEF4444);
+// accent colors resolved per-widget from theme
+
+const _kLent = Color(0xFF10B981);
+const _kBorrowed = Color(0xFFF43F5E);
+
+Color _lentColor(BuildContext context) => _kLent;
+
+Color _borrowedColor(BuildContext context) => _kBorrowed;
 
 /// Personal debt overview backed by domain debt transactions.
 class DebtDashboardScreen extends ConsumerWidget {
@@ -112,7 +118,7 @@ class _DashboardBody extends StatelessWidget {
         _TopDebtsSection(
           title: 'Top Lent Debts',
           icon: Icons.call_made,
-          color: _kGreen,
+          color: _lentColor(context),
           debts: lent.where((t) => !t.isSettled).toList()
             ..sort((a, b) => b.remainingAmount.compareTo(a.remainingAmount)),
         ),
@@ -120,7 +126,7 @@ class _DashboardBody extends StatelessWidget {
         _TopDebtsSection(
           title: 'Top Borrowed Debts',
           icon: Icons.call_received,
-          color: _kRed,
+          color: _borrowedColor(context),
           debts: borrowed.where((t) => !t.isSettled).toList()
             ..sort((a, b) => b.remainingAmount.compareTo(a.remainingAmount)),
         ),
@@ -165,25 +171,27 @@ class _HeroCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: gradientColors.first.withValues(alpha: 0.4),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: gradientColors.first.withValues(alpha: 0.35),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Net Balance',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Text(
+                  'Net Balance',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
               GestureDetector(
@@ -193,31 +201,24 @@ class _HeroCard extends StatelessWidget {
                   debts.where((t) => !t.isSettled).toList(),
                 ),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(
+                  child: const Text(
                     'View All',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            '${isPositive ? '+' : '-'}₹${netBalance.abs().toStringAsFixed(0)}',
+            '${isPositive ? '+' : '-'}₹${NumberFormat('#,##0').format(netBalance.abs())}',
             style: const TextStyle(
-              fontSize: 38,
+              fontSize: 36,
               fontWeight: FontWeight.w800,
               color: Colors.white,
               letterSpacing: -1.5,
@@ -228,26 +229,27 @@ class _HeroCard extends StatelessWidget {
             isPositive
                 ? 'Others owe you more · $activeCount active'
                 : 'You owe others more · $activeCount active',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.65),
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.6)),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
-              _HeroChip(
-                icon: Icons.call_made,
-                label: 'Lent',
-                value: '₹${totalLent.toStringAsFixed(0)}',
-                color: _kGreen,
+              Expanded(
+                child: _HeroStatChip(
+                  icon: Icons.call_made_rounded,
+                  label: 'You Lent',
+                  value: '₹${NumberFormat('#,##0').format(totalLent)}',
+                  color: _lentColor(context),
+                ),
               ),
-              const SizedBox(width: 10),
-              _HeroChip(
-                icon: Icons.call_received,
-                label: 'Borrowed',
-                value: '₹${totalBorrowed.toStringAsFixed(0)}',
-                color: _kRed,
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _HeroStatChip(
+                  icon: Icons.call_received_rounded,
+                  label: 'You Borrowed',
+                  value: '₹${NumberFormat('#,##0').format(totalBorrowed)}',
+                  color: _borrowedColor(context),
+                ),
               ),
             ],
           ),
@@ -257,12 +259,12 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-class _HeroChip extends StatelessWidget {
+class _HeroStatChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Color color;
-  const _HeroChip({
+  const _HeroStatChip({
     required this.icon,
     required this.label,
     required this.value,
@@ -271,47 +273,36 @@ class _HeroChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.13),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 14, color: Colors.white),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            const SizedBox(width: 8),
-            Column(
+            child: Icon(icon, size: 15, color: Colors.white),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white.withValues(alpha: 0.65),
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
+                Text(label, style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.6))),
+                const SizedBox(height: 2),
+                Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -325,82 +316,17 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
-        _ActionBtn(
-          icon: Icons.calendar_month,
-          label: 'Monthly Debts',
-          color: primary,
-          onTap: () => context.push('/personal/debt-list'),
-        ),
-        const SizedBox(width: 10),
-        _ActionBtn(
-          icon: Icons.list_alt_rounded,
-          label: 'View All',
-          color: primary,
-          onTap: () => context.push('/personal/debts'),
-        ),
-        const SizedBox(width: 10),
-        _ActionBtn(
-          icon: Icons.call_made,
-          label: 'Lent',
-          color: _kGreen,
-          onTap: () => context.push('/personal/debts'),
-        ),
-        const SizedBox(width: 10),
-        _ActionBtn(
-          icon: Icons.call_received,
-          label: 'Borrowed',
-          color: _kRed,
-          onTap: () => context.push('/personal/debts?tab=1'),
-        ),
+        Expanded(child: AppQuickActionTile(icon: Icons.calendar_month_rounded, label: 'Monthly', color: cs.primary, onTap: () => context.push('/personal/debt-list'))),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: AppQuickActionTile(icon: Icons.list_alt_rounded, label: 'All Debts', color: const Color(0xFF6366F1), onTap: () => context.push('/personal/debts'))),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: AppQuickActionTile(icon: Icons.call_made_rounded, label: 'Lent', color: _lentColor(context), onTap: () => context.push('/personal/debts'))),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: AppQuickActionTile(icon: Icons.call_received_rounded, label: 'Borrowed', color: _borrowedColor(context), onTap: () => context.push('/personal/debts?tab=1'))),
       ],
-    );
-  }
-}
-
-class _ActionBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ActionBtn({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: isDark ? 0.12 : 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -444,68 +370,55 @@ class _MonthlyChart extends StatelessWidget {
     if (maxVal == 0) return const SizedBox.shrink();
 
     return Container(
-      decoration: debtCardDecoration(context),
-      padding: const EdgeInsets.all(16),
+      decoration: appCardDecoration(context),
+      padding: const EdgeInsets.all(AppSpacing.base),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppSectionHeader(
             title: 'Monthly Debt Activity',
             actionLabel: 'View All',
-            onAction: () => showDebtDetailsSheet(
-              context,
-              'Monthly Debt Activity',
-              allDebts,
-            ),
+            onAction: () => showDebtDetailsSheet(context, 'Monthly Debt Activity', allDebts),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.base),
           SizedBox(
-            height: 140,
+            height: 150,
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
-                maxY: maxVal * 1.2,
+                maxY: maxVal * 1.25,
                 barTouchData: BarTouchData(
                   enabled: true,
                   touchTooltipData: BarTouchTooltipData(
                     fitInsideHorizontally: true,
                     fitInsideVertically: true,
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) =>
-                        BarTooltipItem(
-                          '${DateFormat('MMM yyyy').format(DateTime.parse('${months[group.x]}-01'))}\n${rodIndex == 0 ? 'Lent' : 'Borrowed'}: ₹${NumberFormat('#,##0.##').format(rod.toY)}',
-                          const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final dt = DateTime.parse('${months[group.x]}-01');
+                      final label = '${DateFormat('MMM yyyy').format(dt)}';
+                      final type = rodIndex == 0 ? 'Lent' : 'Borrowed';
+                      final amt = NumberFormat('#,##0').format(rod.toY);
+                      return BarTooltipItem(
+                        '$label\n$type: ₹$amt',
+                        const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                      );
+                    },
                   ),
                 ),
                 titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (val, _) {
                         final idx = val.toInt();
-                        if (idx < 0 || idx >= months.length)
-                          return const SizedBox.shrink();
-                        final label = DateFormat(
-                          'MMM',
-                        ).format(DateTime.parse('${months[idx]}-01'));
-                        return Text(
-                          label,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: cs.onSurface.withValues(alpha: 0.5),
+                        if (idx < 0 || idx >= months.length) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            DateFormat('MMM').format(DateTime.parse('${months[idx]}-01')),
+                            style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5)),
                           ),
                         );
                       },
@@ -515,41 +428,31 @@ class _MonthlyChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => FlLine(
-                    color: cs.outline.withValues(alpha: 0.08),
-                    strokeWidth: 1,
-                  ),
+                  getDrawingHorizontalLine: (_) => FlLine(color: cs.outline.withValues(alpha: 0.08), strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: List.generate(months.length, (i) {
                   final m = months[i];
+                  final lc = _lentColor(context);
+                  final bc = _borrowedColor(context);
                   return BarChartGroupData(
                     x: i,
+                    groupVertically: false,
                     barRods: [
-                      BarChartRodData(
-                        toY: lentByMonth[m]!,
-                        color: _kGreen,
-                        width: 8,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      BarChartRodData(
-                        toY: borrowedByMonth[m]!,
-                        color: _kRed,
-                        width: 8,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                      BarChartRodData(toY: lentByMonth[m]!, color: lc, width: 9, borderRadius: BorderRadius.circular(AppRadius.sm)),
+                      BarChartRodData(toY: borrowedByMonth[m]!, color: bc, width: 9, borderRadius: BorderRadius.circular(AppRadius.sm)),
                     ],
                   );
                 }),
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              _Legend(color: _kGreen, label: 'Lent'),
-              const SizedBox(width: 16),
-              _Legend(color: _kRed, label: 'Borrowed'),
+              _ChartDot(color: _lentColor(context), label: 'Lent'),
+              const SizedBox(width: AppSpacing.base),
+              _ChartDot(color: _borrowedColor(context), label: 'Borrowed'),
             ],
           ),
         ],
@@ -558,34 +461,18 @@ class _MonthlyChart extends StatelessWidget {
   }
 }
 
-class _Legend extends StatelessWidget {
+class _ChartDot extends StatelessWidget {
   final Color color;
   final String label;
-  const _Legend({required this.color, required this.label});
-
+  const _ChartDot({required this.color, required this.label});
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.6),
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
       ],
     );
   }
@@ -609,64 +496,60 @@ class _BorrowedVsLentChart extends StatelessWidget {
     if (total == 0) return const SizedBox.shrink();
 
     return Container(
-      decoration: debtCardDecoration(context),
-      padding: const EdgeInsets.all(16),
+      decoration: appCardDecoration(context),
+      padding: const EdgeInsets.all(AppSpacing.base),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppSectionHeader(
             title: 'Lent vs Borrowed',
             actionLabel: 'View All',
-            onAction: () => showDebtDetailsSheet(
-              context,
-              'Outstanding Debts',
-              debts.where((t) => !t.isSettled).toList(),
-            ),
+            onAction: () => showDebtDetailsSheet(context, 'Outstanding Debts', debts.where((t) => !t.isSettled).toList()),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.base),
           Row(
             children: [
               SizedBox(
-                width: 100,
-                height: 100,
+                width: 110,
+                height: 110,
                 child: PieChart(
                   PieChartData(
-                    sectionsSpace: 3,
-                    centerSpaceRadius: 28,
+                    sectionsSpace: 2,
+                    centerSpaceRadius: 30,
                     sections: [
-                      PieChartSectionData(
-                        value: totalLent,
-                        color: _kGreen,
-                        title: '',
-                        radius: 32,
-                      ),
-                      PieChartSectionData(
-                        value: totalBorrowed,
-                        color: _kRed,
-                        title: '',
-                        radius: 32,
-                      ),
+                      PieChartSectionData(value: totalLent, color: _lentColor(context), title: '', radius: 34),
+                      PieChartSectionData(value: totalBorrowed, color: _borrowedColor(context), title: '', radius: 34),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ChartLegendRow(
-                      color: _kGreen,
-                      label: 'You Lent',
-                      amount: totalLent,
-                      total: total,
+                    _PieLegendRow(color: _lentColor(context), label: 'You Lent', amount: totalLent, total: total),
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: totalLent / total,
+                        backgroundColor: _borrowedColor(context).withValues(alpha: 0.2),
+                        valueColor: AlwaysStoppedAnimation(_lentColor(context)),
+                        minHeight: 5,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _ChartLegendRow(
-                      color: _kRed,
-                      label: 'You Borrowed',
-                      amount: totalBorrowed,
-                      total: total,
+                    const SizedBox(height: AppSpacing.md),
+                    _PieLegendRow(color: _borrowedColor(context), label: 'You Borrowed', amount: totalBorrowed, total: total),
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: totalBorrowed / total,
+                        backgroundColor: _lentColor(context).withValues(alpha: 0.2),
+                        valueColor: AlwaysStoppedAnimation(_borrowedColor(context)),
+                        minHeight: 5,
+                      ),
                     ),
                   ],
                 ),
@@ -679,55 +562,24 @@ class _BorrowedVsLentChart extends StatelessWidget {
   }
 }
 
-class _ChartLegendRow extends StatelessWidget {
+class _PieLegendRow extends StatelessWidget {
   final Color color;
   final String label;
   final double amount;
   final double total;
-  const _ChartLegendRow({
-    required this.color,
-    required this.label,
-    required this.amount,
-    required this.total,
-  });
-
+  const _PieLegendRow({required this.color, required this.label, required this.amount, required this.total});
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final pct = total > 0 ? (amount / total * 100).toInt() : 0;
     return Row(
       children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: cs.onSurface.withValues(alpha: 0.7),
-            ),
-          ),
-        ),
-        Text(
-          '₹${amount.toStringAsFixed(0)}',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text(
-          '$pct%',
-          style: TextStyle(
-            fontSize: 11,
-            color: cs.onSurface.withValues(alpha: 0.4),
-          ),
-        ),
+        Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7)))),
+        Text('₹${NumberFormat('#,##0').format(amount)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+        const SizedBox(width: 6),
+        Text('$pct%', style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4))),
       ],
     );
   }
@@ -848,7 +700,7 @@ class DebtInsights extends StatelessWidget {
               icon: type == DebtType.lent
                   ? Icons.call_made
                   : Icons.call_received,
-              color: type == DebtType.lent ? _kGreen : _kRed,
+              color: type == DebtType.lent ? _lentColor(context) : _borrowedColor(context),
               debts:
                   debts
                       .where((t) => !t.isSettled && t.debtType == type)

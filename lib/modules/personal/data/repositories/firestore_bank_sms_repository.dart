@@ -8,6 +8,8 @@ import 'package:split_ex/modules/personal/domain/repositories/bank_sms_repositor
 import 'package:split_ex/modules/personal/data/datasources/personal_firestore_data_source.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
 import 'package:split_ex/modules/personal/data/models/personal_transaction_firestore_model.dart';
+import '../../domain/entities/transactions/expense_split.dart';
+import '../../domain/policies/transactions/transaction_validation.dart';
 
 export 'package:split_ex/modules/personal/domain/repositories/bank_sms_repository.dart'
     show BankSmsMatch, BankSmsSaveResult, BankSmsDebtAllocation;
@@ -299,6 +301,11 @@ class FirestoreBankSmsRepository implements PersonalBankSmsRepository {
     bool matchAccount = false,
     bool applyMerchantRule = false,
     bool rememberCategory = false,
+    ExpenseSplit? split,
+    DebtType? debtType,
+    String? personName,
+    DateTime? dueDate,
+    String? notes,
   }) async {
     final value = amount ?? sms.amount;
     if (!value.isFinite || value <= 0) {
@@ -310,6 +317,39 @@ class FirestoreBankSmsRepository implements PersonalBankSmsRepository {
     final when = date ?? sms.date;
     final receipt = _receipt(uid, sms);
     final target = _transactions(uid).doc(existingId ?? sms.transactionId);
+    if (existingId != null && (split != null || debtType != null)) {
+      throw StateError('Edit the existing transaction to change its sharing.');
+    }
+    if (debtType != null &&
+        ((personName?.trim().isEmpty ?? true) ||
+            (debtType == DebtType.lent) != (type == 'expense'))) {
+      throw StateError(
+        'Enter a person and choose the matching payment direction.',
+      );
+    }
+    validatePersonalTransactionForCreate(
+      PersonalTransaction(
+        id: target.id,
+        title: title ?? sms.title,
+        amount: value,
+        type: type == 'expense'
+            ? TransactionType.expense
+            : TransactionType.income,
+        category: category,
+        date: when,
+        userId: uid,
+        month: DateFormat('yyyy-MM').format(when),
+        createdAt: DateTime.now(),
+        split: split,
+        debtType: debtType,
+        personName: personName,
+        dueDate: dueDate,
+      ),
+    );
+    final children = [
+      for (final share in split?.shares ?? const <ExpenseSplitShare>[])
+        (share: share, ref: _transactions(uid).doc()),
+    ];
     var assignedAccount = accountId;
     if (assignedAccount == null && matchAccount && sms.accountLast4 != null) {
       final matches = await _source
@@ -364,6 +404,27 @@ class FirestoreBankSmsRepository implements PersonalBankSmsRepository {
         }
         transaction.update(target, metadata);
       } else if (!existing.exists) {
+        for (final child in children) {
+          transaction.set(child.ref, {
+            'title':
+                'Share of ${title?.trim().isNotEmpty == true ? title!.trim() : sms.title}',
+            'amount': child.share.amount,
+            'type': 'expense',
+            'category': selectedCategory,
+            'date': Timestamp.fromDate(when),
+            'month': DateFormat('yyyy-MM').format(when),
+            'userId': uid,
+            'createdAt': FieldValue.serverTimestamp(),
+            'debtType': 'lent',
+            'personName': child.share.personName.trim(),
+            'splitSourceId': target.id,
+            'isSettled': false,
+            'settledAmount': 0,
+            'writtenOffAmount': 0,
+            'partialSettlements': [],
+            if (dueDate != null) 'dueDate': Timestamp.fromDate(dueDate),
+          });
+        }
         transaction.set(target, {
           'title': title?.trim().isNotEmpty == true ? title!.trim() : sms.title,
           'amount': value,
@@ -374,7 +435,7 @@ class FirestoreBankSmsRepository implements PersonalBankSmsRepository {
           'userId': uid,
           'createdAt': FieldValue.serverTimestamp(),
           'notes':
-              'Recorded from bank SMS (${sms.sender})'
+              '${notes?.trim().isNotEmpty == true ? '${notes!.trim()}\n' : ''}Recorded from bank SMS (${sms.sender})'
               '${sms.reference == null ? '' : ' · Ref ${sms.reference}'}'
               '${sms.accountLast4 == null ? '' : ' · Account ending ${sms.accountLast4}'}',
           'source': 'bank_sms',
@@ -382,6 +443,22 @@ class FirestoreBankSmsRepository implements PersonalBankSmsRepository {
           'isSettled': false,
           'settledAmount': 0,
           'partialSettlements': [],
+          if (dueDate != null) 'dueDate': Timestamp.fromDate(dueDate),
+          if (debtType != null) ...{
+            'debtType': debtType.name,
+            'personName': personName!.trim(),
+          },
+          if (split != null) ...{
+            'splitMode': split.mode.name,
+            'splitShares': [
+              for (final child in children)
+                {
+                  'personName': child.share.personName.trim(),
+                  'amount': child.share.amount,
+                  'debtId': child.ref.id,
+                },
+            ],
+          },
           ...metadata,
         });
       }

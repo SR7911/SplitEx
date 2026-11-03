@@ -32,7 +32,9 @@ class ExpensesWidgetSnapshot {
       if (!entry.amount.isFinite || entry.amount < 0) {
         throw const FormatException('Invalid transaction amount');
       }
-      final minor = (entry.amount * 100).round();
+      final minor =
+          ((entry.hasSharedExpense ? entry.spendingAmount : entry.amount) * 100)
+              .round();
       if (entry.isExpense) {
         expenses += minor;
         count++;
@@ -60,7 +62,11 @@ class ExpensesWidgetSnapshot {
       symbol: '\u20b9',
       decimalDigits: 2,
     );
-    final wholeMoney = NumberFormat.currency(locale: 'en_IN', symbol: '\u20b9', decimalDigits: 0);
+    final wholeMoney = NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '\u20b9',
+      decimalDigits: 0,
+    );
     return {
       'schemaVersion': 2,
       'userId': userId,

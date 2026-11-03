@@ -5,6 +5,7 @@ import 'package:split_ex/modules/project/domain/entities/project_model.dart';
 import 'package:split_ex/modules/project/presentation/providers/project_provider.dart';
 import 'package:split_ex/modules/project/presentation/screens/add_project_expense_sheet.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 class ProjectExpensesScreen extends ConsumerStatefulWidget {
@@ -173,7 +174,7 @@ class _ProjectExpensesScreenState extends ConsumerState<ProjectExpensesScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Text('${filtered.length} expenses', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+                    Text('${filtered.length} expenses', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
                     const Spacer(),
                     Text(
                       'Total: ₹${filtered.fold(0.0, (s, e) => s + e.amount).toStringAsFixed(0)}',
@@ -222,23 +223,19 @@ class _ExpenseCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUserIdProvider);
-    final debtColor = expense.debtType == ProjectDebtType.lent ? Colors.green : Colors.red;
+    final debtColor = expense.debtType == ProjectDebtType.lent ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
 
     return GestureDetector(
       onTap: () => _showDetail(context, ref, uid),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.1)),
-        ),
+        decoration: appCardDecoration(context, accentColor: expense.hasDebt ? debtColor : Theme.of(context).colorScheme.primary),
         child: Row(
           children: [
             CircleAvatar(
               radius: 20,
-              backgroundColor: expense.hasDebt ? debtColor.withOpacity(0.1) : Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              backgroundColor: expense.hasDebt ? debtColor.withValues(alpha: 0.1) : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               child: Icon(
                 expense.hasDebt ? (expense.debtType == ProjectDebtType.lent ? Icons.call_made : Icons.call_received) : Icons.receipt_long,
                 size: 18,
@@ -256,13 +253,13 @@ class _ExpenseCard extends ConsumerWidget {
                     children: [
                       Text(
                         '${expense.category} • ${DateFormat('dd MMM').format(expense.date)}',
-                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
                       ),
                       if (expense.hasDebt) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(color: debtColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                          decoration: BoxDecoration(color: debtColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
                           child: Text(
                             expense.isSettled ? 'Settled' : (expense.debtType == ProjectDebtType.lent ? 'Lent' : 'Borrowed'),
                             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: expense.isSettled ? Colors.grey : debtColor),
@@ -272,7 +269,7 @@ class _ExpenseCard extends ConsumerWidget {
                     ],
                   ),
                   if (expense.personName != null)
-                    Text(expense.personName!, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
+                    Text(expense.personName!, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4))),
                 ],
               ),
             ),
@@ -318,7 +315,7 @@ class _FilterChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
       ),
@@ -420,3 +417,8 @@ class _ProjectFilterBottomSheetState extends State<_ProjectFilterBottomSheet> {
     );
   }
 }
+
+
+
+
+

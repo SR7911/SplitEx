@@ -1,5 +1,6 @@
 import '../policies/sms/bank_sms_parser.dart';
 import '../entities/transactions/personal_transaction.dart';
+import '../entities/transactions/expense_split.dart';
 
 class BankSmsMatch {
   final String id, title;
@@ -66,5 +67,10 @@ abstract class PersonalBankSmsRepository {
     bool matchAccount = false,
     bool applyMerchantRule = false,
     bool rememberCategory = false,
+    ExpenseSplit? split,
+    DebtType? debtType,
+    String? personName,
+    DateTime? dueDate,
+    String? notes,
   });
 }

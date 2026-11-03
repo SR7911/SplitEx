@@ -12,6 +12,10 @@ import 'package:split_ex/modules/personal/presentation/accounts/providers/person
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_due_date_picker.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/widgets/expense_split_editor.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/widgets/shared_expense_details.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showPersonalTransactionDetail(
   BuildContext context,
@@ -123,16 +127,14 @@ class _TransactionDetailSheetState
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Updated')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Updated')));
       }
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not update: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Could not update: $e')));
       }
     }
   }
@@ -163,580 +165,437 @@ class _TransactionDetailSheetState
       await ref.read(deletePersonalTransactionProvider)(userId, widget.txn.id);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
       }
       return;
     }
     if (mounted) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Deleted')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Deleted')));
     }
   }
 
+  Widget _optionSwitch({
+    required String title,
+    String? subtitle,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return SwitchListTile(
+      value: value,
+      onChanged: _saving ? null : onChanged,
+      title: Text(title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle,
+              style: TextStyle(
+                  fontSize: 11, color: cs.onSurface.withValues(alpha: .6))),
+      secondary:
+          Icon(icon, size: 20, color: cs.onSurface.withValues(alpha: .5)),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isNeutralLent =
-        !_editing &&
-        widget.txn.debtType == DebtType.lent &&
-        widget.txn.isSettled;
-    final isIncome =
-        _type == TransactionType.income &&
-        (_editing || widget.txn.debtType != DebtType.borrowed);
-    final color = isNeutralLent
-        ? Colors.blueGrey
+    final txn = widget.txn.hasSharedExpense
+        ? ref
+                .watch(
+                  personalMonthDisplayTransactionsProvider(widget.txn.month),
+                )
+                .valueOrNull
+                ?.where((entry) => entry.id == widget.txn.id)
+                .firstOrNull ??
+            widget.txn
+        : widget.txn;
+
+    if (_editing) return _buildEditMode(context, txn);
+
+    // ── VIEW MODE ──
+    final isNeutralLent = txn.debtType == DebtType.lent && txn.isSettled;
+    final isIncome = txn.type == TransactionType.income &&
+        txn.debtType != DebtType.borrowed;
+    final amountColor = isNeutralLent
+        ? AppColors.info(context)
         : isIncome
-        ? Colors.green
-        : Colors.red;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+            ? AppColors.success(context)
+            : AppColors.error(context);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            Center(
-              child: Container(
-                width: 48,
-                height: 5,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+    return PersonalFormSheet(
+      title: 'Transaction Details',
+      icon: Icons.receipt_long_rounded,
+      trailing: txn.splitSourceId == null && txn.debtSourceId == null
+          ? Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                onPressed: () => setState(() => _editing = true),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+                visualDensity: VisualDensity.compact,
               ),
-            ),
-
-            // Header with actions
-            Row(
+              IconButton(
+                onPressed: _delete,
+                icon: Icon(Icons.delete_outline,
+                    color: AppColors.error(context)),
+                tooltip: 'Delete',
+                visualDensity: VisualDensity.compact,
+              ),
+            ])
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.base),
+            decoration: appCardDecoration(context),
+            child: Column(
               children: [
-                Icon(Icons.receipt_long, color: color, size: 24),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _editing ? 'Edit Transaction' : 'Transaction Details',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
-                  ),
-                ),
-                if (!_editing &&
-                    widget.txn.splitSourceId == null &&
-                    widget.txn.debtSourceId == null) ...[
-                  IconButton(
-                    onPressed: () => setState(() => _editing = true),
-                    icon: const Icon(Icons.edit_outlined),
-                    tooltip: 'Edit',
-                  ),
-                  IconButton(
-                    onPressed: _delete,
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: 'Delete',
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            if (!_editing) ...[
-              // View mode
-              _DetailCard(
-                color: color,
-                isDark: isDark,
-                children: [
-                  _DetailRow(
+                _ViewRow(
                     icon: Icons.title,
                     label: 'Title',
-                    value: widget.txn.title,
-                  ),
-                  _DetailRow(
-                    icon: Icons.currency_rupee,
-                    label: 'Amount',
-                    value: '₹${widget.txn.amount.toStringAsFixed(0)}',
-                    valueColor: color,
-                  ),
-                  _DetailRow(
-                    icon: isNeutralLent
-                        ? Icons.handshake_outlined
-                        : isIncome
-                        ? Icons.arrow_downward
-                        : Icons.arrow_upward,
-                    label: 'Type',
-                    value: widget.txn.debtType == DebtType.lent
-                        ? 'LENT DEBT'
-                        : widget.txn.debtType == DebtType.borrowed
-                        ? 'BORROWED DEBT'
-                        : _type.name.toUpperCase(),
-                  ),
-                  _DetailRow(
-                    icon: Icons.category,
+                    value: txn.title),
+                _ViewRow(
+                  icon: Icons.currency_rupee_rounded,
+                  label: 'Amount',
+                  value: '₹${txn.amount.toStringAsFixed(0)}',
+                  valueColor: amountColor,
+                ),
+                _ViewRow(
+                  icon: isNeutralLent
+                      ? Icons.handshake_outlined
+                      : isIncome
+                          ? Icons.south_rounded
+                          : Icons.north_rounded,
+                  label: 'Type',
+                  value: txn.debtType == DebtType.lent
+                      ? 'Lent Debt'
+                      : txn.debtType == DebtType.borrowed
+                          ? 'Borrowed Debt'
+                          : txn.type.name[0].toUpperCase() +
+                              txn.type.name.substring(1),
+                ),
+                _ViewRow(
+                    icon: Icons.label_outline_rounded,
                     label: 'Category',
-                    value: widget.txn.category,
+                    value: txn.category),
+                _ViewRow(
+                  icon: Icons.calendar_today_rounded,
+                  label: 'Date',
+                  value: DateFormat('dd MMM yyyy').format(txn.date),
+                ),
+                if (txn.accountId != null)
+                  _ViewRow(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Account',
+                    value: ref
+                            .watch(personalAccountsProvider)
+                            .valueOrNull
+                            ?.where((a) => a.id == txn.accountId)
+                            .firstOrNull
+                            ?.name ??
+                        'Assigned account',
                   ),
-                  _DetailRow(
-                    icon: Icons.calendar_today,
-                    label: 'Date',
-                    value: DateFormat('dd MMM yyyy').format(widget.txn.date),
+                if (txn.dueDate != null)
+                  _ViewRow(
+                    icon: Icons.event_outlined,
+                    label: 'Repayment due',
+                    value: DateFormat('dd MMM yyyy').format(txn.dueDate!),
                   ),
-                  if (widget.txn.accountId != null)
-                    _DetailRow(
-                      icon: Icons.account_balance_wallet_outlined,
-                      label: 'Account',
-                      value:
-                          ref
-                              .watch(personalAccountsProvider)
-                              .valueOrNull
-                              ?.where((a) => a.id == widget.txn.accountId)
-                              .firstOrNull
-                              ?.name ??
-                          'Assigned account',
-                    ),
-                  if (widget.txn.dueDate != null)
-                    _DetailRow(
-                      icon: Icons.event_outlined,
-                      label: 'Repayment due',
-                      value: DateFormat(
-                        'dd MMM yyyy',
-                      ).format(widget.txn.dueDate!),
-                    ),
-                  if (widget.txn.hasDebt) ...[
-                    _DetailRow(
-                      icon: Icons.person,
+                if (txn.hasDebt) ...[
+                  _ViewRow(
+                      icon: Icons.person_outline_rounded,
                       label: 'Person',
-                      value: widget.txn.personName!,
-                    ),
-                    _DetailRow(
-                      icon: widget.txn.debtType == DebtType.lent
-                          ? Icons.call_made
-                          : Icons.call_received,
-                      label: 'Debt',
-                      value: widget.txn.debtType == DebtType.lent
-                          ? 'You Lent'
-                          : 'You Borrowed',
-                      valueColor: widget.txn.debtType == DebtType.lent
-                          ? Colors.green
-                          : Colors.red,
-                    ),
-                    _DetailRow(
-                      icon: Icons.check_circle_outline,
-                      label: 'Debt status',
-                      value: widget.txn.isSettled
-                          ? (widget.txn.writtenOffAmount > 0
-                                ? 'Closed'
-                                : 'Settled')
-                          : widget.txn.settledAmount > 0 ||
-                                widget.txn.writtenOffAmount > 0
-                          ? 'Partially settled · ₹${widget.txn.remainingAmount.toStringAsFixed(2)} remaining'
-                          : 'Outstanding · ₹${widget.txn.remainingAmount.toStringAsFixed(2)} remaining',
-                    ),
-                  ],
-                  if (widget.txn.split != null) ...[
-                    _DetailRow(
-                      icon: Icons.call_split_rounded,
-                      label: 'Split',
-                      value: widget.txn.split!.mode == ExpenseSplitMode.equal
-                          ? 'Equal with ${widget.txn.split!.shares.length} people'
-                          : 'Manual with ${widget.txn.split!.shares.length} people',
-                    ),
-                    for (final share in widget.txn.split!.shares)
-                      _DetailRow(
-                        icon: Icons.person_outline,
-                        label: share.personName,
-                        value:
-                            '₹${share.amount.toStringAsFixed(2)} owed to you',
-                      ),
-                    _DetailRow(
-                      icon: Icons.account_circle_outlined,
-                      label: 'Your share',
-                      value:
-                          '₹${(widget.txn.split!.ownShareCents(widget.txn.amount) / 100).toStringAsFixed(2)}',
-                    ),
-                  ],
-                  if (widget.txn.splitSourceId != null)
-                    const _DetailRow(
-                      icon: Icons.link_rounded,
-                      label: 'Split share',
-                      value: 'Edit the original expense to change this share',
-                    ),
-                  if (widget.txn.debtSourceId != null)
-                    const _DetailRow(
-                      icon: Icons.handshake_outlined,
-                      label: 'Debt payment',
-                      value: 'Recorded in the related debt history',
-                    ),
-                  if (widget.txn.notes != null && widget.txn.notes!.isNotEmpty)
-                    _DetailRow(
-                      icon: Icons.notes,
-                      label: 'Notes',
-                      value: widget.txn.notes!,
-                    ),
+                      value: txn.personName!),
+                  _ViewRow(
+                    icon: txn.debtType == DebtType.lent
+                        ? Icons.call_made_rounded
+                        : Icons.call_received_rounded,
+                    label: 'Debt',
+                    value: txn.debtType == DebtType.lent
+                        ? 'You Lent'
+                        : 'You Borrowed',
+                    valueColor: txn.debtType == DebtType.lent
+                        ? AppColors.success(context)
+                        : AppColors.error(context),
+                  ),
+                  _ViewRow(
+                    icon: Icons.check_circle_outline,
+                    label: 'Status',
+                    value: txn.isSettled
+                        ? (txn.writtenOffAmount > 0 ? 'Closed' : 'Settled')
+                        : txn.settledAmount > 0 || txn.writtenOffAmount > 0
+                            ? 'Partial · ₹${txn.remainingAmount.toStringAsFixed(2)} left'
+                            : 'Outstanding · ₹${txn.remainingAmount.toStringAsFixed(2)} left',
+                  ),
                 ],
-              ),
-              if (widget.txn.hasDebt || widget.txn.debtSourceId != null) ...[
-                const SizedBox(height: 12),
-                FilledButton.icon(
+                if (txn.splitSourceId != null)
+                  const _ViewRow(
+                    icon: Icons.link_rounded,
+                    label: 'Split share',
+                    value: 'Edit the original expense to change this share',
+                  ),
+                if (txn.debtSourceId != null)
+                  const _ViewRow(
+                    icon: Icons.handshake_outlined,
+                    label: 'Debt payment',
+                    value: 'Recorded in the related debt history',
+                  ),
+                if (txn.notes != null && txn.notes!.isNotEmpty)
+                  _ViewRow(
+                      icon: Icons.notes_rounded,
+                      label: 'Notes',
+                      value: txn.notes!),
+              ],
+            ),
+          ),
+          if (txn.hasSharedExpense) ...[
+            const SizedBox(height: AppSpacing.md),
+            SharedExpenseDetails(transaction: txn, expanded: true),
+            for (final share in txn.split!.shares)
+              if (share.debtId?.isNotEmpty == true) ...[
+                const SizedBox(height: AppSpacing.sm),
+                FilledButton.tonalIcon(
                   onPressed: () {
-                    final debtId = widget.txn.debtSourceId ?? widget.txn.id;
                     final router = GoRouter.of(context);
                     Navigator.pop(context);
                     router.push(
-                      '/personal/debts?debtId=${Uri.encodeComponent(debtId)}',
-                    );
+                        '/personal/debts?debtId=${Uri.encodeComponent(share.debtId!)}');
                   },
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('View debt and settlement history'),
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: Text('View ${share.personName}\'s debt'),
                 ),
               ],
-            ] else ...[
-              // Edit mode
-              SegmentedButton<TransactionType>(
-                segments: const [
-                  ButtonSegment(
-                    value: TransactionType.expense,
-                    label: Text('Expense'),
-                    icon: Icon(Icons.arrow_upward, size: 16),
-                  ),
-                  ButtonSegment(
-                    value: TransactionType.income,
-                    label: Text('Income'),
-                    icon: Icon(Icons.arrow_downward, size: 16),
-                  ),
-                ],
-                selected: {_type},
-                onSelectionChanged: (s) => setState(() {
-                  _type = s.first;
-                  if (_type != TransactionType.expense) _splitExpense = false;
-                }),
+          ],
+          if ((txn.hasDebt && !txn.isSettled) || txn.debtSourceId != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.icon(
+              onPressed: () {
+                final debtId = txn.debtSourceId ?? txn.id;
+                final router = GoRouter.of(context);
+                Navigator.pop(context);
+                router.push(
+                    '/personal/debts?debtId=${Uri.encodeComponent(debtId)}');
+              },
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: const Text('View debt and settlement history'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditMode(BuildContext context, PersonalTransaction txn) {
+    return PersonalFormSheet(
+      title: 'Edit Transaction',
+      icon: Icons.edit_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SegmentedButton<TransactionType>(
+            segments: const [
+              ButtonSegment(
+                value: TransactionType.expense,
+                label: Text('Expense'),
+                icon: Icon(Icons.north_rounded, size: 15),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _amountCtrl,
-                onChanged: (_) => setState(() {}),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+              ButtonSegment(
+                value: TransactionType.income,
+                label: Text('Income'),
+                icon: Icon(Icons.south_rounded, size: 15),
+              ),
+            ],
+            selected: {_type},
+            onSelectionChanged: (s) => setState(() {
+              _type = s.first;
+              if (_type != TransactionType.expense) _splitExpense = false;
+            }),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          TextFormField(
+            controller: _amountCtrl,
+            onChanged: (_) => setState(() {}),
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Amount (₹)',
+              prefixIcon: Icon(Icons.currency_rupee_rounded),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            controller: _titleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Title',
+              prefixIcon: Icon(Icons.receipt_long_outlined),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _category,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    prefixIcon: Icon(Icons.label_outline_rounded),
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                  ),
+                  items: personalCategories
+                      .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(c,
+                              style: const TextStyle(fontSize: 14))))
+                      .toList(),
+                  onChanged: (v) => setState(() => _category = v!),
+                  isExpanded: true,
                 ),
-                decoration: InputDecoration(
-                  labelText: 'Amount (₹)',
-                  prefixIcon: Icon(
-                    Icons.currency_rupee,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withOpacity(0.5),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                  prefixIcon: Icon(
-                    Icons.receipt_long,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withOpacity(0.5),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+              const SizedBox(width: AppSpacing.md),
+              _TxnDateButton(
+                date: _date,
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _date,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setState(() => _date = picked);
+                },
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: InputDecoration(
-                        labelText: 'Category',
-                        filled: true,
-                        fillColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                      items: personalCategories
-                          .map(
-                            (c) => DropdownMenuItem(
-                              value: c,
-                              child: Text(
-                                c,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (v) => setState(() => _category = v!),
-                      isExpanded: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _date,
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) setState(() => _date = picked);
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 18,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            DateFormat('dd MMM').format(_date),
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          PersonalAccountPicker(
+            value: _accountId,
+            enabled: !_saving,
+            label: 'Account (optional)',
+            showHelperText: false,
+            onChanged: (v) => setState(() => _accountId = v),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _notesCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Notes (optional)',
+              prefixIcon: Icon(Icons.notes_rounded),
+            ),
+            maxLines: 2,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _optionSwitch(
+            title: 'Involves someone else?',
+            icon: Icons.people_outline_rounded,
+            value: _involvesPerson,
+            onChanged: (v) => setState(() {
+              _involvesPerson = v;
+              if (v) _splitExpense = false;
+            }),
+          ),
+          if (_involvesPerson) ...[
+            const SizedBox(height: AppSpacing.sm),
+            SegmentedButton<DebtType>(
+              segments: const [
+                ButtonSegment(
+                    value: DebtType.lent,
+                    label: Text('I Lent'),
+                    icon: Icon(Icons.call_made_rounded, size: 15)),
+                ButtonSegment(
+                    value: DebtType.borrowed,
+                    label: Text('I Borrowed'),
+                    icon: Icon(Icons.call_received_rounded, size: 15)),
+              ],
+              selected: {_debtType},
+              onSelectionChanged: (s) =>
+                  setState(() => _debtType = s.first),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _personCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Person\'s name',
+                hintText: 'e.g. John, Sarah',
+                prefixIcon: Icon(Icons.person_outline_rounded),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _notesCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Notes (optional)',
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              // Debt toggle
-              PersonalAccountPicker(
-                value: _accountId,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            DebtDueDatePicker(
+              value: _dueDate,
+              debtDate: _date,
+              enabled: !_saving,
+              onChanged: (v) => setState(() => _dueDate = v),
+            ),
+          ],
+          if (_type == TransactionType.expense && !_involvesPerson) ...[
+            _optionSwitch(
+              title: 'Split with people',
+              subtitle: 'Their shares become debts owed to you',
+              icon: Icons.call_split_rounded,
+              value: _splitExpense,
+              onChanged: (v) => setState(() => _splitExpense = v),
+            ),
+            if (_splitExpense) ...[
+              const SizedBox(height: AppSpacing.sm),
+              ExpenseSplitEditor(
+                key: _splitEditorKey,
+                totalText: _amountCtrl.text,
+                initialSplit: txn.split,
                 enabled: !_saving,
-                label: 'Account (optional)',
-                showHelperText: false,
-                onChanged: (v) => setState(() => _accountId = v),
               ),
-              const SizedBox(height: 16),
-              SwitchListTile(
-                value: _involvesPerson,
-                onChanged: (v) => setState(() {
-                  _involvesPerson = v;
-                  if (v) _splitExpense = false;
-                }),
-                title: const Text(
-                  'Involves someone else?',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-                secondary: Icon(
-                  Icons.people_outline,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.5),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                dense: true,
-              ),
-              if (_involvesPerson) ...[
-                DebtDueDatePicker(
-                  value: _dueDate,
-                  debtDate: _date,
-                  enabled: !_saving,
-                  onChanged: (v) => setState(() => _dueDate = v),
-                ),
-                const SizedBox(height: 12),
-                SegmentedButton<DebtType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: DebtType.lent,
-                      label: Text('I Lent'),
-                      icon: Icon(Icons.call_made, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: DebtType.borrowed,
-                      label: Text('I Borrowed'),
-                      icon: Icon(Icons.call_received, size: 16),
-                    ),
-                  ],
-                  selected: {_debtType},
-                  onSelectionChanged: (s) =>
-                      setState(() => _debtType = s.first),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _personCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Person\'s name',
-                    hintText: 'e.g. John, Sarah',
-                    prefixIcon: Icon(
-                      Icons.person_outline,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ],
-              if (_type == TransactionType.expense && !_involvesPerson) ...[
-                SwitchListTile(
-                  value: _splitExpense,
-                  onChanged: (value) => setState(() => _splitExpense = value),
-                  title: const Text('Split with people'),
-                  subtitle: const Text('Their shares become debts owed to you'),
-                  secondary: const Icon(Icons.call_split_rounded),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                ),
-                if (_splitExpense) ...[
-                  ExpenseSplitEditor(
-                    key: _splitEditorKey,
-                    totalText: _amountCtrl.text,
-                    initialSplit: widget.txn.split,
-                    enabled: !_saving,
-                  ),
-                  const SizedBox(height: 12),
-                  DebtDueDatePicker(
-                    value: _dueDate,
-                    debtDate: _date,
-                    enabled: !_saving,
-                    onChanged: (value) => setState(() => _dueDate = value),
-                  ),
-                ],
-              ],
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _editing = false),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _saving ? null : _save,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Save'),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: AppSpacing.md),
+              DebtDueDatePicker(
+                value: _dueDate,
+                debtDate: _date,
+                enabled: !_saving,
+                onChanged: (v) => setState(() => _dueDate = v),
               ),
             ],
           ],
-        ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => setState(() => _editing = false),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _saving ? null : _save,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child:
+                              CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _DetailCard extends StatelessWidget {
-  final Color color;
-  final bool isDark;
-  final List<Widget> children;
-  const _DetailCard({
-    required this.color,
-    required this.isDark,
-    required this.children,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? color.withOpacity(0.08) : color.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.15)),
-      ),
-      child: Column(children: children),
-    );
-  }
-}
-
-class _DetailRow extends StatelessWidget {
+class _ViewRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Color? valueColor;
-  const _DetailRow({
+  const _ViewRow({
     required this.icon,
     required this.label,
     required this.value,
@@ -745,37 +604,64 @@ class _DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ),
-          const SizedBox(width: 8),
+          Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: .45)),
+          const SizedBox(width: AppSpacing.md),
+          Text(label,
+              style: AppTextStyles.label(context)
+                  .copyWith(color: cs.onSurface.withValues(alpha: .6))),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               value,
               textAlign: TextAlign.right,
               softWrap: true,
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.label(context).copyWith(
                 fontWeight: FontWeight.w600,
                 color: valueColor,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TxnDateButton extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onTap;
+  const _TxnDateButton({required this.date, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: cs.outline.withValues(alpha: .15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_rounded,
+                size: 16, color: cs.onSurface.withValues(alpha: .55)),
+            const SizedBox(width: 6),
+            Text(DateFormat('dd MMM').format(date),
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w500)),
+          ],
+        ),
       ),
     );
   }

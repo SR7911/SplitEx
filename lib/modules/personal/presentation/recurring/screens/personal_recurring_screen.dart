@@ -8,6 +8,7 @@ import 'package:split_ex/modules/personal/domain/entities/transactions/personal_
 import 'package:split_ex/modules/personal/presentation/recurring/providers/personal_recurring_providers.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/screens/add_personal_transaction_screen.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 /// Personal recurring entries backed by the domain repository.
 class PersonalRecurringScreen extends ConsumerWidget {
@@ -29,17 +30,10 @@ class PersonalRecurringScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (items) {
           if (items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.repeat_rounded, size: 64, color: Colors.grey.shade300),
-                  const SizedBox(height: 12),
-                  const Text('No recurring transactions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text('Automate your regular expenses', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-                ],
-              ),
+            return const AppEmptyState(
+              icon: Icons.repeat_rounded,
+              title: 'No recurring transactions',
+              subtitle: 'Automate your regular expenses',
             );
           }
 
@@ -50,13 +44,13 @@ class PersonalRecurringScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               if (active.isNotEmpty) ...[
-                const Text('Active', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                AppSectionHeader(title: 'Active (${active.length})', actionLabel: null, onAction: null),
                 const SizedBox(height: 10),
                 ...active.map((r) => _RecurringCard(item: r, isPast: false)),
               ],
               if (past.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                Text('Past', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey.shade500)),
+                AppSectionHeader(title: 'Past (${past.length})', actionLabel: null, onAction: null),
                 const SizedBox(height: 10),
                 ...past.map((r) => _RecurringCard(item: r, isPast: true)),
               ],
@@ -124,13 +118,14 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: isDark ? cs.surfaceContainerHigh : cs.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         ),
         child: SingleChildScrollView(
@@ -141,9 +136,9 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 48, height: 5,
+                  width: 40, height: 4,
                   margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(2)),
                 ),
               ),
               Row(
@@ -217,7 +212,7 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
         labelText: label,
         prefixIcon: Icon(icon, size: 18),
         filled: true,
-        fillColor: cs.surfaceContainerHighest.withOpacity(0.5),
+        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       ),
     );
@@ -230,7 +225,7 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: cs.surfaceContainerHighest.withOpacity(0.5),
+        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
@@ -249,7 +244,7 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
         labelText: 'Day of month (1–31)',
         prefixIcon: const Icon(Icons.event_repeat_rounded, size: 18),
         filled: true,
-        fillColor: cs.surfaceContainerHighest.withOpacity(0.5),
+        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       ),
       onChanged: (v) => _dayOfMonth = int.tryParse(v) ?? _dayOfMonth,
@@ -272,23 +267,23 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withOpacity(0.5),
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            Icon(Icons.event_busy, size: 18, color: cs.onSurface.withOpacity(0.6)),
+            Icon(Icons.event_busy, size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 _endDate != null ? 'Ends: ${DateFormat('dd MMM yyyy').format(_endDate!)}' : 'End date (optional)',
-                style: TextStyle(fontSize: 14, color: _endDate != null ? null : cs.onSurface.withOpacity(0.5)),
+                style: TextStyle(fontSize: 14, color: _endDate != null ? null : cs.onSurface.withValues(alpha: 0.5)),
               ),
             ),
             if (_endDate != null)
               GestureDetector(
                 onTap: () => setState(() { _endDate = null; _clearEndDate = true; }),
-                child: const Icon(Icons.close, size: 18, color: Colors.grey),
+                child: Icon(Icons.close, size: 18, color: cs.onSurface.withValues(alpha: 0.4)),
               ),
           ],
         ),
@@ -357,9 +352,11 @@ class _RecurringCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isPast ? Colors.grey : (item.active ? Colors.green : Colors.orange);
-    final opacity = isPast ? 0.5 : 1.0;
+    const kGreen = Color(0xFF22C55E);
+    const kAmber = Color(0xFFF59E0B);
+    final cs = Theme.of(context).colorScheme;
+    final color = isPast ? cs.onSurface.withValues(alpha: 0.4) : (item.active ? kGreen : kAmber);
+    final opacity = isPast ? 0.55 : 1.0;
 
     return GestureDetector(
       onTap: () => _showDetailSheet(context, ref),
@@ -367,17 +364,13 @@ class _RecurringCard extends ConsumerWidget {
         opacity: opacity,
         child: Container(
           margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.1)),
-          ),
+          clipBehavior: Clip.antiAlias,
+          decoration: appCardDecoration(context, accentColor: isPast ? null : color),
           child: Row(
             children: [
               Container(
                 width: 44, height: 44,
-                decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                 child: Icon(
                   isPast ? Icons.history : (item.active ? Icons.autorenew_rounded : Icons.pause_circle_outline),
                   color: color, size: 22,
@@ -395,8 +388,8 @@ class _RecurringCard extends ConsumerWidget {
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                            child: Text('${item.editHistory.length} edit${item.editHistory.length > 1 ? 's' : ''}', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Colors.blue)),
+                            decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                            child: Text('${item.editHistory.length} edit${item.editHistory.length > 1 ? 's' : ''}', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF3B82F6))),
                           ),
                         ],
                       ],
@@ -409,12 +402,12 @@ class _RecurringCard extends ConsumerWidget {
                     if (item.endDate != null)
                       Text(
                         isPast ? 'Ended: ${DateFormat('dd MMM yyyy').format(item.endDate!)}' : 'Ends: ${DateFormat('dd MMM yyyy').format(item.endDate!)}',
-                        style: TextStyle(fontSize: 10, color: isPast ? Colors.grey : Colors.orange),
+                        style: TextStyle(fontSize: 10, color: isPast ? cs.onSurface.withValues(alpha: 0.4) : const Color(0xFFF59E0B)),
                       ),
                   ],
                 ),
               ),
-              Text('₹${item.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isPast ? Colors.grey : null)),
+              Text('₹${item.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isPast ? cs.onSurface.withValues(alpha: 0.4) : color)),
             ],
           ),
         ),
@@ -444,11 +437,12 @@ class _RecurringDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = isPast ? Colors.grey : cs.primary;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isPast ? cs.onSurface.withValues(alpha: 0.4) : cs.primary;
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
+        color: isDark ? cs.surfaceContainerHigh : cs.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: ListView(
@@ -457,9 +451,9 @@ class _RecurringDetailSheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 48, height: 5,
+              width: 40, height: 4,
               margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(2)),
             ),
           ),
           Row(
@@ -545,9 +539,9 @@ class _RecurringDetailSheet extends StatelessWidget {
                       }
                       Navigator.pop(context);
                     },
-                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
-                    label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), side: const BorderSide(color: Colors.red)),
+                    icon: Icon(Icons.delete_outline, size: 18, color: cs.error),
+                    label: Text('Delete', style: TextStyle(color: cs.error)),
+                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), side: BorderSide(color: cs.error)),
                   ),
                 ),
               ],
@@ -576,25 +570,25 @@ class _EditHistoryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHighest.withOpacity(0.5) : Colors.grey.shade50,
+        color: isDark ? cs.surfaceContainerHighest.withValues(alpha: 0.5) : cs.surfaceContainerHighest.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isLatest ? Colors.blue.withOpacity(0.3) : cs.outline.withOpacity(0.08)),
+        border: Border.all(color: isLatest ? const Color(0xFF3B82F6).withValues(alpha: 0.3) : cs.outline.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.history_rounded, size: 14, color: isLatest ? Colors.blue : cs.onSurface.withOpacity(0.4)),
+              Icon(Icons.history_rounded, size: 14, color: isLatest ? const Color(0xFF3B82F6) : cs.onSurface.withValues(alpha: 0.4)),
               const SizedBox(width: 6),
               Text(
                 isLatest ? 'Previous version' : 'Version ${total - index}',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isLatest ? Colors.blue : cs.onSurface.withOpacity(0.5)),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isLatest ? const Color(0xFF3B82F6) : cs.onSurface.withValues(alpha: 0.5)),
               ),
               const Spacer(),
               Text(
                 DateFormat('dd MMM yy, hh:mm a').format(snapshot.editedAt),
-                style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.4)),
+                style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4)),
               ),
             ],
           ),
@@ -635,9 +629,9 @@ class _SnapChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: cs.onSurface.withOpacity(0.5)),
+          Icon(icon, size: 11, color: cs.onSurface.withValues(alpha: 0.5)),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.8))),
+          Text(label, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.8))),
         ],
       ),
     );
@@ -658,9 +652,9 @@ class _DetailRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
           const SizedBox(width: 12),
-          Text(label, style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6))),
+          Text(label, style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
           const Spacer(),
           Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
         ],

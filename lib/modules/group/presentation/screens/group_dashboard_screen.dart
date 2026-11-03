@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,34 +9,24 @@ import 'package:split_ex/modules/group/presentation/providers/group_provider.dar
 import 'package:split_ex/modules/group/presentation/screens/group_expense_sheet.dart';
 import 'package:split_ex/modules/group/presentation/screens/group_reports_screen.dart';
 import 'package:split_ex/modules/group/presentation/screens/group_settlement_screen.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
 
 // ─── Shared design tokens (mirrors personal_expense_tab) ─────────────────────
-const _kGreen  = Color(0xFF22C55E);
-const _kRed    = Color(0xFFEF4444);
 const _kAmber  = Color(0xFFF59E0B);
-const _kIndigo = Color(0xFF6366F1);
 const _kBlue   = Color(0xFF3B82F6);
 const _kTeal   = Color(0xFF14B8A6);
 const _kOrange = Color(0xFFF97316);
 
+Color _lentColor(BuildContext context) => const Color(0xFF10B981);
+Color _borrowedColor(BuildContext context) => const Color(0xFFF43F5E);
+
 BoxDecoration _cardDeco(BuildContext context) {
   final cs     = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  return BoxDecoration(
-    color: isDark ? cs.surfaceContainerHigh : cs.surface,
-    borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-        blurRadius: 12,
-        offset: const Offset(0, 3),
-      ),
-    ],
-  );
+  return appCardDecoration(context);
 }
 
 Widget _sectionTitle(BuildContext context, String title, {Widget? action}) {
@@ -386,7 +376,7 @@ class _InsightsCard extends StatelessWidget {
     final topPct = topCat != null && total > 0 ? '${(topCat.value / total * 100).toStringAsFixed(0)}%' : '—';
 
     final stats = [
-      (Icons.calculate_outlined,    _kIndigo, 'Avg Expense',    '₹${_fmt(avg)}'),
+      (Icons.calculate_outlined,    const Color(0xFF6366F1), 'Avg Expense',    '₹${_fmt(avg)}'),
       (Icons.category_outlined,     _kAmber,  'Top Category',   topCat != null ? '${topCat.key} $topPct' : '—'),
       (Icons.groups_outlined,       _kTeal,   'Active Members', '${expenses.map((e) => e.paidBy).toSet().length}'),
       (Icons.receipt_long_outlined, _kBlue,   'Total Expenses', '${expenses.length}'),
@@ -487,7 +477,7 @@ class _MemberBalancesCard extends StatelessWidget {
             final name   = nameMap[e.key] ?? e.key.substring(0, 6);
             final isOwed = e.value > 0.01;
             final owes   = e.value < -0.01;
-            final color  = isOwed ? _kGreen : owes ? _kRed : cs.onSurface.withValues(alpha: 0.4);
+            final color  = isOwed ? _lentColor(context) : owes ? _borrowedColor(context) : cs.onSurface.withValues(alpha: 0.4);
             final isLast = entry.key == sorted.length - 1;
             return Padding(
               padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
@@ -538,14 +528,15 @@ class _GroupQuickActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs     = Theme.of(context).colorScheme;
     final group  = ref.watch(groupStreamProvider(groupId)).valueOrNull;
 
     final actions = [
-      (Icons.add_circle_outline_rounded, 'Add',      _kIndigo, () => showGroupExpenseSheet(context, groupId: groupId, memberIds: memberIds)),
+      (Icons.add_circle_outline_rounded, 'Add',      cs.primary, () => showGroupExpenseSheet(context, groupId: groupId, memberIds: memberIds)),
       (Icons.bar_chart_rounded,          'Reports',  _kBlue,   () => showGroupReportsSheet(context, groupId)),
       (Icons.receipt_long_outlined,      'Expenses', _kTeal,   onExpensesTab),
       (Icons.handshake_outlined,         'Settle',   _kOrange, onSettleUpTab),
-      (Icons.link_rounded,               'Invite',   _kGreen,  () {
+      (Icons.link_rounded,               'Invite',   _lentColor(context),  () {
         Clipboard.setData(ClipboardData(text: group?.inviteCode ?? groupId));
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invite code copied!')));
       }),
@@ -1132,7 +1123,7 @@ class _SettleUpTab extends ConsumerWidget {
         final isMyDebt = debt.from == uid;
         final fromName = nameMap[debt.from] ?? debt.from;
         final toName   = nameMap[debt.to] ?? debt.to;
-        final color    = isMyDebt ? _kRed : _kGreen;
+        final color    = isMyDebt ? _borrowedColor(context) : _lentColor(context);
         final isDark   = Theme.of(context).brightness == Brightness.dark;
         final cs       = Theme.of(context).colorScheme;
         return Padding(

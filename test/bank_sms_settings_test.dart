@@ -11,6 +11,7 @@ import 'package:split_ex/modules/personal/data/datasources/method_channel_bank_s
 import 'package:split_ex/modules/personal/domain/policies/sms/bank_sms_parser.dart';
 import 'package:split_ex/modules/personal/domain/repositories/bank_sms_repository.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
 import 'package:split_ex/modules/personal/dependencies.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/providers/personal_account_providers.dart';
 
@@ -19,6 +20,10 @@ class _ReviewOnlyRepository extends Fake implements PersonalBankSmsRepository {
   List<BankSmsDebtAllocation>? settledAllocations;
   List<PersonalTransaction> openDebts = [];
   int debtQueries = 0;
+  ExpenseSplit? recordedSplit;
+  DebtType? recordedDebtType;
+  String? recordedPerson;
+  String? recordedNotes;
 
   @override
   Future<bool> wasRecorded(String uid, ParsedBankSms sms) async => false;
@@ -68,8 +73,17 @@ class _ReviewOnlyRepository extends Fake implements PersonalBankSmsRepository {
     bool matchAccount = false,
     bool applyMerchantRule = false,
     bool rememberCategory = false,
+    ExpenseSplit? split,
+    DebtType? debtType,
+    String? personName,
+    DateTime? dueDate,
+    String? notes,
   }) async {
     saves++;
+    recordedSplit = split;
+    recordedDebtType = debtType;
+    recordedPerson = personName;
+    recordedNotes = notes;
     return BankSmsSaveResult.recorded;
   }
 }
@@ -208,6 +222,70 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+  for (final sharing in [true, false]) {
+    testWidgets(
+      'SMS review records ${sharing ? 'a shared expense' : 'money lent'} without editing again',
+      (tester) async {
+        final sms = BankSmsParser().parse(
+          id: 'shared-review',
+          sender: 'VM-TESTBK',
+          body: 'INR 100 debited from A/c XX1234 to SHOP UPI Ref 629300123456.',
+          receivedAt: DateTime.now(),
+        )!;
+        state['reviews'] = [sms.toMap()];
+        final repository = _ReviewOnlyRepository();
+        await open(tester, reviewOnly: true, repository: repository);
+        await tester.tap(find.text(sms.title).first);
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
+        final toggle = find.widgetWithText(
+          SwitchListTile,
+          sharing ? 'Split this expense' : 'Involves someone else?',
+        );
+        await tester.ensureVisible(toggle);
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        if (sharing) {
+          await tester.ensureVisible(find.text('Manual'));
+          await tester.tap(find.text('Manual'));
+          await tester.pumpAndSettle();
+          final person = find.widgetWithText(TextField, 'Person 1');
+          await tester.ensureVisible(person);
+          await tester.enterText(person, 'Alex');
+          final share = find.widgetWithText(TextField, 'Share');
+          await tester.ensureVisible(share);
+          await tester.enterText(share, '45');
+        } else {
+          final person = find.widgetWithText(TextField, 'Person’s name');
+          await tester.ensureVisible(person);
+          await tester.enterText(person, 'Alex');
+        }
+        final notes = find.widgetWithText(TextField, 'Notes (optional)');
+        await tester.ensureVisible(notes);
+        await tester.enterText(notes, 'Lunch');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(find.text('Record Transaction'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Record Transaction'));
+        await tester.pumpAndSettle();
+        expect(repository.saves, 1);
+        expect(repository.recordedNotes, 'Lunch');
+        if (sharing) {
+          expect(repository.recordedSplit!.shares.single.personName, 'Alex');
+          expect(repository.recordedSplit!.shares.single.amount, 45);
+        } else {
+          expect(repository.recordedDebtType, DebtType.lent);
+          expect(repository.recordedPerson, 'Alex');
+        }
+        expect(state['reviews'], isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('reviewed bank payment follows selected debt priority', (
     tester,
   ) async {

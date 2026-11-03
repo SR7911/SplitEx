@@ -8,6 +8,8 @@ import 'package:split_ex/app/auth/providers/auth_provider.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_due_date_picker.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/widgets/expense_split_editor.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 const personalCategories = [
   'Food',
@@ -142,404 +144,239 @@ class _AddPersonalTransactionSheetState
     return SwitchListTile(
       value: value,
       onChanged: _saving ? null : onChanged,
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-      ),
+      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
       subtitle: subtitle == null
           ? null
-          : Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 11,
-                color: cs.onSurface.withValues(alpha: .6),
-              ),
-            ),
-      secondary: Icon(
-        icon,
-        size: 20,
-        color: cs.onSurface.withValues(alpha: .5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          : Text(subtitle, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: .6))),
+      secondary: Icon(icon, size: 20, color: cs.onSurface.withValues(alpha: .5)),
+      contentPadding: EdgeInsets.zero,
       dense: true,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return PersonalFormSheet(
+      title: 'Add Transaction',
+      icon: Icons.add_circle_outline_rounded,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Type toggle
+            SegmentedButton<TransactionType>(
+              segments: const [
+                ButtonSegment(
+                  value: TransactionType.expense,
+                  label: Text('Expense'),
+                  icon: Icon(Icons.north_rounded, size: 15),
+                ),
+                ButtonSegment(
+                  value: TransactionType.income,
+                  label: Text('Income'),
+                  icon: Icon(Icons.south_rounded, size: 15),
+                ),
+              ],
+              selected: {_type},
+              onSelectionChanged: (s) => setState(() {
+                _type = s.first;
+                if (_type != TransactionType.expense) _splitExpense = false;
+              }),
+            ),
+            const SizedBox(height: AppSpacing.base),
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+            // Amount
+            TextFormField(
+              controller: _amountCtrl,
+              onChanged: (_) => setState(() {}),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹)',
+                prefixIcon: Icon(Icons.currency_rupee_rounded),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                if (double.tryParse(v) == null || double.parse(v) <= 0)
+                  return 'Enter a valid amount';
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Title
+            TextFormField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                hintText: 'e.g. Dinner, Uber, Salary',
+                prefixIcon: Icon(Icons.receipt_long_outlined),
+              ),
+              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Category + Date
+            Row(
               children: [
-                // Drag handle
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _category,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      prefixIcon: Icon(Icons.label_outline_rounded),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
+                    items: personalCategories
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14))))
+                        .toList(),
+                    onChanged: (v) => setState(() => _category = v!),
+                    isExpanded: true,
                   ),
                 ),
-                // Header
-                Row(
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Add Transaction',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Type toggle
-                SegmentedButton<TransactionType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: TransactionType.expense,
-                      label: Text('Expense'),
-                      icon: Icon(Icons.arrow_upward, size: 16),
-                    ),
-                    ButtonSegment(
-                      value: TransactionType.income,
-                      label: Text('Income'),
-                      icon: Icon(Icons.arrow_downward, size: 16),
-                    ),
-                  ],
-                  selected: {_type},
-                  onSelectionChanged: (s) => setState(() {
-                    _type = s.first;
-                    if (_type != TransactionType.expense) _splitExpense = false;
-                  }),
-                ),
-                const SizedBox(height: 16),
-
-                // Amount
-                TextFormField(
-                  controller: _amountCtrl,
-                  onChanged: (_) => setState(() {}),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Amount (₹)',
-                    prefixIcon: Icon(
-                      Icons.currency_rupee,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  autofocus: true,
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    if (double.tryParse(v) == null || double.parse(v) <= 0)
-                      return 'Enter valid amount';
-                    return null;
+                const SizedBox(width: AppSpacing.md),
+                _DateButton(
+                  date: _date,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _date,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setState(() => _date = picked);
                   },
-                ),
-                const SizedBox(height: 16),
-
-                // Title
-                TextFormField(
-                  controller: _titleCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Title',
-                    hintText: 'e.g. Dinner, Uber, Salary',
-                    prefixIcon: Icon(
-                      Icons.receipt_long,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-
-                // Category & Date row
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _category,
-                        decoration: InputDecoration(
-                          labelText: 'Category',
-                          prefixIcon: Icon(
-                            Icons.category,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                          filled: true,
-                          fillColor: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withOpacity(0.5),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                        ),
-                        items: personalCategories
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  c,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) => setState(() => _category = v!),
-                        isExpanded: true,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _date,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) setState(() => _date = picked);
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: 18,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withOpacity(0.6),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              DateFormat('dd MMM').format(_date),
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Debt toggle
-                PersonalAccountPicker(
-                  value: _accountId,
-                  enabled: !_saving,
-                  label: 'Account (optional)',
-                  showHelperText: false,
-                  onChanged: (v) => setState(() => _accountId = v),
-                ),
-                const SizedBox(height: 16),
-                _optionSwitch(
-                  title: 'Involves someone else?',
-                  icon: Icons.people_outline,
-                  value: _involvesPerson,
-                  onChanged: (v) => setState(() {
-                    _involvesPerson = v;
-                    if (v) _splitExpense = false;
-                  }),
-                ),
-
-                if (_involvesPerson) ...[
-                  const SizedBox(height: 8),
-                  DebtDueDatePicker(
-                    value: _dueDate,
-                    debtDate: _date,
-                    enabled: !_saving,
-                    onChanged: (v) => setState(() => _dueDate = v),
-                  ),
-                  const SizedBox(height: 12),
-                  SegmentedButton<DebtType>(
-                    segments: const [
-                      ButtonSegment(
-                        value: DebtType.lent,
-                        label: Text('I Lent'),
-                        icon: Icon(Icons.call_made, size: 16),
-                      ),
-                      ButtonSegment(
-                        value: DebtType.borrowed,
-                        label: Text('I Borrowed'),
-                        icon: Icon(Icons.call_received, size: 16),
-                      ),
-                    ],
-                    selected: {_debtType},
-                    onSelectionChanged: (s) =>
-                        setState(() => _debtType = s.first),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _personCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Person\'s name',
-                      hintText: 'e.g. John, Sarah',
-                      prefixIcon: Icon(
-                        Icons.person_outline,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                      filled: true,
-                      fillColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    validator: (v) =>
-                        _involvesPerson && (v == null || v.trim().isEmpty)
-                        ? 'Required'
-                        : null,
-                  ),
-                ],
-                if (_type == TransactionType.expense && !_involvesPerson) ...[
-                  _optionSwitch(
-                    title: 'Split with people',
-                    subtitle: 'Their shares become debts owed to you',
-                    icon: Icons.call_split_rounded,
-                    value: _splitExpense,
-                    onChanged: (value) => setState(() => _splitExpense = value),
-                  ),
-                  if (_splitExpense) ...[
-                    const SizedBox(height: 8),
-                    ExpenseSplitEditor(
-                      key: _splitEditorKey,
-                      totalText: _amountCtrl.text,
-                      enabled: !_saving,
-                    ),
-                    const SizedBox(height: 12),
-                    DebtDueDatePicker(
-                      value: _dueDate,
-                      debtDate: _date,
-                      enabled: !_saving,
-                      onChanged: (value) => setState(() => _dueDate = value),
-                    ),
-                  ],
-                ],
-                const SizedBox(height: 16),
-
-                // Notes
-                TextFormField(
-                  controller: _notesCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Notes (optional)',
-                    prefixIcon: Icon(
-                      Icons.notes,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 24),
-
-                // Save
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: _saving
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Save Transaction',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Account
+            PersonalAccountPicker(
+              value: _accountId,
+              enabled: !_saving,
+              label: 'Account (optional)',
+              showHelperText: false,
+              onChanged: (v) => setState(() => _accountId = v),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // Involves person toggle
+            _optionSwitch(
+              title: 'Involves someone else?',
+              icon: Icons.people_outline_rounded,
+              value: _involvesPerson,
+              onChanged: (v) => setState(() {
+                _involvesPerson = v;
+                if (v) _splitExpense = false;
+              }),
+            ),
+            if (_involvesPerson) ...[
+              const SizedBox(height: AppSpacing.sm),
+              SegmentedButton<DebtType>(
+                segments: const [
+                  ButtonSegment(value: DebtType.lent,     label: Text('I Lent'),     icon: Icon(Icons.call_made_rounded,     size: 15)),
+                  ButtonSegment(value: DebtType.borrowed, label: Text('I Borrowed'), icon: Icon(Icons.call_received_rounded, size: 15)),
+                ],
+                selected: {_debtType},
+                onSelectionChanged: (s) => setState(() => _debtType = s.first),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _personCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Person\'s name',
+                  hintText: 'e.g. John, Sarah',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+                validator: (v) => _involvesPerson && (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              DebtDueDatePicker(
+                value: _dueDate,
+                debtDate: _date,
+                enabled: !_saving,
+                onChanged: (v) => setState(() => _dueDate = v),
+              ),
+            ],
+
+            // Split toggle
+            if (_type == TransactionType.expense && !_involvesPerson) ...[
+              _optionSwitch(
+                title: 'Split with people',
+                subtitle: 'Their shares become debts owed to you',
+                icon: Icons.call_split_rounded,
+                value: _splitExpense,
+                onChanged: (v) => setState(() => _splitExpense = v),
+              ),
+              if (_splitExpense) ...[
+                const SizedBox(height: AppSpacing.sm),
+                ExpenseSplitEditor(
+                  key: _splitEditorKey,
+                  totalText: _amountCtrl.text,
+                  enabled: !_saving,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DebtDueDatePicker(
+                  value: _dueDate,
+                  debtDate: _date,
+                  enabled: !_saving,
+                  onChanged: (v) => setState(() => _dueDate = v),
+                ),
+              ],
+            ],
+            const SizedBox(height: AppSpacing.sm),
+
+            // Notes
+            TextFormField(
+              controller: _notesCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                prefixIcon: Icon(Icons.notes_rounded),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save Transaction'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateButton extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onTap;
+  const _DateButton({required this.date, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: cs.outline.withValues(alpha: .15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_rounded, size: 16, color: cs.onSurface.withValues(alpha: .55)),
+            const SizedBox(width: 6),
+            Text(DateFormat('dd MMM').format(date), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+          ],
         ),
       ),
     );

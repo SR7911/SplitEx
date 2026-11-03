@@ -7,6 +7,7 @@ import 'package:split_ex/modules/project/presentation/providers/project_provider
 import 'package:split_ex/modules/project/presentation/screens/add_project_expense_sheet.dart';
 import 'package:split_ex/modules/project/presentation/screens/project_reports_screen.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 class ProjectDashboardScreen extends ConsumerWidget {
@@ -229,14 +230,14 @@ class _BudgetCard extends StatelessWidget {
             top: -24, right: -24,
             child: Container(
               width: 100, height: 100,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.07)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.07)),
             ),
           ),
           Positioned(
             bottom: -30, left: -20,
             child: Container(
               width: 90, height: 90,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.05)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.05)),
             ),
           ),
           Padding(
@@ -250,7 +251,7 @@ class _BudgetCard extends StatelessWidget {
                     Container(
                       width: 42, height: 42,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(_typeIcon(project.projectType), color: Colors.white, size: 20),
@@ -268,7 +269,7 @@ class _BudgetCard extends StatelessWidget {
                           ),
                           Text(
                             project.projectType,
-                            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+                            style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.7)),
                           ),
                         ],
                       ),
@@ -276,9 +277,9 @@ class _BudgetCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -301,7 +302,7 @@ class _BudgetCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Total Spent', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                          Text('Total Spent', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
                           const SizedBox(height: 4),
                           TweenAnimationBuilder<double>(
                             tween: Tween(begin: 0, end: totalSpent),
@@ -316,14 +317,14 @@ class _BudgetCard extends StatelessWidget {
                     ),
                     Container(
                       width: 1, height: 48,
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       margin: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(isOver ? 'Over by' : 'Remaining', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                          Text(isOver ? 'Over by' : 'Remaining', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
                           const SizedBox(height: 4),
                           Text(
                             _fmt(remaining.abs()),
@@ -348,10 +349,10 @@ class _BudgetCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Budget used', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                        Text('Budget used', style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7))),
                         Text(
                           '${(progress * 100).toStringAsFixed(0)}% of ${_fmt(project.estimatedBudget)}',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.85)),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.85)),
                         ),
                       ],
                     ),
@@ -365,7 +366,7 @@ class _BudgetCard extends StatelessWidget {
                         builder: (_, v, __) => LinearProgressIndicator(
                           value: v,
                           minHeight: 7,
-                          backgroundColor: Colors.white.withOpacity(0.2),
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
                           valueColor: AlwaysStoppedAnimation(
                             isOver ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC),
                           ),
@@ -424,7 +425,7 @@ class _BudgetStat extends StatelessWidget {
         children: [
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
         ],
       ),
     );
@@ -442,9 +443,9 @@ class _StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -469,13 +470,13 @@ class _MetaPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = highlight
         ? (highlightColor ?? const Color(0xFFF59E0B))
-        : Colors.white.withOpacity(0.75);
+        : Colors.white.withValues(alpha: 0.75);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -508,9 +509,9 @@ class _QuickActions extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                color: isDark ? color.withOpacity(0.18) : color.withOpacity(0.1),
+                color: isDark ? color.withValues(alpha: 0.18) : color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: color.withOpacity(isDark ? 0.25 : 0.2)),
+                border: Border.all(color: color.withValues(alpha: isDark ? 0.25 : 0.2)),
               ),
               child: Column(
                 children: [
@@ -528,7 +529,7 @@ class _QuickActions extends ConsumerWidget {
         action(
           Icons.add_circle_outline,
           'Add Expense',
-          isCompleted ? cs.onSurface.withOpacity(0.3) : cs.primary,
+          isCompleted ? cs.onSurface.withValues(alpha: 0.3) : cs.primary,
           isCompleted
               ? () => ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Project is completed. Reopen it to add expenses.')),
@@ -581,25 +582,23 @@ class _InsightsCard extends StatelessWidget {
         ? (topCat.value / totalSpent * 100).toStringAsFixed(0)
         : '0';
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.lightbulb_outline_rounded, size: 16, color: Colors.amber.shade700),
-                const SizedBox(width: 8),
-                Text('Spending Insights',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // Avg + top category
-            Row(
+    return Container(
+      decoration: appCardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.lightbulb_outline_rounded, size: 16, color: Colors.amber.shade700),
+              const SizedBox(width: 8),
+              Text('Spending Insights',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Avg + top category
+          Row(
               children: [
                 Expanded(
                   child: _InsightTile(
@@ -623,7 +622,7 @@ class _InsightsCard extends StatelessWidget {
             if (paymentBreakdown.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text('Payment Methods',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.5))),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.5))),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -633,9 +632,9 @@ class _InsightsCard extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.07),
+                      color: cs.primary.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: cs.primary.withOpacity(0.15)),
+                      border: Border.all(color: cs.primary.withValues(alpha: 0.15)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -652,8 +651,7 @@ class _InsightsCard extends StatelessWidget {
                 }).toList(),
               ),
             ],
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -685,7 +683,7 @@ class _InsightTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.07),
+        color: color.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -700,7 +698,7 @@ class _InsightTile extends StatelessWidget {
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
-                Text(label, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
+                Text(label, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7))),
               ],
             ),
           ),
@@ -720,30 +718,28 @@ class _DebtCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final net = debtSummary.lent - debtSummary.borrowed;
-    final netColor = net >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final netColor = net >= 0 ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
     final cs = Theme.of(context).colorScheme;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.handshake_outlined, size: 16, color: Colors.orange.shade600),
-                const SizedBox(width: 8),
-                Text('Debt Summary',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _DebtStat(label: 'You Lent', value: '₹${debtSummary.lent.toStringAsFixed(0)}', color: const Color(0xFF10B981)),
-                _DebtStat(label: 'You Borrowed', value: '₹${debtSummary.borrowed.toStringAsFixed(0)}', color: const Color(0xFFEF4444)),
+    return Container(
+      decoration: appCardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.handshake_outlined, size: 16, color: Colors.orange.shade600),
+              const SizedBox(width: 8),
+              Text('Debt Summary',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _DebtStat(label: 'You Lent', value: '₹${debtSummary.lent.toStringAsFixed(0)}', color: const Color(0xFF10B981)),
+              _DebtStat(label: 'You Borrowed', value: '₹${debtSummary.borrowed.toStringAsFixed(0)}', color: const Color(0xFFF43F5E)),
                 _DebtStat(
                   label: net >= 0 ? 'Net Receivable' : 'Net Payable',
                   value: '₹${net.abs().toStringAsFixed(0)}',
@@ -754,20 +750,20 @@ class _DebtCard extends StatelessWidget {
             if (personDebts.isNotEmpty) ...[
               const Divider(height: 24),
               Text('Unsettled by Person',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface.withOpacity(0.5))),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.5))),
               const SizedBox(height: 8),
               ...personDebts.entries.map((entry) {
                 final name = entry.key;
                 final d = entry.value;
                 final personNet = d.lent - d.borrowed;
-                final personColor = personNet >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final personColor = personNet >= 0 ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 14,
-                        backgroundColor: personColor.withOpacity(0.12),
+                        backgroundColor: personColor.withValues(alpha: 0.12),
                         child: Text(
                           name[0].toUpperCase(),
                           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: personColor),
@@ -789,8 +785,7 @@ class _DebtCard extends StatelessWidget {
                 );
               }),
             ],
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -810,7 +805,7 @@ class _DebtStat extends StatelessWidget {
           Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
           const SizedBox(height: 3),
           Text(label,
-              style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55)),
+              style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
               textAlign: TextAlign.center),
         ],
       ),
@@ -827,23 +822,21 @@ class _DetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
-                const SizedBox(width: 8),
-                Text('Project Details',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
-              ],
-            ),
-            const SizedBox(height: 12),
+    return Container(
+      decoration: appCardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Text('Project Details',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
+            ],
+          ),
+          const SizedBox(height: 12),
             _InfoRow(label: 'Type', value: project.projectType),
             _InfoRow(label: 'Status', value: project.status.name[0].toUpperCase() + project.status.name.substring(1)),
             _InfoRow(label: 'Start Date', value: DateFormat('dd MMM yyyy').format(project.startDate)),
@@ -851,8 +844,7 @@ class _DetailsCard extends StatelessWidget {
               _InfoRow(label: 'Target End', value: DateFormat('dd MMM yyyy').format(project.targetEndDate!)),
             if (project.description?.isNotEmpty == true)
               _InfoRow(label: 'Description', value: project.description!),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -873,7 +865,7 @@ class _InfoRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 96,
-            child: Text(label, style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.55))),
+            child: Text(label, style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.55))),
           ),
           Expanded(
             child: Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: cs.onSurface)),
@@ -894,47 +886,44 @@ class _RecentExpensesCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.receipt_long_rounded, size: 16, color: cs.primary),
-                const SizedBox(width: 8),
-                Text('Recent Expenses',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () => context.push('/projects/$projectId/expenses'),
-                  child: Text('View All',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+    return Container(
+      decoration: appCardDecoration(context),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 16, color: cs.primary),
+              const SizedBox(width: 8),
+              Text('Recent Expenses',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: cs.onSurface)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () => context.push('/projects/$projectId/expenses'),
+                child: Text('View All',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.primary)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
             if (expenses.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(Icons.receipt_long_outlined, size: 36, color: cs.onSurface.withOpacity(0.2)),
+                      Icon(Icons.receipt_long_outlined, size: 36, color: cs.onSurface.withValues(alpha: 0.2)),
                       const SizedBox(height: 8),
                       Text('No expenses yet',
-                          style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.4))),
+                          style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.4))),
                     ],
                   ),
                 ),
               )
             else
               ...expenses.map((e) => _ExpenseTile(expense: e)),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -948,7 +937,7 @@ class _ExpenseTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isLent = expense.debtType == ProjectDebtType.lent;
-    final debtColor = isLent ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final debtColor = isLent ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
@@ -956,7 +945,7 @@ class _ExpenseTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: (expense.hasDebt ? debtColor : cs.primary).withOpacity(0.1),
+            backgroundColor: (expense.hasDebt ? debtColor : cs.primary).withValues(alpha: 0.1),
             child: Icon(
               expense.hasDebt
                   ? (isLent ? Icons.call_made_rounded : Icons.call_received_rounded)
@@ -976,7 +965,7 @@ class _ExpenseTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis),
                 Text(
                   '${expense.category} · ${DateFormat('dd MMM').format(expense.date)}',
-                  style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.5)),
+                  style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5)),
                 ),
               ],
             ),
@@ -991,7 +980,7 @@ class _ExpenseTile extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 2),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: (expense.isSettled ? Colors.grey : debtColor).withOpacity(0.1),
+                    color: (expense.isSettled ? Colors.grey : debtColor).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -1010,3 +999,4 @@ class _ExpenseTile extends StatelessWidget {
     );
   }
 }
+

@@ -20,10 +20,19 @@ class _OfflineIndicatorState extends ConsumerState<OfflineIndicator>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+    ref.listenManual(connectivityProvider, (_, status) {
+      if (status == ConnectivityStatus.online) {
+        _controller.stop();
+        _controller.value = 1;
+      } else {
+        _controller.repeat(reverse: true);
+      }
+    }, fireImmediately: true);
+    _pulse = Tween<double>(
+      begin: 0.6,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -40,10 +49,7 @@ class _OfflineIndicatorState extends ConsumerState<OfflineIndicator>
 
     return AnimatedBuilder(
       animation: _pulse,
-      builder: (context, child) => Opacity(
-        opacity: _pulse.value,
-        child: child,
-      ),
+      builder: (context, child) => Opacity(opacity: _pulse.value, child: child),
       child: Container(
         margin: const EdgeInsets.only(right: 6),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -58,7 +64,11 @@ class _OfflineIndicatorState extends ConsumerState<OfflineIndicator>
             SizedBox(width: 4),
             Text(
               'Offline',
-              style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),

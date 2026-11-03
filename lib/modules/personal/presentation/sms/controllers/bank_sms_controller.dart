@@ -8,6 +8,8 @@ import 'package:split_ex/modules/personal/domain/repositories/bank_sms_device_ga
 import 'package:split_ex/modules/personal/domain/use_cases/sms/process_bank_sms_queue.dart';
 import 'package:split_ex/modules/personal/domain/use_cases/sms/import_shared_bank_sms.dart';
 import 'package:split_ex/modules/personal/domain/use_cases/sms/approve_bank_sms_review.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
 
 final bankSmsControllerProvider = ChangeNotifierProvider<BankSmsController>(
   (ref) => BankSmsController(
@@ -27,6 +29,7 @@ class BankSmsController extends ChangeNotifier {
   String? userId;
   bool enabled = false, autoRecord = true, permission = false, busy = false;
   bool rcsEnabled = false, rcsPermission = false;
+  bool statusLoaded = false;
   int sharedImportCount = 0;
   int pendingCount = 0;
   String? error;
@@ -51,6 +54,7 @@ class BankSmsController extends ChangeNotifier {
 
   Future<void> bindUser(String? uid) {
     if (!supported) return Future.value();
+    if (userId != uid) statusLoaded = false;
     userId = uid;
     _binding = _binding.catchError((_) {}).then((_) async {
       await device.bindUser(uid);
@@ -66,6 +70,7 @@ class BankSmsController extends ChangeNotifier {
     try {
       final data = await device.status();
       if (data['owner'] != (userId ?? '')) return;
+      statusLoaded = true;
       enabled = data['enabled'] == true;
       autoRecord = data['autoRecord'] != false;
       permission = data['permission'] == true;
@@ -193,6 +198,11 @@ class BankSmsController extends ChangeNotifier {
     String? toAccountId,
     bool trustSender = false,
     bool rememberCategory = false,
+    ExpenseSplit? split,
+    DebtType? debtType,
+    String? personName,
+    DateTime? dueDate,
+    String? notes,
   }) async {
     final uid = userId;
     if (uid == null) throw StateError('Sign in to record this payment.');
@@ -213,6 +223,11 @@ class BankSmsController extends ChangeNotifier {
       toAccountId: toAccountId,
       trustSender: trustSender,
       rememberCategory: rememberCategory,
+      split: split,
+      debtType: debtType,
+      personName: personName,
+      dueDate: dueDate,
+      notes: notes,
     );
     if (uid == userId) await refresh();
     return result;

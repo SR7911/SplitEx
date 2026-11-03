@@ -389,7 +389,7 @@ class _LoanCardState extends ConsumerState<_LoanCard> with SingleTickerProviderS
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () async {
               Navigator.pop(ctx);
               final userId = ref.read(authStateProvider).valueOrNull?.uid;
@@ -414,7 +414,7 @@ class _LoanCardState extends ConsumerState<_LoanCard> with SingleTickerProviderS
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
             onPressed: () async {
               Navigator.pop(ctx);
               final userId = ref.read(authStateProvider).valueOrNull?.uid;
@@ -564,14 +564,14 @@ class _LoanCardState extends ConsumerState<_LoanCard> with SingleTickerProviderS
                               ])),
                             if (loan.recurringId != null)
                               const PopupMenuItem(value: 'delete_recurring', child: Row(children: [
-                                Icon(Icons.repeat_rounded, size: 16, color: Colors.orange),
+                                Icon(Icons.repeat_rounded, size: 16, color: Color(0xFFF59E0B)),
                                 SizedBox(width: 10),
-                                Text('Delete Recurring', style: TextStyle(fontSize: 13, color: Colors.orange)),
+                                Text('Delete Recurring', style: TextStyle(fontSize: 13, color: Color(0xFFF59E0B))),
                               ])),
                             const PopupMenuItem(value: 'delete', child: Row(children: [
-                              Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                              Icon(Icons.delete_outline, size: 16, color: Color(0xFFEF4444)),
                               SizedBox(width: 10),
-                              Text('Delete Loan', style: TextStyle(fontSize: 13, color: Colors.red)),
+                              Text('Delete Loan', style: TextStyle(fontSize: 13, color: Color(0xFFEF4444))),
                             ])),
                           ],
                         ),

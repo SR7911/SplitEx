@@ -1,5 +1,6 @@
 import 'package:split_ex/modules/personal/domain/entities/budgets/personal_budget.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import '../../policies/transactions/shared_expense_progress.dart';
 
 class CategoryReview {
   final String category;
@@ -62,14 +63,22 @@ class MonthlyMoneyReview {
     bool included(PersonalTransaction t, DateTime min, DateTime max) =>
         !t.date.isBefore(min) &&
         t.date.isBefore(DateTime(max.year, max.month, max.day + 1));
-    final entries = current.where((t) => included(t, start, end)).toList();
-    final old = previous.where((t) => included(t, before, prevEnd)).toList();
-    double sum(Iterable<PersonalTransaction> ts) =>
-        ts.fold(0, (n, t) => n + t.amount);
+    final entries = attachSharedExpenseDebts(
+      current,
+      debts,
+    ).where((t) => included(t, start, end)).toList();
+    final old = attachSharedExpenseDebts(
+      previous,
+      debts,
+    ).where((t) => included(t, before, prevEnd)).toList();
+    double sum(Iterable<PersonalTransaction> ts) => ts.fold(
+      0,
+      (n, t) => n + (t.countsAsSpending ? t.spendingAmount : t.amount),
+    );
     Map<String, double> spending(List<PersonalTransaction> ts) {
       final values = <String, double>{};
       for (final t in ts.where((t) => t.countsAsSpending)) {
-        values[t.category] = (values[t.category] ?? 0) + t.amount;
+        values[t.category] = (values[t.category] ?? 0) + t.spendingAmount;
       }
       return values;
     }

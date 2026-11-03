@@ -21,8 +21,11 @@ class ExpenseSplit {
   const ExpenseSplit({required this.mode, required this.shares});
 
   int ownShareCents(double total) =>
-      moneyCents(total) -
-      shares.fold<int>(0, (sum, share) => sum + moneyCents(share.amount));
+      roundedMoneyCents(total) -
+      shares.fold<int>(
+        0,
+        (sum, share) => sum + roundedMoneyCents(share.amount),
+      );
 
   void validate(double total) {
     final totalCents = moneyCents(total);
@@ -51,12 +54,18 @@ class ExpenseSplit {
   }
 }
 
-/// Money is validated and allocated in paise to avoid floating point drift.
-int moneyCents(double amount) {
+/// Read-side currency conversion for stored/calculated values with extra precision.
+/// This does not change persisted values or relax new-entry validation.
+int roundedMoneyCents(double amount) {
   if (!amount.isFinite || amount < 0 || amount * 100 > 9007199254740991) {
     throw StateError('Enter a valid amount.');
   }
-  final cents = (amount * 100).round();
+  return (amount * 100).round();
+}
+
+/// Validate user-entered money before saving, then allocate it in paise.
+int moneyCents(double amount) {
+  final cents = roundedMoneyCents(amount);
   if ((amount * 100 - cents).abs() > 0.000001) {
     throw StateError('Use at most two decimal places.');
   }

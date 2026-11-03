@@ -10,6 +10,7 @@ import 'package:split_ex/modules/room/domain/policies/balance_service.dart';
 import 'package:split_ex/modules/notifications/services/notification_helper.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -43,7 +44,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final userId = ref.watch(currentUserIdProvider);
     final roomAsync = ref.watch(roomStreamProvider(widget.roomId));
 
-    // Trigger UPI check after build
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpiId());
 
     return Scaffold(
@@ -72,8 +72,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   _BalanceSummaryCard(balance: balance),
                   const SizedBox(height: 20),
                   if (userDebts.isNotEmpty) ...[
-                    Text('Your Settlements',
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text('Your Settlements', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     ...userDebts.map((d) => _DebtTile(
                           debt: d,
@@ -83,8 +82,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         )),
                   ],
                   const SizedBox(height: 20),
-                  Text('All Settlements',
-                      style: Theme.of(context).textTheme.titleMedium),
+                  Text('All Settlements', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   if (allDebts.isEmpty)
                     const Text('All settled up! 🎉')
@@ -119,7 +117,7 @@ class _BalanceSummaryCard extends StatelessWidget {
     final color = isPositive
         ? const Color(0xFF10B981)
         : isNegative
-            ? const Color(0xFFEF4444)
+            ? const Color(0xFFF43F5E)
             : cs.primary;
     final label = isPositive ? 'You are owed' : isNegative ? 'You owe' : 'All settled up!';
     final icon = isPositive
@@ -133,13 +131,13 @@ class _BalanceSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
-              ? [color.withOpacity(0.35), color.withOpacity(0.2)]
-              : [color.withOpacity(0.15), color.withOpacity(0.06)],
+              ? [color.withValues(alpha: 0.35), color.withValues(alpha: 0.2)]
+              : [color.withValues(alpha: 0.15), color.withValues(alpha: 0.06)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Row(
@@ -148,7 +146,7 @@ class _BalanceSummaryCard extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: color.withOpacity(isDark ? 0.25 : 0.12),
+              color: color.withValues(alpha: isDark ? 0.25 : 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 26),
@@ -160,7 +158,7 @@ class _BalanceSummaryCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 13, color: cs.onSurface.withOpacity(0.65), fontWeight: FontWeight.w500),
+                  style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.65), fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 4),
                 if (isPositive || isNegative)
@@ -205,10 +203,22 @@ class _DebtTile extends ConsumerWidget {
     final toName = debt.to == currentUserId ? 'You' : (nameMap[debt.to] ?? debt.to);
     final canRemind = debt.to == currentUserId;
     final canSettle = debt.from == currentUserId;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = canSettle ? const Color(0xFFF43F5E) : const Color(0xFF10B981);
 
-    return Card(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: appCardDecoration(context, accentColor: color),
       child: ListTile(
-        leading: const Icon(Icons.swap_horiz),
+        tileColor: Colors.transparent,
+        leading: Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: isDark ? 0.2 : 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(Icons.swap_horiz, color: color, size: 20),
+        ),
         title: Text('$fromName → $toName'),
         subtitle: canSettle
             ? TextButton.icon(
@@ -231,10 +241,10 @@ class _DebtTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '\u20B9${debt.amount.toStringAsFixed(2)}',
+              '₹${debt.amount.toStringAsFixed(2)}',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: debt.from == currentUserId ? Colors.red : Colors.green,
+                color: color,
               ),
             ),
             if (canRemind)
@@ -242,8 +252,7 @@ class _DebtTile extends ConsumerWidget {
                 icon: const Icon(Icons.notifications_active, size: 20),
                 tooltip: 'Send Reminder',
                 onPressed: () {
-                  final helper = NotificationHelper(
-                      ref.read(notificationServiceProvider));
+                  final helper = NotificationHelper(ref.read(notificationServiceProvider));
                   helper.sendReminder(
                     roomId: roomId,
                     fromName: nameMap[currentUserId] ?? 'You',

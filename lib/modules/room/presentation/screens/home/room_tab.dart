@@ -564,92 +564,75 @@ class _RoomCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.xl),
       child: Container(
         decoration: appCardDecoration(context, accentColor: _kBlue),
-        child: Stack(
-          children: [
-            Positioned(
-              left: 0, top: 0, bottom: 0,
-              child: Container(
-                width: 3,
-                decoration: const BoxDecoration(
-                  color: _kBlue,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(AppRadius.xl),
-                    bottomLeft: Radius.circular(AppRadius.xl),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Row(
+            children: [
+              Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    (room.name as String)[0].toUpperCase(),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _kBlue),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(19, 14, 16, 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 46, height: 46,
-                    decoration: BoxDecoration(
-                      color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Center(
-                      child: Text(
-                        (room.name as String)[0].toUpperCase(),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _kBlue),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(room.name as String,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 3),
+                    Row(children: [
+                      Icon(Icons.people_outline_rounded, size: 12, color: cs.onSurface.withValues(alpha: 0.4)),
+                      const SizedBox(width: 4),
+                      Text('${(room.memberIds as List).length} members',
+                          style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 6),
+                        width: 3, height: 3,
+                        decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.25), shape: BoxShape.circle),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(room.name as String,
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 3),
-                        Row(children: [
-                          Icon(Icons.people_outline_rounded, size: 12, color: cs.onSurface.withValues(alpha: 0.4)),
-                          const SizedBox(width: 4),
-                          Text('${(room.memberIds as List).length} members',
-                              style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
-                          Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 6),
-                            width: 3, height: 3,
-                            decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.25), shape: BoxShape.circle),
-                          ),
-                          Icon(Icons.vpn_key_outlined, size: 11, color: cs.onSurface.withValues(alpha: 0.4)),
-                          const SizedBox(width: 4),
-                          Text(room.inviteCode as String,
-                              style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
-                        ]),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (room.isLocked as bool)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _kAmber.withValues(alpha: isDark ? 0.15 : 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _kAmber.withValues(alpha: 0.25)),
-                      ),
-                      child: const Text('Locked', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kAmber)),
-                    )
-                  else if (isAdmin)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _kBlue.withValues(alpha: 0.25)),
-                      ),
-                      child: const Text('Admin', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kBlue)),
-                    )
-                  else
-                    Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
-                ],
+                      Icon(Icons.vpn_key_outlined, size: 11, color: cs.onSurface.withValues(alpha: 0.4)),
+                      const SizedBox(width: 4),
+                      Text(room.inviteCode as String,
+                          style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
+                    ]),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 10),
+              if (room.isLocked as bool)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _kAmber.withValues(alpha: isDark ? 0.15 : 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _kAmber.withValues(alpha: 0.25)),
+                  ),
+                  child: const Text('Locked', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kAmber)),
+                )
+              else if (isAdmin)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _kBlue.withValues(alpha: 0.25)),
+                  ),
+                  child: const Text('Admin', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kBlue)),
+                )
+              else
+                Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+            ],
+          ),
         ),
       ),
     );

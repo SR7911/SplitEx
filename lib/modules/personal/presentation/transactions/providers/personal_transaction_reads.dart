@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/modules/personal/dependencies.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
 import 'package:split_ex/modules/personal/domain/policies/transactions/monthly_transaction_summary.dart';
+import 'package:split_ex/modules/personal/domain/policies/transactions/shared_expense_progress.dart';
 
 final personalMonthTransactionsProvider =
     StreamProvider.family<List<PersonalTransaction>, String>((ref, month) {
@@ -10,6 +11,27 @@ final personalMonthTransactionsProvider =
       return ref
           .watch(personalTransactionRepositoryProvider)
           .transactionsForMonth(userId, month);
+    });
+
+final personalMonthDisplayTransactionsProvider =
+    Provider.family<AsyncValue<List<PersonalTransaction>>, String>((
+      ref,
+      month,
+    ) {
+      final transactions = ref.watch(personalMonthTransactionsProvider(month));
+      if (!(transactions.valueOrNull ?? []).any(
+        (entry) => entry.hasSharedExpense,
+      )) {
+        return transactions;
+      }
+      final debts = ref.watch(personalDebtTransactionsProvider);
+      if (debts.hasError) {
+        return AsyncError(debts.error!, debts.stackTrace ?? StackTrace.current);
+      }
+      if (debts.isLoading) return const AsyncLoading();
+      return transactions.whenData(
+        (entries) => attachSharedExpenseDebts(entries, debts.requireValue),
+      );
     });
 
 final personalDebtTransactionsProvider =
@@ -68,6 +90,9 @@ final personalDomainMonthlySummaryProvider =
 final personalDomainCategorySpendingProvider =
     Provider.family<Map<String, double>, String>((ref, month) {
       final transactions =
-          ref.watch(personalMonthTransactionsProvider(month)).valueOrNull ?? [];
+          ref
+              .watch(personalMonthDisplayTransactionsProvider(month))
+              .valueOrNull ??
+          [];
       return calculatePersonalCategorySpending(transactions);
     });

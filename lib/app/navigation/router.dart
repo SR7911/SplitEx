@@ -225,7 +225,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/personal/calendar',
-        builder: (context, state) => const PaymentCalendarScreen(),
+        builder: (context, state) => PaymentCalendarScreen(
+          initialDate: state.extra is DateTime ? state.extra as DateTime : null,
+        ),
       ),
       GoRoute(
         path: '/personal/sms-review',

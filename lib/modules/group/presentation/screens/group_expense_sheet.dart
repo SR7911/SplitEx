@@ -363,7 +363,7 @@ class _SheetHeader extends StatelessWidget {
       children: [
         Container(
           width: 40, height: 40,
-          decoration: BoxDecoration(color: primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
           child: Icon(isAdd ? Icons.add_circle_outline : Icons.receipt_long, size: 22, color: primary),
         ),
         const SizedBox(width: 12),
@@ -485,14 +485,14 @@ class _CategoryDateRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.calendar_today, size: 16,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(enabled ? 0.6 : 0.4)),
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: enabled ? 0.6 : 0.4)),
                 const SizedBox(width: 6),
                 Text(DateFormat('dd MMM').format(date), style: const TextStyle(fontSize: 13)),
               ],
@@ -561,7 +561,7 @@ class _SplitSection extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.splitscreen_rounded, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+            Icon(Icons.splitscreen_rounded, size: 16, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             const SizedBox(width: 6),
             Text('Split', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
           ],
@@ -616,7 +616,7 @@ class _SplitSection extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               'Split equally among ${memberIds.length} members',
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
             ),
           ),
       ],
@@ -635,9 +635,9 @@ class _ShareBreakdown extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: primary.withOpacity(0.05),
+        color: primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primary.withOpacity(0.1)),
+        border: Border.all(color: primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,7 +660,7 @@ class _ShareBreakdown extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: primary.withOpacity(0.1),
+                    backgroundColor: primary.withValues(alpha: 0.1),
                     child: Text(
                       name.isNotEmpty ? name[0].toUpperCase() : '?',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primary),
@@ -696,10 +696,11 @@ class _ShareBreakdown extends StatelessWidget {
 
 InputDecoration _dec(BuildContext context, String label, IconData icon) => InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+      prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
       filled: true,
-      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
     );
+

@@ -8,6 +8,8 @@ import 'package:split_ex/modules/personal/presentation/transactions/providers/pe
 import 'package:split_ex/modules/personal/presentation/transactions/screens/add_personal_transaction_screen.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/screens/view_personal_transaction_sheet.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
+import '../widgets/shared_expense_details.dart';
 
 /// Personal transactions for one month, backed by the domain read contract.
 class PersonalTransactionsScreen extends ConsumerStatefulWidget {
@@ -68,6 +70,7 @@ class _PersonalTransactionsScreenState
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => _PersonalFilterBottomSheet(
         categories: categories,
         categoryFilter: _categoryFilter,
@@ -99,7 +102,7 @@ class _PersonalTransactionsScreenState
   @override
   Widget build(BuildContext context) {
     final txnsAsync = ref.watch(
-      personalMonthTransactionsProvider(widget.monthKey),
+      personalMonthDisplayTransactionsProvider(widget.monthKey),
     );
     final debts = ref.watch(personalDebtTransactionsProvider).valueOrNull ?? [];
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -179,7 +182,8 @@ class _PersonalTransactionsScreenState
                 return false;
               }
               if (_search.isNotEmpty &&
-                  !t.title.toLowerCase().contains(_search.toLowerCase()))
+                  ![t.title, t.personName ?? '', ...?t.split?.shares.map((s) => s.personName)]
+                      .join(' ').toLowerCase().contains(_search.toLowerCase()))
                 return false;
               if (_categoryFilter != null && t.category != _categoryFilter)
                 return false;
@@ -214,10 +218,8 @@ class _PersonalTransactionsScreenState
                       prefixIcon: const Icon(Icons.search, size: 20),
                       filled: true,
                       fillColor: isDark
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest
-                          : Colors.grey.shade100,
+                          ? Theme.of(context).colorScheme.surfaceContainerHigh
+                          : Theme.of(context).colorScheme.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
@@ -232,93 +234,22 @@ class _PersonalTransactionsScreenState
                 ),
                 const SizedBox(height: 12),
 
-                if (linkedPayments > 0) ...[
+                // Debt payments banner
+                if (linkedPayments > 0)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Material(
-                      color: isDark
-                          ? Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => context.push('/personal/debts'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outline.withValues(alpha: 0.1),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                                child: Icon(
-                                  Icons.history_rounded,
-                                  size: 18,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$linkedPayments debt ${linkedPayments == 1 ? 'payment' : 'payments'} this month',
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'View payment history in Debts',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                size: 18,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.45),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: AppFinanceTile(
+                      icon: Icons.history_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                      title: '$linkedPayments debt ${linkedPayments == 1 ? 'payment' : 'payments'} this month',
+                      subtitle: 'View payment history in Debts',
+                      action: Icon(Icons.chevron_right_rounded, size: 18,
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .3)),
+                      onTap: () => context.push('/personal/debts'),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
 
-                // Filter chips + filter icon
+                // Filter chips
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
@@ -326,7 +257,7 @@ class _PersonalTransactionsScreenState
                       Expanded(
                         child: _FilterChip(
                           label: 'All',
-                          icon: Icons.list,
+                          icon: Icons.list_rounded,
                           selected: _filter == null,
                           onTap: () => setState(() => _filter = null),
                         ),
@@ -335,41 +266,38 @@ class _PersonalTransactionsScreenState
                       Expanded(
                         child: _FilterChip(
                           label: 'Expenses',
-                          icon: Icons.arrow_upward,
+                          icon: Icons.north_rounded,
                           selected: _filter == TransactionType.expense,
-                          onTap: () =>
-                              setState(() => _filter = TransactionType.expense),
+                          onTap: () => setState(() => _filter = TransactionType.expense),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _FilterChip(
                           label: 'Income',
-                          icon: Icons.arrow_downward,
+                          icon: Icons.south_rounded,
                           selected: _filter == TransactionType.income,
-                          onTap: () =>
-                              setState(() => _filter = TransactionType.income),
+                          onTap: () => setState(() => _filter = TransactionType.income),
                         ),
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () => _showFilterSheet(context, categories),
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: _hasAdvancedFilters
                                 ? Theme.of(context).colorScheme.primary
-                                : Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(12),
+                                : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
                           child: Icon(
-                            Icons.tune,
+                            Icons.tune_rounded,
                             size: 18,
                             color: _hasAdvancedFilters
                                 ? Colors.white
-                                : Theme.of(context).iconTheme.color,
+                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: .6),
                           ),
                         ),
                       ),
@@ -387,9 +315,7 @@ class _PersonalTransactionsScreenState
                         '${filtered.length} transactions',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withOpacity(0.5),
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -400,22 +326,10 @@ class _PersonalTransactionsScreenState
                 // Day-wise grouped list
                 Expanded(
                   child: filtered.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.receipt_long_outlined,
-                                size: 48,
-                                color: Colors.grey.shade300,
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'No transactions found',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ],
-                          ),
+                      ? const AppEmptyState(
+                          icon: Icons.receipt_long_outlined,
+                          title: 'No transactions found',
+                          subtitle: 'Try adjusting your filters or add a new transaction.',
                         )
                       : _DayWiseList(transactions: filtered),
                 ),
@@ -457,7 +371,7 @@ class _DayWiseList extends StatelessWidget {
         final date = DateTime.parse(dateKey);
         final dayExpense = dayTxns
             .where(_isShownAsExpense)
-            .fold<double>(0, (s, t) => s + t.amount);
+            .fold<double>(0, (s, t) => s + (t.hasSharedExpense ? t.spendingAmount : t.amount));
         final dayIncome = dayTxns
             .where(_isShownAsIncome)
             .fold<double>(0, (s, t) => s + t.amount);
@@ -469,37 +383,44 @@ class _DayWiseList extends StatelessWidget {
           children: [
             // Day header
             Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
               child: Row(
                 children: [
-                  Text(
-                    isToday ? 'Today' : DateFormat('EEE, dd MMM').format(date),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.7),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isToday
+                          ? Theme.of(context).colorScheme.primary.withValues(alpha: .12)
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Text(
+                      isToday ? 'Today' : DateFormat('EEE, dd MMM').format(date),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isToday
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurface.withValues(alpha: .6),
+                      ),
                     ),
                   ),
                   const Spacer(),
                   if (dayExpense > 0)
                     Text(
-                      '-₹${dayExpense.toStringAsFixed(0)}',
+                      '-${_fmt(dayExpense)}',
                       style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red,
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                        color: Color(0xFFEF4444),
                       ),
                     ),
                   if (dayExpense > 0 && dayIncome > 0) const SizedBox(width: 8),
                   if (dayIncome > 0)
                     Text(
-                      '+₹${dayIncome.toStringAsFixed(0)}',
+                      '+${_fmt(dayIncome)}',
                       style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
+                        fontSize: 12, fontWeight: FontWeight.w600,
+                        color: Color(0xFF22C55E),
                       ),
                     ),
                 ],
@@ -532,18 +453,18 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs     = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? Theme.of(context).colorScheme.primary
-              : (isDark
-                    ? Theme.of(context).colorScheme.surfaceContainerHighest
-                    : Colors.grey.shade100),
-          borderRadius: BorderRadius.circular(12),
+              ? cs.primary
+              : isDark ? cs.surfaceContainerHigh : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
@@ -551,21 +472,16 @@ class _FilterChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                icon,
-                size: 14,
-                color: selected
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                icon, size: 13,
+                color: selected ? cs.onPrimary : cs.onSurface.withValues(alpha: .55),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : null,
+                  color: selected ? cs.onPrimary : cs.onSurface.withValues(alpha: .7),
                 ),
               ),
             ],
@@ -581,124 +497,178 @@ class _TxnCard extends StatelessWidget {
   final VoidCallback onTap;
   const _TxnCard({required this.txn, required this.onTap});
 
+  static const _kGreen    = Color(0xFF22C55E);
+  static const _kRed      = Color(0xFFEF4444);
+  static const _kNeutral  = Color(0xFF64748B);
+
   @override
   Widget build(BuildContext context) {
-    final isNeutralLent = _isNeutralLent(txn);
-    final isIncome = _isShownAsIncome(txn);
-    final color = isNeutralLent
-        ? Colors.blueGrey
-        : isIncome
-        ? Colors.green
-        : Colors.red;
-    final sign = isNeutralLent
-        ? ''
-        : isIncome
-        ? '+'
-        : '-';
+    final cs     = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isNeutralLent = _isNeutralLent(txn);
+    final isIncome      = _isShownAsIncome(txn);
+    final color  = isNeutralLent ? _kNeutral : isIncome ? _kGreen : _kRed;
+    final sign   = isNeutralLent ? '' : isIncome ? '+' : '-';
+    final icon   = isNeutralLent
+        ? Icons.handshake_outlined
+        : isIncome
+        ? Icons.south_rounded
+        : Icons.north_rounded;
+
+    // Amount display — net spend for shared, raw amount otherwise
+    final showNetSpend = txn.hasSharedExpense && txn.sharedStatusKnown;
+    final displayAmount = showNetSpend ? txn.spendingAmount : txn.amount;
+    final amountStr = _fmt(displayAmount);
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: isDark
-              ? Theme.of(context).colorScheme.surfaceContainerHighest
-              : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
-          ),
-        ),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: color.withOpacity(0.1),
-              child: Icon(
-                isNeutralLent
-                    ? Icons.handshake_outlined
-                    : isIncome
-                    ? Icons.arrow_downward_rounded
-                    : Icons.arrow_upward_rounded,
-                size: 18,
-                color: color,
-              ),
+          color: isDark ? cs.surfaceContainerHigh : cs.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: color.withValues(alpha: isDark ? .18 : .12)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? .10 : .03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    txn.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                  // Icon
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: isDark ? .14 : .09),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: Icon(icon, size: 18, color: color),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${txn.category} • ${DateFormat('dd MMM').format(txn.date)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (txn.hasDebt) ...[
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
+                  const SizedBox(width: AppSpacing.md),
+
+                  // Body
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _DebtChip(
-                          label: txn.debtType == DebtType.lent
-                              ? 'Debt · Lent'
-                              : 'Debt · Borrowed',
-                          color: Theme.of(context).colorScheme.primary,
+                        // Title + amount row
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                txn.title,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: cs.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '$sign$amountStr',
+                                  key: ValueKey('transaction-net-spend-${txn.id}'),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: color,
+                                  ),
+                                ),
+                                if (showNetSpend)
+                                  Text(
+                                    'of ${_fmt(txn.amount)}',
+                                    style: AppTextStyles.caption(context),
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
-                        if (txn.isSettled)
-                          _DebtChip(label: 'Settled', color: Colors.blueGrey),
+                        const SizedBox(height: 3),
+
+                        // Category · date
+                        Text(
+                          '${txn.category}  ·  ${DateFormat('dd MMM').format(txn.date)}',
+                          style: AppTextStyles.caption(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+
+                        // Debt badge row
+                        if (txn.hasDebt) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              _Badge(
+                                label: txn.debtType == DebtType.lent ? 'Lent' : 'Borrowed',
+                                color: cs.primary,
+                              ),
+                              if (txn.isSettled)
+                                _Badge(
+                                  label: txn.writtenOffAmount > 0 ? 'Closed' : 'Settled',
+                                  color: _kGreen,
+                                )
+                              else if (txn.settledAmount > 0)
+                                _Badge(
+                                  label: '${_fmt(txn.remainingAmount)} left',
+                                  color: _kRed,
+                                ),
+                              if (txn.personName != null && txn.personName!.isNotEmpty)
+                                _Badge(label: txn.personName!, color: _kNeutral),
+                            ],
+                          ),
+                        ],
+
+                        // Shared expense details
+                        if (txn.hasSharedExpense)
+                          SharedExpenseDetails(transaction: txn),
                       ],
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            Text(
-              '$sign₹${txn.amount.toStringAsFixed(0)}',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _DebtChip extends StatelessWidget {
+String _fmt(double v) => NumberFormat.currency(
+  locale: 'en_IN', symbol: '₹',
+  decimalDigits: v == v.roundToDouble() ? 0 : 2,
+).format(v);
+
+class _Badge extends StatelessWidget {
   final String label;
   final Color color;
-
-  const _DebtChip({required this.label, required this.color});
-
+  const _Badge({required this.label, required this.color});
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(6),
+      color: color.withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(AppRadius.sm - 2),
     ),
     child: Text(
       label,
@@ -760,18 +730,35 @@ class _PersonalFilterBottomSheetState
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerHigh : cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        top: 8,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

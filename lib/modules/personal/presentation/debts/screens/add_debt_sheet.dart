@@ -8,6 +8,8 @@ import 'package:split_ex/modules/personal/presentation/transactions/providers/pe
 import 'package:split_ex/modules/personal/presentation/transactions/screens/add_personal_transaction_screen.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_due_date_picker.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showAddDebtSheet(BuildContext context, {String? initialMonth}) {
   showModalBottomSheet(
@@ -49,11 +51,8 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
     if (widget.initialMonth != null) {
       final parts = widget.initialMonth!.split('-');
       _date = DateTime(int.parse(parts[0]), int.parse(parts[1]));
-      // clamp to today if initialMonth is current month
       final now = DateTime.now();
-      if (_date.year == now.year && _date.month == now.month) {
-        _date = now;
-      }
+      if (_date.year == now.year && _date.month == now.month) _date = now;
     } else {
       _date = DateTime.now();
     }
@@ -79,7 +78,6 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
     final userId = ref.read(authStateProvider).valueOrNull?.uid;
     if (userId == null) return;
 
-    // Lent = expense (deducts balance), Borrowed = income (adds to balance at creation)
     final txnType = _debtType == DebtType.lent
         ? TransactionType.expense
         : TransactionType.income;
@@ -106,7 +104,9 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save. Check your account, amount and repayment date, then retry.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save. Check your details and retry.')),
+        );
       }
       return;
     }
@@ -129,254 +129,233 @@ class _AddDebtSheetState extends ConsumerState<_AddDebtSheet> {
         : suggestions.where((s) => s.toLowerCase().contains(query)).toList();
 
     final isLent = _debtType == DebtType.lent;
-    final accentColor = isLent ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    final accentColor = isLent ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+    return PersonalFormSheet(
+      title: 'Add Debt',
+      icon: isLent ? Icons.call_made_rounded : Icons.call_received_rounded,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Lent / Borrowed toggle
+            Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [
+                  _TypeTab(label: 'I Lent', icon: Icons.call_made_rounded, color: const Color(0xFF10B981), selected: isLent, onTap: () => setState(() => _debtType = DebtType.lent)),
+                  _TypeTab(label: 'I Borrowed', icon: Icons.call_received_rounded, color: const Color(0xFFF43F5E), selected: !isLent, onTap: () => setState(() => _debtType = DebtType.borrowed)),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.base),
+
+            // Amount
+            TextFormField(
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹)',
+                prefixIcon: Icon(Icons.currency_rupee_rounded),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter valid amount';
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Title
+            TextFormField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                prefixIcon: Icon(Icons.notes_rounded),
+              ),
+              validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Person name + suggestions
+            TextFormField(
+              controller: _personCtrl,
+              focusNode: _personFocus,
+              decoration: const InputDecoration(
+                labelText: 'Person\'s name',
+                prefixIcon: Icon(Icons.person_outline_rounded),
+              ),
+              onChanged: (_) => setState(() {}),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+            ),
+            if (_showSuggestions && filtered.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  border: Border.all(color: cs.outline.withValues(alpha: 0.12)),
+                ),
+                child: Column(
+                  children: filtered.take(5).map((name) => InkWell(
+                    onTap: () {
+                      _personCtrl.text = name;
+                      _personFocus.unfocus();
+                      setState(() => _showSuggestions = false);
+                    },
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base, vertical: AppSpacing.sm),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: accentColor.withValues(alpha: 0.12),
+                            child: Text(name[0].toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: accentColor)),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+                  )).toList(),
+                ),
+              ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Category + Date
+            Row(
               children: [
-                // Handle
-                Center(
-                  child: Container(
-                    width: 48, height: 5,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(color: accentColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-                      child: Icon(isLent ? Icons.call_made : Icons.call_received, color: accentColor, size: 20),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _category,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      prefixIcon: Icon(Icons.label_outline_rounded),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                     ),
-                    const SizedBox(width: 12),
-                    Text('Add Debt', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Lent / Borrowed toggle
-                Container(
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(4),
-                  child: Row(
-                    children: [
-                      _TypeTab(
-                        label: 'I Lent',
-                        icon: Icons.call_made,
-                        color: const Color(0xFF22C55E),
-                        selected: isLent,
-                        onTap: () => setState(() => _debtType = DebtType.lent),
-                      ),
-                      _TypeTab(
-                        label: 'I Borrowed',
-                        icon: Icons.call_received,
-                        color: const Color(0xFFEF4444),
-                        selected: !isLent,
-                        onTap: () => setState(() => _debtType = DebtType.borrowed),
-                      ),
-                    ],
+                    items: personalCategories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
+                    onChanged: (v) => setState(() => _category = v!),
+                    isExpanded: true,
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // Amount
-                TextFormField(
-                  controller: _amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  autofocus: true,
-                  decoration: _inputDeco(context, 'Amount (₹)', Icons.currency_rupee),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter valid amount';
-                    return null;
+                const SizedBox(width: AppSpacing.md),
+                _DebtDateButton(
+                  date: _date,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _date,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setState(() => _date = picked);
                   },
-                ),
-                const SizedBox(height: 12),
-
-                // Title
-                TextFormField(
-                  controller: _titleCtrl,
-                  decoration: _inputDeco(context, 'Description', Icons.notes),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-
-                // Person name with suggestions
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextFormField(
-                      controller: _personCtrl,
-                      focusNode: _personFocus,
-                      decoration: _inputDeco(context, 'Person\'s name', Icons.person_outline),
-                      onChanged: (_) => setState(() {}),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                    ),
-                    if (_showSuggestions && filtered.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: cs.outline.withValues(alpha: 0.12)),
-                        ),
-                        child: Column(
-                          children: filtered.take(5).map((name) => InkWell(
-                            onTap: () {
-                              _personCtrl.text = name;
-                              _personFocus.unfocus();
-                              setState(() => _showSuggestions = false);
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: accentColor.withValues(alpha: 0.12),
-                                    child: Text(name[0].toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: accentColor)),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                                ],
-                              ),
-                            ),
-                          )).toList(),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Category & Date row
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _category,
-                        decoration: _inputDeco(context, 'Category', Icons.category).copyWith(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-                        items: personalCategories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14)))).toList(),
-                        onChanged: (v) => setState(() => _category = v!),
-                        isExpanded: true,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _date,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) setState(() => _date = picked);
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.calendar_today, size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
-                            const SizedBox(width: 8),
-                            Text(DateFormat('dd MMM').format(_date), style: const TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Notes
-                PersonalAccountPicker(value: _accountId, enabled: !_saving, onChanged: (v) => setState(() => _accountId = v)),
-                const SizedBox(height: 12),
-                DebtDueDatePicker(value: _dueDate, debtDate: _date, enabled: !_saving, onChanged: (v) => setState(() => _dueDate = v)),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _notesCtrl,
-                  decoration: _inputDeco(context, 'Notes (optional)', Icons.edit_note),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 20),
-
-                // Balance impact hint
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: accentColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: accentColor.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, size: 16, color: accentColor),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          isLent
-                              ? 'Lent amount will be deducted from your balance. It returns when settled.'
-                              : 'Borrowed amount adds to your balance. Settlement will deduct it.',
-                          style: TextStyle(fontSize: 11, color: accentColor, fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                FilledButton(
-                  onPressed: _saving ? null : _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accentColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                  ),
-                  child: _saving
-                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(isLent ? 'Record Lent' : 'Record Borrowed', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: AppSpacing.md),
+
+            PersonalAccountPicker(
+              value: _accountId,
+              enabled: !_saving,
+              onChanged: (v) => setState(() => _accountId = v),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            DebtDueDatePicker(
+              value: _dueDate,
+              debtDate: _date,
+              enabled: !_saving,
+              onChanged: (v) => setState(() => _dueDate = v),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            TextFormField(
+              controller: _notesCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Notes (optional)',
+                prefixIcon: Icon(Icons.edit_note_rounded),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Balance impact hint
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 15, color: accentColor),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      isLent
+                          ? 'Lent amount deducts from your balance. Returns when settled.'
+                          : 'Borrowed amount adds to your balance. Settlement will deduct it.',
+                      style: TextStyle(fontSize: 11, color: accentColor, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(backgroundColor: accentColor),
+              child: _saving
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(isLent ? 'Record Lent' : 'Record Borrowed', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-InputDecoration _inputDeco(BuildContext context, String label, IconData icon) {
-  final cs = Theme.of(context).colorScheme;
-  return InputDecoration(
-    labelText: label,
-    prefixIcon: Icon(icon, color: cs.onSurface.withValues(alpha: 0.5)),
-    filled: true,
-    fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-  );
+class _DebtDateButton extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onTap;
+  const _DebtDateButton({required this.date, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: cs.outline.withValues(alpha: 0.15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.55)),
+            const SizedBox(width: 6),
+            Text(DateFormat('dd MMM').format(date), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _TypeTab extends StatelessWidget {
@@ -389,28 +368,29 @@ class _TypeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           decoration: BoxDecoration(
             color: selected ? color.withValues(alpha: 0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: selected ? Border.all(color: color.withValues(alpha: 0.4)) : null,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: selected ? Border.all(color: color.withValues(alpha: 0.35)) : null,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: selected ? color : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+              Icon(icon, size: 15, color: selected ? color : cs.onSurface.withValues(alpha: 0.4)),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? color : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  color: selected ? color : cs.onSurface.withValues(alpha: 0.4),
                 ),
               ),
             ],

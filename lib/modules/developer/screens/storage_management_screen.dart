@@ -151,9 +151,11 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Firebase Admin'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loadStats)],
+      appBar: AppHeader(
+        showBack: true,
+        title: 'Firebase Admin',
+        showNotification: false,
+        trailing: IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _loadStats, tooltip: 'Refresh'),
       ),
       body: GradientBody(child: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -166,7 +168,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
+                          color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -324,7 +326,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: Colors.orange.withOpacity(0.1),
+                          backgroundColor: Colors.orange.withValues(alpha: 0.1),
                           child: const Icon(Icons.photo_library, color: Colors.orange),
                         ),
                         title: Text('${_stats!.totalImages} receipt images'),
@@ -342,7 +344,7 @@ class _StorageManagementScreenState extends ConsumerState<StorageManagementScree
                     Card(
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      color: isDark ? Colors.blue.withOpacity(0.08) : Colors.blue.shade50,
+                      color: isDark ? Colors.blue.withValues(alpha: 0.08) : Colors.blue.shade50,
                       child: const Padding(
                         padding: EdgeInsets.all(14),
                         child: Column(
@@ -403,7 +405,7 @@ class _StatPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.08),
+          color: isDark ? color.withValues(alpha: 0.15) : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(

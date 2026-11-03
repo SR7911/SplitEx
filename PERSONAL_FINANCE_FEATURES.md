@@ -1,5 +1,55 @@
 # Personal finance additions
 
+## Shared expense repayments and SMS entry
+
+- Original shared payments now show their participants, allocated shares, live
+  Pending/Partially settled/Settled/Closed status and net spending in Transactions,
+  transaction details and dashboard recent transactions. Search also matches share
+  participants. The full original payment remains visible and editable under the
+  existing settlement-history restrictions.
+- Shared transaction tiles show the current net amount prominently as **Your
+  spend**, with **Paid** underneath for the original payment. For a 100 payment
+  with a 45 share, this changes from 100 to 80 after 20 is repaid, then to 55 after
+  the remaining 25 is repaid. The participant and repayment details stay visible.
+- Cash repayments of linked split debts reduce the original expense's net
+  spending. Paying 100 with your share 55 and another person's share 45 starts at
+  100 spent; receiving 20 reduces it to 80, and receiving all 45 reduces it to 55.
+  Write-offs and non-cash tallies do not count as returned money. A later-month
+  reimbursement updates the original purchase month's net cost, while cash/account
+  movement stays in the actual payment month. Ordinary lent/borrowed principal
+  remains outside purchase spending.
+- Dashboard totals, category budgets, weekly/report charts, Monthly Money Review,
+  Needs attention budget checks and launcher widget snapshots use this joined
+  state. Joins reuse existing transaction/debt streams rather than querying each
+  tile. Existing settled shares work without rewriting stored expenses.
+- SMS review can create split expenses directly using the existing equal/manual
+  editor, or record a person-involved lent/borrowed payment. Account, repayment
+  date and notes are available. Split debts, original payment and import receipt
+  are committed atomically; repeated SMS delivery cannot add duplicate shares.
+- Transaction controls use white theme surfaces in light mode and retain dark
+  surfaces in dark mode. The header's offline pulse stops while online.
+
+## Needs attention
+
+- The Personal dashboard shows this card directly below its existing balance
+  hero. It follows the shared card, section header and finance tile styles.
+- Alerts follow the month selected on the dashboard. The current month shows
+  payments scheduled from today through the following six days and the live bank
+  message inbox. Historical months show unrecorded outgoing payments scheduled
+  within that month and hide live inbox alerts. Budget checks always use the
+  selected month, which is labeled on the card.
+- Payment checks reuse Payment Calendar projections, including the next month
+  when needed. Incoming money and recorded entries are excluded. These are
+  scheduled entries, not bank-verified unpaid bills; older overdue entries remain
+  available in Payment Calendar.
+- Rows open the calendar on the earliest applicable date, the SMS inbox, or budgets
+  for the selected month. Opening the card or a destination does not record payments.
+- Budget checks reuse purchase-spending rules and compare integer paise. Debt
+  principal and repayments remain excluded. Loading and failed checks stay visible
+  and do not produce an all-clear message; SMS waits for its first status load.
+- The calendar day refreshes at midnight. UI conventions for future work are in
+  `AGENTS.md`.
+
 ## Monthly review, savings goals and merchant categories
 
 - **Personal → Monthly Money Review** sits alongside Accounts & Wallets and Payment

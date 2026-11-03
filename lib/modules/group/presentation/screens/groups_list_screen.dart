@@ -6,8 +6,6 @@ import 'package:split_ex/modules/group/domain/entities/group_model.dart';
 import 'package:split_ex/modules/group/presentation/providers/group_provider.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
-const _kGreen  = Color(0xFF22C55E);
-const _kRed    = Color(0xFFEF4444);
 const _kBlue   = Color(0xFF3B82F6);
 const _kIndigo = Color(0xFF6366F1);
 const _kTeal   = Color(0xFF14B8A6);
@@ -231,7 +229,8 @@ class _GroupsMiniStatRow extends ConsumerWidget {
       netBalance += ref.watch(groupUserBalanceProvider(g.id));
     }
     final isOwed = netBalance > 0.01;
-    final balColor = isOwed ? _kGreen : netBalance < -0.01 ? _kRed : _kIndigo;
+    final cs = Theme.of(context).colorScheme;
+    final balColor = isOwed ? const Color(0xFF10B981) : netBalance < -0.01 ? const Color(0xFFF43F5E) : _kIndigo;
 
     return Row(
       children: [
@@ -240,6 +239,7 @@ class _GroupsMiniStatRow extends ConsumerWidget {
         Expanded(child: AppMiniStatCard(label: 'Members', value: '$totalMembers',                              icon: Icons.people_rounded,  color: _kTeal)),
         const SizedBox(width: 10),
         Expanded(child: AppMiniStatCard(label: isOwed ? 'Owed' : 'You Owe', value: '₹${netBalance.abs().toStringAsFixed(0)}', icon: isOwed ? Icons.south_rounded : Icons.north_rounded, color: balColor)),
+
       ],
     );
   }
@@ -250,13 +250,14 @@ class _GroupsMiniStatRow extends ConsumerWidget {
 class _GroupsQuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         Expanded(
           child: _WideQuickAction(
             icon: Icons.add_rounded,
             label: 'Create Group',
-            color: _kGreen,
+            color: cs.primary,
             onTap: () => context.push('/groups/create'),
           ),
         ),

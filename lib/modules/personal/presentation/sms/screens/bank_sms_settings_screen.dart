@@ -14,6 +14,9 @@ import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/modules/personal/presentation/accounts/widgets/personal_account_picker.dart';
 import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
+import 'package:split_ex/modules/personal/presentation/transactions/widgets/expense_split_editor.dart';
+import 'package:split_ex/modules/personal/presentation/debts/widgets/debt_due_date_picker.dart';
 
 class BankSmsSettingsScreen extends ConsumerStatefulWidget {
   final bool reviewOnly;
@@ -291,6 +294,10 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                   const SizedBox(height: 20),
                   AppSectionHeader(
                     title: 'Review Transactions (${service.reviews.length})',
+                    actionLabel: service.reviews.isNotEmpty
+                        ? '${service.reviews.length} pending'
+                        : null,
+                    onAction: null,
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -406,26 +413,46 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                         ),
                       ),
                     ...service.trustedSenders.map(
-                      (sender) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          Icons.verified_user_outlined,
-                          color: cs.primary,
-                        ),
-                        title: Text(
-                          sender,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                      (sender) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          decoration: appCardDecoration(context),
+                          child: ListTile(
+                            leading: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: cs.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                        ),
-                        trailing: IconButton(
-                          tooltip: 'Stop trusting sender',
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: busy
-                              ? null
-                              : () => _run(() => service.trust(sender, false)),
+                              child: Icon(
+                                Icons.verified_user_outlined,
+                                color: cs.primary,
+                                size: 18,
+                              ),
+                            ),
+                            title: Text(
+                              sender,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'Stop trusting sender',
+                              icon: Icon(
+                                Icons.remove_circle_outline,
+                                color: cs.error,
+                                size: 20,
+                              ),
+                              onPressed: busy
+                                  ? null
+                                  : () => _run(
+                                      () => service.trust(sender, false),
+                                    ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -455,6 +482,11 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
   String? _fromAccountId, _toAccountId;
   bool _asTransfer = false;
   bool _settleDebt = false;
+  bool _splitExpense = false, _involvesPerson = false;
+  final _splitEditorKey = GlobalKey<ExpenseSplitEditorState>();
+  final _person = TextEditingController();
+  final _notes = TextEditingController();
+  DateTime? _dueDate;
   final List<String> _selectedDebtIds = [];
   bool _rememberCategory = false;
   String? _suggestedCategory;
@@ -477,9 +509,14 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
     try {
       if (uid == null) throw StateError('Sign in to record this payment.');
       final repo = ref.read(bankSmsRepositoryProvider);
-      final matches = await repo.possibleMatches(uid, widget.sms);
-      final suggestion = await repo.suggestedCategory(uid, widget.sms);
-      final debts = await repo.openDebtsForSms(uid, widget.sms);
+      final results = await Future.wait<Object?>([
+        repo.possibleMatches(uid, widget.sms),
+        repo.suggestedCategory(uid, widget.sms),
+        repo.openDebtsForSms(uid, widget.sms),
+      ]);
+      final matches = results[0] as List<BankSmsMatch>;
+      final suggestion = results[1] as String?;
+      final debts = results[2] as List<PersonalTransaction>;
       if (!mounted) return;
       setState(() {
         _matches = matches;
@@ -503,11 +540,28 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
   void dispose() {
     _title.dispose();
     _amount.dispose();
+    _person.dispose();
+    _notes.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final amount = double.tryParse(_amount.text);
+    final newEntry = !_settleDebt && !_asTransfer && _decision == 'new';
+    ExpenseSplit? split;
+    if (newEntry) {
+      try {
+        split = _splitExpense
+            ? _splitEditorKey.currentState!.buildSplit()
+            : null;
+        if (_involvesPerson && _person.text.trim().isEmpty) {
+          throw StateError('Enter the person’s name.');
+        }
+      } on StateError catch (error) {
+        setState(() => _error = error.message.toString());
+        return;
+      }
+    }
     List<BankSmsDebtAllocation>? debtAllocations;
     if (_settleDebt) {
       try {
@@ -559,6 +613,19 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
             date: _date,
             direction: _settleDebt ? widget.sms.direction : _direction,
             debtAllocations: debtAllocations,
+            split: split,
+            debtType: newEntry && _involvesPerson
+                ? (_direction == BankSmsDirection.debit
+                      ? DebtType.lent
+                      : DebtType.borrowed)
+                : null,
+            personName: newEntry && _involvesPerson
+                ? _person.text.trim()
+                : null,
+            dueDate: newEntry && (_involvesPerson || _splitExpense)
+                ? _dueDate
+                : null,
+            notes: newEntry ? _notes.text.trim() : null,
             accountId: _accountId,
             asTransfer: !_settleDebt && _asTransfer,
             fromAccountId: _fromAccountId,
@@ -864,6 +931,7 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
           const SizedBox(height: 14),
           TextField(
             controller: _amount,
+            onChanged: (_) => setState(() {}),
             enabled: !_saving && !linked && !_settleDebt,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
@@ -930,6 +998,9 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
                       _asTransfer = value == 'transfer';
                       if (!_asTransfer)
                         _direction = BankSmsDirection.values.byName(value!);
+                      if (_asTransfer || _direction != BankSmsDirection.debit) {
+                        _splitExpense = false;
+                      }
                     }),
             ),
           const SizedBox(height: 14),
@@ -950,6 +1021,73 @@ class _BankSmsReviewSheetState extends ConsumerState<_BankSmsReviewSheet> {
                   ? null
                   : (value) => setState(() => _category = value!),
             ),
+          if (!_asTransfer &&
+              !_settleDebt &&
+              !linked &&
+              _decision == 'new') ...[
+            const SizedBox(height: AppSpacing.md),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'Involves someone else?',
+                style: TextStyle(fontSize: 14),
+              ),
+              subtitle: Text(
+                _direction == BankSmsDirection.debit
+                    ? 'Record this payment as money lent'
+                    : 'Record this payment as money borrowed',
+              ),
+              value: _involvesPerson,
+              onChanged: _saving
+                  ? null
+                  : (value) => setState(() {
+                      _involvesPerson = value;
+                      if (value) _splitExpense = false;
+                    }),
+            ),
+            if (_involvesPerson)
+              TextField(
+                controller: _person,
+                enabled: !_saving,
+                decoration: const InputDecoration(labelText: 'Person’s name'),
+              ),
+            if (!_involvesPerson && _direction == BankSmsDirection.debit) ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Split this expense',
+                  style: TextStyle(fontSize: 14),
+                ),
+                subtitle: const Text(
+                  'Keep your share and track what others owe',
+                ),
+                value: _splitExpense,
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _splitExpense = value),
+              ),
+              if (_splitExpense)
+                ExpenseSplitEditor(
+                  key: _splitEditorKey,
+                  totalText: _amount.text,
+                  enabled: !_saving,
+                ),
+            ],
+            if (_involvesPerson || _splitExpense)
+              DebtDueDatePicker(
+                value: _dueDate,
+                debtDate: _date,
+                enabled: !_saving,
+                onChanged: (value) => setState(() => _dueDate = value),
+              ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _notes,
+              enabled: !_saving,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: 'Notes (optional)'),
+            ),
+          ],
           if (sms.source == 'sms' &&
               !_settleDebt &&
               !_asTransfer &&

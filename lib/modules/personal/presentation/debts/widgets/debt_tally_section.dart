@@ -3,9 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/app/auth/providers/auth_provider.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
 import 'package:split_ex/modules/personal/domain/policies/debts/debt_tally.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_commands.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
+import 'debt_widgets.dart';
+
+String _money(int cents) => NumberFormat.currency(
+  locale: 'en_IN',
+  symbol: '₹',
+  decimalDigits: cents % 100 == 0 ? 0 : 2,
+).format(cents / 100);
+
+String _remainingLabel(DebtTallyPlan plan) => plan.netCents > 0
+    ? 'After tally: ${_money(plan.netCents)} to receive'
+    : plan.netCents < 0
+    ? 'After tally: ${_money(-plan.netCents)} to repay'
+    : 'After tally: both sides settled';
 
 class DebtTallySection extends StatelessWidget {
   final List<PersonalTransaction> debts;
@@ -15,7 +30,7 @@ class DebtTallySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final people = <String, String>{};
     for (final debt in debts) {
-      if (debt.personName == null || debt.remainingAmount <= 0) continue;
+      if (!isActiveTallyDebt(debt)) continue;
       people.putIfAbsent(
         debtPersonKey(debt.personName!),
         () => debt.personName!.trim(),
@@ -28,39 +43,61 @@ class DebtTallySection extends StatelessWidget {
           ..sort((a, b) => a.personName.compareTo(b.personName));
     if (plans.isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      color: cs.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.base),
+      child: Container(
+        decoration: appCardDecoration(context),
+        padding: const EdgeInsets.all(AppSpacing.base),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const AppSectionHeader(title: 'Tally opposite debts'),
+            const SizedBox(height: AppSpacing.xs),
             Text(
-              'Tally opposite debts',
-              style: Theme.of(context).textTheme.titleMedium,
+              'Match balances with the same person. No money moves.',
+              style: AppTextStyles.caption(context),
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Offset what you owe and what you are owed by the same person. No payment is recorded.',
-            ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final plan in plans) ...[
-                    OutlinedButton.icon(
-                      onPressed: () =>
-                          showDebtTallySheet(context, plan.personName),
-                      icon: const Icon(Icons.balance_rounded),
-                      label: Text(
-                        '${plan.personName} · ₹${(plan.offsetCents / 100).toStringAsFixed(2)}',
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
+            const SizedBox(height: AppSpacing.md),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = plans.length == 1
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth * .92).clamp(220.0, 340.0);
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < plans.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpacing.sm),
+                        SizedBox(
+                          width: width,
+                          child: AppFinanceTile(
+                            icon: Icons.balance_rounded,
+                            title: plans[i].personName,
+                            subtitle: plans[i].netCents > 0
+                                ? '${_money(plans[i].netCents)} left to receive'
+                                : plans[i].netCents < 0
+                                ? '${_money(-plans[i].netCents)} left to repay'
+                                : 'No balance left after tally',
+                            value: _money(plans[i].offsetCents),
+                            detail: 'To offset',
+                            color: cs.primary,
+                            onTap: () => showDebtTallySheet(
+                              context,
+                              plans[i].personName,
+                            ),
+                            action: Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: cs.onSurface.withValues(alpha: .3),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -74,6 +111,7 @@ void showDebtTallySheet(BuildContext context, String personName) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    backgroundColor: Colors.transparent,
     builder: (_) => _DebtTallySheet(personName: personName),
   );
 }
@@ -113,110 +151,154 @@ class _DebtTallySheetState extends ConsumerState<_DebtTallySheet> {
         );
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _error = '$error';
         });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final debts =
-        ref.watch(personalDebtTransactionsProvider).valueOrNull ??
-        const <PersonalTransaction>[];
+    final state = ref.watch(personalDebtTransactionsProvider);
+    final debts = state.valueOrNull ?? const <PersonalTransaction>[];
     final plan = planDebtTally(widget.personName, debts);
-    final formatter = NumberFormat('#,##0.00');
+    final cs = Theme.of(context).colorScheme;
+    final ready = !state.isLoading && !state.hasError;
     final affected =
-        debts.where((debt) => plan.offsetsCents.containsKey(debt.id)).toList()
+        debts.where((debt) => isActiveTallyDebt(debt) && plan.offsetsCents.containsKey(debt.id)).toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-    return FractionallySizedBox(
-      heightFactor: .8,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Tally with ${widget.personName}',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'This offsets opposing balances, oldest debts first. It records a tally in each debt’s history without moving money.',
-            ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'They owe you: ₹${formatter.format(plan.lentCents / 100)}',
-                    ),
-                    Text(
-                      'You owe them: ₹${formatter.format(plan.borrowedCents / 100)}',
-                    ),
-                    const Divider(),
-                    Text(
-                      'Offset now: ₹${formatter.format(plan.offsetCents / 100)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      plan.netCents > 0
-                          ? 'After tally: ${widget.personName} owes you ₹${formatter.format(plan.netCents / 100)}'
-                          : plan.netCents < 0
-                          ? 'After tally: you owe ${widget.personName} ₹${formatter.format(-plan.netCents / 100)}'
-                          : 'After tally: both sides are settled',
-                    ),
-                  ],
-                ),
+    return DebtSheetFrame(
+      title: 'Tally with ${widget.personName}',
+      subtitle: 'Review matching balances · No money moves',
+      icon: Icons.balance_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: !ready
+                ? Center(
+                    child: state.hasError
+                        ? TextButton.icon(
+                            onPressed: () => ref.invalidate(
+                              personalDebtTransactionsProvider,
+                            ),
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Could not load debts · Retry'),
+                          )
+                        : const CircularProgressIndicator(),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(AppSpacing.base),
+                    children: [
+                      Text(
+                        'Only active balances are matched, oldest debts first. A debt stays partially settled if its remaining balance is not fully covered.',
+                        style: AppTextStyles.bodySmall(
+                          context,
+                        ).copyWith(height: 1.5),
+                      ),
+                      const SizedBox(height: AppSpacing.base),
+                      Container(
+                        decoration: appCardDecoration(context),
+                        padding: const EdgeInsets.all(AppSpacing.base),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const AppSectionHeader(title: 'Tally preview'),
+                            const SizedBox(height: AppSpacing.md),
+                            AppFinanceTile(
+                              icon: Icons.call_made_rounded,
+                              title: 'They owe you',
+                              subtitle: 'Outstanding lent balance',
+                              value: _money(plan.lentCents),
+                              color: AppColors.success(context),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            AppFinanceTile(
+                              icon: Icons.call_received_rounded,
+                              title: 'You owe them',
+                              subtitle: 'Outstanding borrowed balance',
+                              value: _money(plan.borrowedCents),
+                              color: AppColors.error(context),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            AppFinanceTile(
+                              icon: Icons.balance_rounded,
+                              title: 'Offset now',
+                              subtitle: 'Applied to both sides',
+                              value: _money(plan.offsetCents),
+                              color: cs.primary,
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            Text(
+                              _remainingLabel(plan),
+                              style: AppTextStyles.label(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      const AppSectionHeader(title: 'Debts affected'),
+                      const SizedBox(height: AppSpacing.md),
+                      for (final debt in affected) ...[
+                        AppFinanceTile(
+                          icon: debt.debtType == DebtType.lent
+                              ? Icons.call_made_rounded
+                              : Icons.call_received_rounded,
+                          title: debt.title,
+                          subtitle:
+                              '${debt.debtType == DebtType.lent ? 'Lent' : 'Borrowed'} · Active: ${_money(roundedMoneyCents(debt.remainingAmount))}',
+                          value: '−${_money(plan.offsetsCents[debt.id]!)}',
+                          detail: 'Offset',
+                          badges: Text(
+                            roundedMoneyCents(debt.remainingAmount) > plan.offsetsCents[debt.id]!
+                                ? 'After tally: ${_money(roundedMoneyCents(debt.remainingAmount) - plan.offsetsCents[debt.id]!)} left · Partially settled'
+                                : 'After tally: ₹0 left · Settled',
+                            style: AppTextStyles.caption(context).copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          color: debt.debtType == DebtType.lent
+                              ? AppColors.success(context)
+                              : AppColors.error(context),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                      if (!plan.canTally)
+                        Text(
+                          'No opposing balances remain to tally.',
+                          style: AppTextStyles.bodySmall(context),
+                        ),
+                      if (_error != null)
+                        Text(_error!, style: TextStyle(color: cs.error)),
+                    ],
+                  ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.base),
+              child: FilledButton.icon(
+                onPressed: !ready || !plan.canTally || _busy
+                    ? null
+                    : () => _confirm(plan),
+                icon: _busy
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.onPrimary,
+                        ),
+                      )
+                    : const Icon(Icons.balance_rounded, size: 18),
+                label: Text(_busy ? 'Tallying…' : 'Confirm Tally'),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Debts affected',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: affected.length,
-                itemBuilder: (_, i) {
-                  final debt = affected[i];
-                  return ListTile(
-                    leading: Icon(
-                      debt.debtType == DebtType.lent
-                          ? Icons.call_made
-                          : Icons.call_received,
-                    ),
-                    title: Text(debt.title),
-                    subtitle: Text(
-                      '${debt.debtType == DebtType.lent ? 'Lent' : 'Borrowed'} · ${DateFormat('dd MMM yyyy').format(debt.date)}',
-                    ),
-                    trailing: Text(
-                      '−₹${formatter.format(plan.offsetsCents[debt.id]! / 100)}',
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-              ),
-            FilledButton(
-              onPressed: !plan.canTally || _busy ? null : () => _confirm(plan),
-              child: Text(_busy ? 'Tallying…' : 'Confirm Tally'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

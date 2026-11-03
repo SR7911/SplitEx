@@ -107,7 +107,7 @@ class _ExpensesWidgetSyncState extends ConsumerState<ExpensesWidgetSync>
         }; // Clear previous user's snapshot.
       } else if (auth.valueOrNull != null) {
         data = {'userId': auth.valueOrNull!.uid};
-        final transactions = ref.watch(personalMonthTransactionsProvider(month));
+        final transactions = ref.watch(personalMonthDisplayTransactionsProvider(month));
         if (transactions.hasError) {
           data = {'userId': auth.valueOrNull!.uid, 'state': 'error'};
         } else if (!transactions.isLoading && transactions.hasValue) {

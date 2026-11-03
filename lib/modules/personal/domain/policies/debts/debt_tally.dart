@@ -3,6 +3,11 @@ import '../../entities/transactions/personal_transaction.dart';
 
 String debtPersonKey(String name) => name.trim().toLowerCase();
 
+/// The settled flag is authoritative for closed/legacy debts even when their
+/// older repayment totals are incomplete. Only outstanding debts may be offset.
+bool isActiveTallyDebt(PersonalTransaction debt) =>
+    debt.hasDebt && !debt.isSettled && roundedMoneyCents(debt.remainingAmount) > 0;
+
 class DebtTallyPlan {
   final String personName;
   final int lentCents;
@@ -31,8 +36,7 @@ DebtTallyPlan planDebtTally(
           .where(
             (debt) =>
                 debtPersonKey(debt.personName ?? '') == key &&
-                debt.hasDebt &&
-                moneyCents(debt.remainingAmount) > 0,
+                isActiveTallyDebt(debt),
           )
           .toList()
         ..sort((a, b) {
@@ -47,11 +51,11 @@ DebtTallyPlan planDebtTally(
       .toList();
   final lentCents = lent.fold<int>(
     0,
-    (sum, debt) => sum + moneyCents(debt.remainingAmount),
+    (sum, debt) => sum + roundedMoneyCents(debt.remainingAmount),
   );
   final borrowedCents = borrowed.fold<int>(
     0,
-    (sum, debt) => sum + moneyCents(debt.remainingAmount),
+    (sum, debt) => sum + roundedMoneyCents(debt.remainingAmount),
   );
   var remaining = lentCents < borrowedCents ? lentCents : borrowedCents;
   final offsets = <String, int>{};
@@ -59,7 +63,7 @@ DebtTallyPlan planDebtTally(
     var sideRemaining = remaining;
     for (final debt in side) {
       if (sideRemaining == 0) break;
-      final available = moneyCents(debt.remainingAmount);
+      final available = roundedMoneyCents(debt.remainingAmount);
       final used = available < sideRemaining ? available : sideRemaining;
       offsets[debt.id] = used;
       sideRemaining -= used;

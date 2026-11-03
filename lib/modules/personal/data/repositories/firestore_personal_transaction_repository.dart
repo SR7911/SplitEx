@@ -518,7 +518,8 @@ class FirestorePersonalTransactionRepository
     final ids = snapshot.docs
         .where(
           (doc) =>
-              debtPersonKey(doc.data()['personName']?.toString() ?? '') == key,
+              debtPersonKey(doc.data()['personName']?.toString() ?? '') == key &&
+              isActiveTallyDebt(PersonalTransactionFirestoreMapper.fromMap(doc.data(), doc.id)),
         )
         .map((doc) => doc.id)
         .toList();
@@ -575,7 +576,7 @@ class FirestorePersonalTransactionRepository
         transaction.update(refs[entry.key]!, {
           'settledAmount': paid + amount,
           'isSettled':
-              moneyCents(paid + writtenOff + amount) >= moneyCents(total),
+              roundedMoneyCents(paid + writtenOff + amount) >= roundedMoneyCents(total),
           'partialSettlements': history,
         });
       }

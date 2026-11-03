@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:split_ex/modules/personal/domain/entities/transactions/personal_transaction.dart';
+import 'package:split_ex/modules/personal/domain/entities/transactions/expense_split.dart';
 import 'package:split_ex/modules/personal/presentation/debts/screens/personal_debts_screen.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/providers/personal_transaction_reads.dart';
 import 'package:split_ex/modules/personal/presentation/transactions/screens/personal_transactions_screen.dart';
@@ -14,6 +15,121 @@ class _OnlineConnectivity extends StateNotifier<ConnectivityStatus>
 }
 
 void main() {
+  for (final scenario in ['pending', 'settled', 'multiple']) {
+    testWidgets('shared expense opens the correct $scenario share debt', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(430, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final multiple = scenario == 'multiple';
+      final settled = scenario != 'pending';
+      final shares = [
+        const ExpenseSplitShare(
+          personName: 'Alex',
+          amount: 45,
+          debtId: 'alex-share',
+        ),
+        if (multiple)
+          const ExpenseSplitShare(
+            personName: 'Sam',
+            amount: 20,
+            debtId: 'sam-share',
+          ),
+      ];
+      final parent = PersonalTransaction(
+        id: 'purchase',
+        title: 'Shared lunch',
+        amount: 100,
+        type: TransactionType.expense,
+        category: 'Food',
+        date: DateTime(2026, 10, 1),
+        userId: 'alice',
+        month: '2026-10',
+        createdAt: DateTime(2026, 10, 1),
+        split: ExpenseSplit(mode: ExpenseSplitMode.manual, shares: shares),
+      );
+      final debts = [
+        for (final share in shares)
+          PersonalTransaction(
+            id: share.debtId!,
+            title: '${share.personName} lunch share',
+            amount: share.amount,
+            type: TransactionType.expense,
+            category: 'Food',
+            date: parent.date,
+            userId: 'alice',
+            month: parent.month,
+            createdAt: parent.createdAt,
+            debtType: DebtType.lent,
+            personName: share.personName,
+            splitSourceId: parent.id,
+            isSettled: settled,
+            settledAmount: settled ? share.amount : 0,
+          ),
+      ];
+      final router = GoRouter(
+        initialLocation: '/personal/transactions',
+        routes: [
+          GoRoute(
+            path: '/personal/transactions',
+            builder: (_, _) =>
+                const PersonalTransactionsScreen(monthKey: '2026-10'),
+          ),
+          GoRoute(
+            path: '/personal/debts',
+            builder: (_, state) => PersonalDebtsScreen(
+              focusDebtId: state.uri.queryParameters['debtId'],
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            connectivityProvider.overrideWith((ref) => _OnlineConnectivity()),
+            personalMonthTransactionsProvider(
+              '2026-10',
+            ).overrideWith((ref) => Stream.value([parent])),
+            personalDebtTransactionsProvider.overrideWith(
+              (ref) => Stream.value(debts),
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Shared lunch'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final target = shares.last;
+      final action = find.text('View ${target.personName}\'s debt');
+      expect(action, findsOneWidget);
+      if (multiple) {
+        expect(find.text('View Alex\'s debt'), findsOneWidget);
+      }
+      await tester.ensureVisible(action);
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(action);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        tester
+            .widget<PersonalDebtsScreen>(find.byType(PersonalDebtsScreen))
+            .focusDebtId,
+        target.debtId,
+      );
+      expect(find.text('Selected debt'), findsOneWidget);
+      expect(find.text('${target.personName} lunch share'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+  }
+
   testWidgets('focused settled debt opens its tab and highlights its card', (
     tester,
   ) async {
@@ -174,10 +290,16 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('Debt · Borrowed'), findsNWidgets(2));
-    expect(find.text('Debt · Lent'), findsNWidgets(2));
+    expect(find.text('Borrowed'), findsNWidgets(2));
+    expect(find.text('Lent'), findsNWidgets(2));
     expect(find.text('Settled'), findsNWidgets(2));
-    expect(find.byIcon(Icons.arrow_upward_rounded), findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byType(ListView),
+        matching: find.byIcon(Icons.north_rounded),
+      ),
+      findsNWidgets(3),
+    );
     expect(find.byIcon(Icons.handshake_outlined), findsOneWidget);
     expect(find.text('-₹200'), findsOneWidget);
     expect(find.text('-₹120'), findsOneWidget);
@@ -190,7 +312,7 @@ void main() {
     await tester.tap(find.text('Borrowed for rent'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.text('BORROWED DEBT'), findsOneWidget);
+    expect(find.text('Borrowed Debt'), findsOneWidget);
     await tester.tap(find.text('View debt and settlement history'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));

@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +19,7 @@ import 'package:split_ex/modules/room/presentation/screens/bills/add_bill_sheet.
 import 'package:split_ex/modules/room/presentation/screens/bills/view_bill_sheet.dart';
 import 'package:split_ex/modules/room/presentation/screens/room/pair_settlement_card.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
 
@@ -1039,15 +1040,20 @@ class _ExpenseTile extends ConsumerWidget {
     final paidByName = expense.paidBy == userId ? 'You' : (nameMap[expense.paidBy] ?? expense.paidBy);
     final hasReceipt = expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty;
 
-    final tile = Card(
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tile = Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: appCardDecoration(context, accentColor: cs.primary),
       child: ListTile(
+        tileColor: Colors.transparent,
         leading: Container(
           width: 40, height: 40,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+            color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Center(child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary)),
+          child: Center(child: Icon(icon, size: 20, color: cs.primary)),
         ),
         title: Text(expense.title),
         subtitle: Text('${expense.category} • ${DateFormat('dd MMM').format(expense.date)} • $paidByName'),
@@ -1056,11 +1062,11 @@ class _ExpenseTile extends ConsumerWidget {
           children: [
             if (hasReceipt)
               IconButton(
-                icon: const Icon(Icons.visibility, size: 20, color: Colors.green),
+                icon: Icon(Icons.visibility, size: 20, color: const Color(0xFF10B981)),
                 tooltip: 'View Receipt',
                 onPressed: () => _showReceipt(context, expense.receiptUrl!),
               ),
-            Text('₹${expense.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('₹${expense.amount.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary)),
           ],
         ),
         onTap: canEdit ? () => showViewExpenseSheet(context, roomId: roomId, expense: expense) : null,
@@ -1184,19 +1190,29 @@ class _BillsTab extends ConsumerWidget {
           children: bills.map((bill) {
             final paidBy = nameMap[bill.paidBy] ?? bill.paidBy;
             final icon = switch (bill.type) { BillType.rent => Icons.home, BillType.electricity => Icons.bolt, BillType.water => Icons.water_drop };
-            final card = Card(
+            final cs = Theme.of(context).colorScheme;
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final billColor = switch (bill.type) {
+              BillType.rent => const Color(0xFF6366F1),
+              BillType.electricity => const Color(0xFFF59E0B),
+              BillType.water => const Color(0xFF3B82F6),
+            };
+            final card = Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: appCardDecoration(context, accentColor: billColor),
               child: ListTile(
+                tileColor: Colors.transparent,
                 leading: Container(
                   width: 40, height: 40,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    color: billColor.withValues(alpha: isDark ? 0.18 : 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Center(child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary)),
+                  child: Center(child: Icon(icon, size: 20, color: billColor)),
                 ),
                 title: Text(bill.typeName),
                 subtitle: Text('Paid by $paidBy • ${DateFormat('dd MMM').format(bill.date)}'),
-                trailing: Text('₹${bill.amount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                trailing: Text('₹${bill.amount.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, color: billColor)),
                 onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
               ),
             );
@@ -1206,13 +1222,14 @@ class _BillsTab extends ConsumerWidget {
             return Dismissible(
               key: Key(bill.id),
               direction: DismissDirection.endToStart,
-              background: Card(
-                color: Colors.red,
-                child: Container(
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20),
-                  child: const Icon(Icons.delete, color: Colors.white),
+              background: Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.only(right: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade400,
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                child: const Icon(Icons.delete, color: Colors.white),
               ),
               confirmDismiss: (_) async {
                 return await showDialog<bool>(

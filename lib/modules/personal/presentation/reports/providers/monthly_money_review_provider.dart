@@ -8,10 +8,10 @@ import 'package:split_ex/modules/personal/presentation/transactions/providers/pe
 final monthlyMoneyReviewProvider = Provider.autoDispose
     .family<AsyncValue<MonthlyMoneyReview>, DateTime>((ref, month) {
       final current = ref.watch(
-        personalMonthTransactionsProvider(DateFormat('yyyy-MM').format(month)),
+        personalMonthDisplayTransactionsProvider(DateFormat('yyyy-MM').format(month)),
       );
       final previous = ref.watch(
-        personalMonthTransactionsProvider(
+        personalMonthDisplayTransactionsProvider(
           DateFormat('yyyy-MM').format(DateTime(month.year, month.month - 1)),
         ),
       );

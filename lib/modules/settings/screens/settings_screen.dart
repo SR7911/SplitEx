@@ -27,6 +27,7 @@ class SettingsScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(AppSpacing.base, AppSpacing.base, AppSpacing.base, 0),
               child: Card(
                 child: ListTile(
+                  tileColor: Colors.transparent,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.base,
                     vertical: AppSpacing.sm,
@@ -51,69 +52,96 @@ class SettingsScreen extends ConsumerWidget {
 
             // Account & Security
             _SectionHeader('Account & Security'),
-            _SettingsTile(
-              icon: Icons.person_outline,
-              label: 'Edit Profile',
-              onTap: () => context.push('/settings/edit-profile'),
-            ),
-            _SettingsTile(
-              icon: Icons.lock_outline,
-              label: 'Change Password',
-              onTap: () => context.push('/settings/change-password'),
-            ),
-            _SettingsTile(
-              icon: Icons.delete_forever_outlined,
-              label: 'Delete Account',
-              color: cs.error,
-              onTap: () => _confirmDeleteAccount(context, ref),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base),
+              child: Card(
+                child: Column(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.person_outline,
+                      label: 'Edit Profile',
+                      onTap: () => context.push('/settings/edit-profile'),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.lock_outline,
+                      label: 'Change Password',
+                      onTap: () => context.push('/settings/change-password'),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.delete_forever_outlined,
+                      label: 'Delete Account',
+                      color: cs.error,
+                      onTap: () => _confirmDeleteAccount(context, ref),
+                    ),
+                  ],
+                ),
+              ),
             ),
 
             const SizedBox(height: AppSpacing.xl),
 
             // Preferences
             _SectionHeader('Preferences'),
-            const _ThemeTile(),
-            const _PaletteTile(),
-            const _BodyGradientTile(),
-            _SettingsTile(
-              icon: Icons.widgets_outlined,
-              label: 'Home screen widget',
-              subtitle: 'Nothing-inspired style, appearance and privacy',
-              onTap: () => context.push('/settings/widget'),
-            ),
-            _SettingsTile(
-              icon: Icons.currency_exchange_outlined,
-              label: 'Default Currency',
-              subtitle: '₹ INR',
-              onTap: () => _showCurrencyPicker(context),
-            ),
-            _SettingsTile(
-              icon: Icons.notifications_outlined,
-              label: 'Notification Preferences',
-              onTap: () => context.push('/settings/notifications'),
-            ),
-            _SettingsTile(
-              icon: Icons.sms_outlined,
-              label: 'Bank SMS Recording',
-              subtitle: 'Auto-record payments and review detected messages',
-              onTap: () => context.push('/settings/bank-sms'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base),
+              child: Card(
+                child: Column(
+                  children: [
+                    const _ThemeTile(),
+                    const _PaletteTile(),
+                    const _BodyGradientTile(),
+                    _SettingsTile(
+                      icon: Icons.widgets_outlined,
+                      label: 'Home screen widget',
+                      subtitle: 'Nothing-inspired style, appearance and privacy',
+                      onTap: () => context.push('/settings/widget'),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.currency_exchange_outlined,
+                      label: 'Default Currency',
+                      subtitle: '₹ INR',
+                      onTap: () => _showCurrencyPicker(context),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.notifications_outlined,
+                      label: 'Notification Preferences',
+                      onTap: () => context.push('/settings/notifications'),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.sms_outlined,
+                      label: 'Bank SMS Recording',
+                      subtitle: 'Auto-record payments and review detected messages',
+                      onTap: () => context.push('/settings/bank-sms'),
+                    ),
+                  ],
+                ),
+              ),
             ),
 
             const SizedBox(height: AppSpacing.xl),
 
             // Legal
             _SectionHeader('Legal'),
-            _SettingsTile(
-              icon: Icons.description_outlined,
-              label: 'Terms of Service',
-              trailing: const Icon(Icons.open_in_new, size: 16),
-              onTap: () => _openUrl(context, 'https://splitex.app/terms'),
-            ),
-            _SettingsTile(
-              icon: Icons.privacy_tip_outlined,
-              label: 'Privacy Policy',
-              trailing: const Icon(Icons.open_in_new, size: 16),
-              onTap: () => _openUrl(context, 'https://splitex.app/privacy'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.base),
+              child: Card(
+                child: Column(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.description_outlined,
+                      label: 'Terms of Service',
+                      trailing: const Icon(Icons.open_in_new, size: 16),
+                      onTap: () => _openUrl(context, 'https://splitex.app/terms'),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.privacy_tip_outlined,
+                      label: 'Privacy Policy',
+                      trailing: const Icon(Icons.open_in_new, size: 16),
+                      onTap: () => _openUrl(context, 'https://splitex.app/privacy'),
+                    ),
+                  ],
+                ),
+              ),
             ),
 
             const SizedBox(height: AppSpacing.xl),
@@ -165,7 +193,7 @@ class SettingsScreen extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () async {
               Navigator.pop(ctx);
               try {
@@ -241,12 +269,21 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final effectiveColor = color ?? cs.onSurface;
+    final effectiveColor = color ?? cs.primary;
     return ListTile(
-      leading: Icon(icon, size: 20, color: effectiveColor.withValues(alpha: 0.7)),
+      tileColor: Colors.transparent,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: effectiveColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 18, color: effectiveColor),
+      ),
       title: Text(
         label,
-        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: effectiveColor),
+        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: effectiveColor == cs.error ? effectiveColor : cs.onSurface),
       ),
       subtitle: subtitle != null ? Text(subtitle!, style: AppTextStyles.caption(context)) : null,
       trailing: trailing ?? Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
@@ -261,6 +298,7 @@ class _ThemeTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    final cs = Theme.of(context).colorScheme;
     final label = switch (themeMode) {
       AppThemeMode.light => 'Light',
       AppThemeMode.dark => 'Dark',
@@ -275,7 +313,16 @@ class _ThemeTile extends ConsumerWidget {
     };
 
     return ListTile(
-      leading: Icon(icon),
+      tileColor: Colors.transparent,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 18, color: cs.primary),
+      ),
       title: const Text('Theme'),
       subtitle: Text(label),
       trailing: const Icon(Icons.chevron_right),
@@ -329,10 +376,19 @@ class _BodyGradientTile extends ConsumerWidget {
     final enabled = ref.watch(bodyGradientProvider);
     final cs = Theme.of(context).colorScheme;
     return ListTile(
-      leading: Icon(
-        Icons.gradient_rounded,
-        size: 20,
-        color: cs.onSurface.withValues(alpha: 0.7),
+      tileColor: Colors.transparent,
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          Icons.gradient_rounded,
+          size: 18,
+          color: cs.primary,
+        ),
       ),
       title: const Text('Screen Body Gradient'),
       subtitle: Text(
@@ -354,6 +410,7 @@ class _PaletteTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentPalette = ref.watch(appPaletteProvider);
 
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
@@ -361,7 +418,15 @@ class _PaletteTile extends ConsumerWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.palette_rounded, size: 22),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: cs.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.palette_rounded, size: 18, color: cs.primary),
+              ),
               const SizedBox(width: 16),
               Text(
                 'Color - ${AppTheme.paletteName(currentPalette)}',

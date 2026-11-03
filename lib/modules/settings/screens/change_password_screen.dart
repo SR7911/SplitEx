@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -64,11 +65,38 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (!isEmailUser) {
       return Scaffold(
         appBar: const AppHeader(showBack: true, title: 'Change Password', showNotification: false),
-        body: const Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            'Password change is only available for email/password accounts.\n\nYou signed in with Google.',
-            textAlign: TextAlign.center,
+        body: GradientBody(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                    ),
+                    child: Icon(Icons.lock_outline_rounded, size: 30, color: Theme.of(context).colorScheme.primary),
+                  ),
+                  const SizedBox(height: AppSpacing.base),
+                  Text(
+                    'Not available',
+                    style: AppTextStyles.sectionTitle(context),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Password change is only available for email/password accounts. You signed in with Google.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body(context).copyWith(
+                      color: AppColors.textSecondary(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -77,61 +105,72 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Scaffold(
       appBar: const AppHeader(showBack: true, title: 'Change Password', showNotification: false),
       body: GradientBody(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.base,
+            AppSpacing.base,
+            AppSpacing.base,
+            AppSpacing.xl,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextFormField(
-                  controller: _currentController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Password',
-                    prefixIcon: Icon(Icons.lock_outline),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.base),
+                  decoration: appCardDecoration(context),
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _currentController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Current Password',
+                          prefixIcon: Icon(Icons.lock_outline_rounded),
+                        ),
+                        validator: (v) =>
+                            v == null || v.isEmpty ? 'Enter current password' : null,
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        controller: _newController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'New Password',
+                          prefixIcon: Icon(Icons.lock_rounded),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Enter new password';
+                          if (v.length < 6) return 'Min 6 characters';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      TextFormField(
+                        controller: _confirmController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm New Password',
+                          prefixIcon: Icon(Icons.lock_rounded),
+                        ),
+                        validator: (v) {
+                          if (v != _newController.text) return 'Passwords do not match';
+                          return null;
+                        },
+                      ),
+                    ],
                   ),
-                  validator: (v) =>
-                      v == null || v.isEmpty ? 'Enter current password' : null,
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _newController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter new password';
-                    if (v.length < 6) return 'Min 6 characters';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _confirmController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm New Password',
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  validator: (v) {
-                    if (v != _newController.text) return 'Passwords do not match';
-                    return null;
-                  },
-                ),
-                const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isLoading ? null : _changePassword,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Change Password'),
-                  ),
+                const SizedBox(height: AppSpacing.xl),
+                FilledButton(
+                  onPressed: _isLoading ? null : _changePassword,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Change Password'),
                 ),
               ],
             ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/shared/domain/entities/settlement_model.dart';
@@ -6,6 +6,7 @@ import 'package:split_ex/modules/group/presentation/providers/group_provider.dar
 import 'package:split_ex/shared/dependencies.dart';
 import 'package:split_ex/shared/domain/entities/debt.dart';
 import 'package:split_ex/modules/group/dependencies.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
@@ -258,37 +259,40 @@ class _AmountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 32,
-              backgroundColor: (isDebtor ? Colors.orange : Colors.blue).withOpacity(0.1),
-              child: Icon(
-                isDebtor ? Icons.payment : Icons.request_page,
-                size: 32,
-                color: isDebtor ? Colors.orange : Colors.blue,
-              ),
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isDebtor ? const Color(0xFFF43F5E) : const Color(0xFF10B981);
+    return Container(
+      decoration: appCardDecoration(context, accentColor: color),
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        children: [
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: isDark ? 0.2 : 0.12),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 14),
-            Text(
-              isDebtor ? 'Pay $otherName' : 'Receive from $otherName',
-              style: Theme.of(context).textTheme.titleLarge,
+            child: Icon(
+              isDebtor ? Icons.payment : Icons.request_page,
+              size: 32,
+              color: color,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '₹${debt.amount.toStringAsFixed(2)}',
-              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDebtor ? Colors.red : Colors.green,
-                  ),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            isDebtor ? 'Pay $otherName' : 'Receive from $otherName',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '₹${debt.amount.toStringAsFixed(2)}',
+            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -334,30 +338,24 @@ class _GroupSettlementHistory extends ConsumerWidget {
             final isCancelled = s.status == SettlementStatus.cancelled;
             final canConfirm = isPending && s.toUserId == uid;
             final canCancel = isPending && s.fromUserId == uid;
+            final statusColor = isPending ? const Color(0xFFF59E0B) : isConfirmed ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final cs = Theme.of(context).colorScheme;
 
-            return Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            return Container(
+              decoration: appCardDecoration(context, accentColor: statusColor),
               child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: (isPending
-                          ? Colors.orange
-                          : isConfirmed
-                              ? Colors.green
-                              : Colors.red)
-                      .withOpacity(0.1),
+                tileColor: Colors.transparent,
+                leading: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: isDark ? 0.2 : 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Icon(
-                    isPending
-                        ? Icons.hourglass_top
-                        : isConfirmed
-                            ? Icons.check_circle
-                            : Icons.cancel,
+                    isPending ? Icons.hourglass_top : isConfirmed ? Icons.check_circle : Icons.cancel,
                     size: 20,
-                    color: isPending
-                        ? Colors.orange
-                        : isConfirmed
-                            ? Colors.green
-                            : Colors.red,
+                    color: statusColor,
                   ),
                 ),
                 title: Text('$from → $to', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),

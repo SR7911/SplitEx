@@ -1,4 +1,5 @@
 import '../../entities/transactions/personal_transaction.dart';
+import 'shared_expense_progress.dart';
 
 class PersonalMonthlySummary {
   final double income;
@@ -27,7 +28,7 @@ PersonalMonthlySummary calculatePersonalMonthlySummary(
   var expenses = 0.0;
   var cashIncome = 0.0;
   var cashExpenses = 0.0;
-  for (final transaction in transactions) {
+  for (final transaction in attachSharedExpenseDebts(transactions, debts)) {
     // A split share is a receivable derived from its original expense, not
     // another transfer of cash. The original expense remains in this stream.
     if (transaction.splitSourceId != null) continue;
@@ -39,7 +40,7 @@ PersonalMonthlySummary calculatePersonalMonthlySummary(
     if (transaction.countsAsIncome) {
       income += transaction.amount;
     } else if (transaction.countsAsSpending) {
-      expenses += transaction.amount;
+      expenses += transaction.spendingAmount;
     }
   }
   for (final debt in debts) {
@@ -69,13 +70,14 @@ PersonalMonthlySummary calculatePersonalMonthlySummary(
 }
 
 Map<String, double> calculatePersonalCategorySpending(
-  Iterable<PersonalTransaction> transactions,
-) {
+  Iterable<PersonalTransaction> transactions, {
+  Iterable<PersonalTransaction> debts = const [],
+}) {
   final spending = <String, double>{};
-  for (final transaction in transactions) {
+  for (final transaction in attachSharedExpenseDebts(transactions, debts)) {
     if (transaction.countsAsSpending) {
       spending[transaction.category] =
-          (spending[transaction.category] ?? 0) + transaction.amount;
+          (spending[transaction.category] ?? 0) + transaction.spendingAmount;
     }
   }
   return spending;

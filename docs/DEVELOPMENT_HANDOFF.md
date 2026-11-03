@@ -15,7 +15,15 @@ Updated 2026-11-01. This is a portable starting point for the next development s
 - Lent and borrowed balances for the same named person can be tallied without a cash transaction. Tally and write-off history entries do not move cash.
 - A debt remains the primary record in Transactions and Debts. Debt status and a navigation action appear on its transaction detail. A settlement updates the debt's `partialSettlements`, `settledAmount`, and `isSettled`; new manual and SMS settlements do **not** create a separate repayment transaction. Old linked repayment documents with `debtSourceId` remain readable and count once for compatibility.
 - New cash settlements carry `cashEntry: true` in debt history. Monthly cash movement includes these entries in their payment month, while purchase spending/budget totals exclude debt principal and repayment. An assigned account balance includes its settlement cash movement. Unassigned payments do not alter an account balance.
-- The Personal dashboard's large amount represents net money movement. Purchase spending and budget figures remain separate. Do not silently change these meanings when editing dashboard calculations.
+- Update 2026-11-02: at the user's request, the Personal hero was restored to its
+  earlier Remaining Balance/Overspent By design, using `summary.remaining`
+  (income minus purchase spending), Income/Spent chips, savings badge, and spending
+  progress. Cash movement remains available in domain summaries; do not replace
+  the restored hero without another user request. Follow `AGENTS.md` for current
+  UI conventions. Needs attention follows the month selected on the hero. The
+  current month shows a seven-day payment window and live SMS inbox; historical
+  months show that month's unrecorded payments and budget overruns without live
+  inbox alerts.
 
 ## SMS and RCS review workflow
 

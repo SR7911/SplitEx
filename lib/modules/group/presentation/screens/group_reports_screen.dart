@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:split_ex/modules/group/presentation/providers/group_provider.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showGroupReportsSheet(BuildContext context, String groupId) {
   showModalBottomSheet(
@@ -28,8 +29,8 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
   int _pieTouched = -1;
 
   static const _colors = [
-    Color(0xFF6366F1), Color(0xFF22C55E), Color(0xFFF59E0B),
-    Color(0xFFEF4444), Color(0xFF14B8A6), Color(0xFF8B5CF6),
+    Color(0xFF6366F1), Color(0xFF10B981), Color(0xFFF59E0B),
+    Color(0xFFF43F5E), Color(0xFF14B8A6), Color(0xFF8B5CF6),
     Color(0xFF3B82F6), Color(0xFFF97316),
   ];
 
@@ -71,7 +72,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
             child: Container(
               width: 40, height: 4,
               margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(10)),
             ),
           ),
 
@@ -81,7 +82,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
               Container(
                 width: 40, height: 40,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  gradient: LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.7)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.bar_chart_rounded, color: Colors.white, size: 20),
@@ -92,7 +93,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Reports', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
-                    Text(group?.name ?? 'Group', style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.5)), overflow: TextOverflow.ellipsis),
+                    Text(group?.name ?? 'Group', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5)), overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
@@ -109,10 +110,10 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                     Container(
                       width: 56, height: 56,
                       decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16)),
-                      child: Icon(Icons.bar_chart_outlined, size: 28, color: cs.onSurface.withOpacity(0.3)),
+                      child: Icon(Icons.bar_chart_outlined, size: 28, color: cs.onSurface.withValues(alpha: 0.3)),
                     ),
                     const SizedBox(height: 12),
-                    Text('No expenses to report', style: TextStyle(color: cs.onSurface.withOpacity(0.4))),
+                    Text('No expenses to report', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.4))),
                   ],
                 ),
               ),
@@ -165,7 +166,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                               Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text('Total', style: TextStyle(fontSize: 9, color: cs.onSurface.withOpacity(0.45))),
+                                  Text('Total', style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45))),
                                   Text('₹${_fmt(total)}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: cs.onSurface)),
                                 ],
                               ),
@@ -199,7 +200,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Divider(height: 1, color: cs.outline.withOpacity(0.08)),
+                  Divider(height: 1, color: cs.outline.withValues(alpha: 0.08)),
                   const SizedBox(height: 12),
                   ...catEntries.asMap().entries.map((e) {
                     final color = _colors[e.key % _colors.length];
@@ -228,7 +229,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                                   child: LinearProgressIndicator(
                                     value: pct,
                                     minHeight: 5,
-                                    backgroundColor: cs.outline.withOpacity(0.1),
+                                    backgroundColor: cs.outline.withValues(alpha: 0.1),
                                     valueColor: AlwaysStoppedAnimation<Color>(color),
                                   ),
                                 ),
@@ -238,7 +239,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
                             child: Text('${(pct * 100).toInt()}%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
                           ),
                         ],
@@ -280,9 +281,9 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                         Container(
                           width: 32, height: 32,
                           decoration: BoxDecoration(
-                            color: cs.primary.withOpacity(isMe ? 0.2 : 0.08),
+                            color: cs.primary.withValues(alpha: isMe ? 0.2 : 0.08),
                             borderRadius: BorderRadius.circular(10),
-                            border: isMe ? Border.all(color: cs.primary.withOpacity(0.4)) : null,
+                            border: isMe ? Border.all(color: cs.primary.withValues(alpha: 0.4)) : null,
                           ),
                           child: Center(child: Text(name[0].toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.primary))),
                         ),
@@ -297,15 +298,15 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                             child: LinearProgressIndicator(
                               value: pct,
                               minHeight: 6,
-                              backgroundColor: cs.outline.withOpacity(0.1),
-                              valueColor: AlwaysStoppedAnimation<Color>(isMe ? cs.primary : cs.primary.withOpacity(0.4)),
+                              backgroundColor: cs.outline.withValues(alpha: 0.1),
+                              valueColor: AlwaysStoppedAnimation<Color>(isMe ? cs.primary : cs.primary.withValues(alpha: 0.4)),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text('₹${_fmt(e.value)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                         const SizedBox(width: 4),
-                        Text('${share.toStringAsFixed(0)}%', style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.4))),
+                        Text('${share.toStringAsFixed(0)}%', style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4))),
                       ],
                     ),
                   );
@@ -325,7 +326,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                   final name = nameMap[e.key] ?? e.key.substring(0, 6);
                   final isOwed = e.value > 0.01;
                   final owes = e.value < -0.01;
-                  final color = isOwed ? const Color(0xFF22C55E) : owes ? const Color(0xFFEF4444) : cs.onSurface.withOpacity(0.4);
+                  final color = isOwed ? const Color(0xFF10B981) : owes ? const Color(0xFFF43F5E) : cs.onSurface.withValues(alpha: 0.4);
                   final isLast = entry.key == balanceSorted.length - 1;
                   return Padding(
                     padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
@@ -334,9 +335,9 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                         Container(
                           width: 32, height: 32,
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.1),
+                            color: color.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: color.withOpacity(0.2)),
+                            border: Border.all(color: color.withValues(alpha: 0.2)),
                           ),
                           child: Center(child: Text(name[0].toUpperCase(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color))),
                         ),
@@ -344,7 +345,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                         Expanded(child: Text(isMe ? 'You' : name, style: TextStyle(fontSize: 13, fontWeight: isMe ? FontWeight.w700 : FontWeight.w500, color: cs.onSurface))),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withOpacity(0.2))),
+                          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.2))),
                           child: Text(
                             isOwed ? 'gets ₹${e.value.toStringAsFixed(0)}' : owes ? 'owes ₹${e.value.abs().toStringAsFixed(0)}' : 'settled',
                             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
@@ -372,9 +373,9 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.08),
+                      color: color.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: color.withOpacity(0.2)),
+                      border: Border.all(color: color.withValues(alpha: 0.2)),
                     ),
                     child: Text('${_splitLabel(e.key)} · ${e.value} ($pct%)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
                   );
@@ -394,7 +395,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                   final isLast = i == (topExpenses.length > 5 ? 4 : topExpenses.length - 1);
                   final paidByName = nameMap[e.paidBy] ?? e.paidBy.substring(0, 6);
                   final rankColors = [const Color(0xFFF59E0B), const Color(0xFF9CA3AF), const Color(0xFFCD7F32)];
-                  final rankColor = i < 3 ? rankColors[i] : cs.primary.withOpacity(0.5);
+                  final rankColor = i < 3 ? rankColors[i] : cs.primary.withValues(alpha: 0.5);
                   return Column(
                     children: [
                       Padding(
@@ -403,7 +404,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                           children: [
                             Container(
                               width: 28, height: 28,
-                              decoration: BoxDecoration(color: rankColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: rankColor.withOpacity(0.3))),
+                              decoration: BoxDecoration(color: rankColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: rankColor.withValues(alpha: 0.3))),
                               child: Center(child: Text('#${i + 1}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: rankColor))),
                             ),
                             const SizedBox(width: 10),
@@ -413,7 +414,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                                 children: [
                                   Text(e.title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
                                   Text('${e.category} · ${DateFormat('dd MMM').format(e.date)} · ${e.paidBy == uid ? 'You' : paidByName}',
-                                      style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.45))),
+                                      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
                                 ],
                               ),
                             ),
@@ -421,7 +422,7 @@ class _GroupReportsSheetState extends ConsumerState<_GroupReportsSheet> {
                           ],
                         ),
                       ),
-                      if (!isLast) Divider(height: 1, indent: 38, color: cs.outline.withOpacity(0.07)),
+                      if (!isLast) Divider(height: 1, indent: 38, color: cs.outline.withValues(alpha: 0.07)),
                     ],
                   );
                 }).toList(),
@@ -449,7 +450,7 @@ class _MonthlyBarChart extends StatelessWidget {
 
     return BarChart(BarChartData(
       maxY: maxVal * 1.25,
-      gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: cs.outline.withOpacity(0.08), strokeWidth: 1)),
+      gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (_) => FlLine(color: cs.outline.withValues(alpha: 0.08), strokeWidth: 1)),
       borderData: FlBorderData(show: false),
       titlesData: FlTitlesData(
         leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
@@ -464,7 +465,7 @@ class _MonthlyBarChart extends StatelessWidget {
               if (i < 0 || i >= entries.length) return const SizedBox();
               final parts = entries[i].key.split('-');
               final label = DateFormat('MMM').format(DateTime(int.parse(parts[0]), int.parse(parts[1])));
-              return Padding(padding: const EdgeInsets.only(top: 4), child: Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.45))));
+              return Padding(padding: const EdgeInsets.only(top: 4), child: Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.45))));
             },
           ),
         ),
@@ -495,12 +496,7 @@ class _ReportCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : cs.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outline.withOpacity(0.08)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.15 : 0.04), blurRadius: 12, offset: const Offset(0, 3))],
-      ),
+      decoration: appCardDecoration(context),
       child: child,
     );
   }
@@ -532,12 +528,7 @@ class _StatsBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : cs.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outline.withOpacity(0.08)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.15 : 0.04), blurRadius: 12, offset: const Offset(0, 3))],
-      ),
+      decoration: appCardDecoration(context),
       child: IntrinsicHeight(child: Row(children: children)),
     );
   }
@@ -558,7 +549,7 @@ class _BannerCell extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
         child: Row(
           children: [
-            Container(width: 32, height: 32, decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(9)), child: Icon(icon, size: 15, color: color)),
+            Container(width: 32, height: 32, decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(9)), child: Icon(icon, size: 15, color: color)),
             const SizedBox(width: 8),
             Expanded(
               child: Column(
@@ -566,7 +557,7 @@ class _BannerCell extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
-                  Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.45)), overflow: TextOverflow.ellipsis),
+                  Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.45)), overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -582,7 +573,7 @@ class _BannerDivider extends StatelessWidget {
   const _BannerDivider({required this.cs});
 
   @override
-  Widget build(BuildContext context) => VerticalDivider(width: 1, thickness: 1, color: cs.outline.withOpacity(0.1));
+  Widget build(BuildContext context) => VerticalDivider(width: 1, thickness: 1, color: cs.outline.withValues(alpha: 0.1));
 }
 
 String _splitLabel(String key) => switch (key) {

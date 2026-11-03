@@ -6,6 +6,7 @@ import 'package:split_ex/modules/project/domain/entities/project_partial_settlem
 import 'package:split_ex/modules/project/presentation/providers/project_provider.dart';
 import 'package:split_ex/modules/project/dependencies.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
 class ProjectDebtsScreen extends ConsumerWidget {
@@ -61,20 +62,20 @@ class ProjectDebtsScreen extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  _SummaryChip(label: 'You Lent', subtitle: 'They owe you', amount: totalLent, color: Colors.green, icon: Icons.call_made),
+                  _SummaryChip(label: 'You Lent', subtitle: 'They owe you', amount: totalLent, color: const Color(0xFF10B981), icon: Icons.call_made),
                   const SizedBox(width: 12),
-                  _SummaryChip(label: 'You Borrowed', subtitle: 'You owe them', amount: totalBorrowed, color: Colors.red, icon: Icons.call_received),
+                  _SummaryChip(label: 'You Borrowed', subtitle: 'You owe them', amount: totalBorrowed, color: const Color(0xFFF43F5E), icon: Icons.call_received),
                 ],
               ),
               const SizedBox(height: 24),
               if (lentList.isNotEmpty) ...[
-                _SectionHeader(title: 'Money You Lent', subtitle: 'People who owe you', color: Colors.green, icon: Icons.call_made),
+                _SectionHeader(title: 'Money You Lent', subtitle: 'People who owe you', color: const Color(0xFF10B981), icon: Icons.call_made),
                 const SizedBox(height: 10),
                 ..._sortedBySettled(lentList).map((e) => _DebtTile(expense: e, isLent: true, projectId: projectId)),
                 const SizedBox(height: 24),
               ],
               if (borrowedList.isNotEmpty) ...[
-                _SectionHeader(title: 'Money You Borrowed', subtitle: 'People you owe', color: Colors.red, icon: Icons.call_received),
+                _SectionHeader(title: 'Money You Borrowed', subtitle: 'People you owe', color: const Color(0xFFF43F5E), icon: Icons.call_received),
                 const SizedBox(height: 10),
                 ..._sortedBySettled(borrowedList).map((e) => _DebtTile(expense: e, isLent: false, projectId: projectId)),
               ],
@@ -101,9 +102,9 @@ class _SummaryChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.08),
+          color: isDark ? color.withValues(alpha: 0.15) : color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -112,7 +113,7 @@ class _SummaryChip extends StatelessWidget {
             Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
             const SizedBox(height: 2),
             Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-            Text(subtitle, style: TextStyle(fontSize: 10, color: color.withOpacity(0.7))),
+            Text(subtitle, style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.7))),
           ],
         ),
       ),
@@ -133,7 +134,7 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Container(
           padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
           child: Icon(icon, size: 16, color: color),
         ),
         const SizedBox(width: 10),
@@ -141,7 +142,7 @@ class _SectionHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
-            Text(subtitle, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5))),
+            Text(subtitle, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
           ],
         ),
       ],
@@ -157,7 +158,7 @@ class _DebtTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final color = isLent ? Colors.green : Colors.red;
+    final color = isLent ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final personName = expense.personName ?? 'Unknown';
     final settled = expense.isSettled;
@@ -168,14 +169,7 @@ class _DebtTile extends ConsumerWidget {
       opacity: settled ? 0.5 : 1.0,
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: isDark ? Theme.of(context).colorScheme.surfaceContainerHighest : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border(left: BorderSide(color: settled ? Colors.grey : (hasPartial ? Colors.orange : color), width: 3)),
-          boxShadow: [
-            if (!isDark && !settled) BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 2)),
-          ],
-        ),
+        decoration: appCardDecoration(context, accentColor: settled ? Colors.grey : (hasPartial ? const Color(0xFFF59E0B) : color)),
         child: Column(
           children: [
             Padding(
@@ -184,7 +178,7 @@ class _DebtTile extends ConsumerWidget {
                 children: [
                   CircleAvatar(
                     radius: 18,
-                    backgroundColor: (settled ? Colors.grey : color).withOpacity(0.1),
+                    backgroundColor: (settled ? Colors.grey : color).withValues(alpha: 0.1),
                     child: settled
                         ? const Icon(Icons.check, color: Colors.grey, size: 16)
                         : Text(personName[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14)),
@@ -205,8 +199,8 @@ class _DebtTile extends ConsumerWidget {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(expense.title, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        Text('${expense.category} • ${DateFormat('dd MMM').format(expense.date)}', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
+                        Text(expense.title, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text('${expense.category} • ${DateFormat('dd MMM').format(expense.date)}', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4))),
                       ],
                     ),
                   ),
@@ -214,7 +208,7 @@ class _DebtTile extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (hasPartial) ...[
-                        Text('₹${expense.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4), decoration: TextDecoration.lineThrough)),
+                        Text('₹${expense.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), decoration: TextDecoration.lineThrough)),
                         Text('₹${remaining.toStringAsFixed(0)} left', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.orange.shade700)),
                       ] else
                         Text(
@@ -228,12 +222,12 @@ class _DebtTile extends ConsumerWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
-                              color: isLent ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                              color: isLent ? const Color(0xFF10B981).withValues(alpha: 0.1) : const Color(0xFFF59E0B).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
                               isLent ? 'Settle?' : 'Settle Up',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isLent ? Colors.green : Colors.orange.shade700),
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isLent ? const Color(0xFF10B981) : const Color(0xFFF59E0B)),
                             ),
                           ),
                         )
@@ -291,7 +285,7 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
       child: Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color)),
     );
   }
@@ -309,9 +303,9 @@ class _PartialHistory extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,13 +325,13 @@ class _PartialHistory extends StatelessWidget {
                   Expanded(
                     child: Text(
                       note.isNotEmpty ? note : 'Payment',
-                      style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.6)),
+                      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.6)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (date != null)
-                    Text(DateFormat('dd MMM').format(date), style: TextStyle(fontSize: 10, color: cs.onSurface.withOpacity(0.4))),
+                    Text(DateFormat('dd MMM').format(date), style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4))),
                   const SizedBox(width: 8),
                   Text('₹${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
                 ],
@@ -386,7 +380,7 @@ class _SettleSheetState extends State<_SettleSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = widget.isLent ? Colors.green : Colors.red;
+    final color = widget.isLent ? const Color(0xFF10B981) : const Color(0xFFF43F5E);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
@@ -396,17 +390,17 @@ class _SettleSheetState extends State<_SettleSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: cs.onSurface.withOpacity(0.2), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
             Text('Settle with ${widget.personName}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Row(
               children: [
-                Text('Total: ₹${widget.totalAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.5))),
+                Text('Total: ₹${widget.totalAmount.toStringAsFixed(0)}', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5))),
                 const SizedBox(width: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                   child: Text('₹${widget.remainingAmount.toStringAsFixed(0)} remaining', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
                 ),
               ],
@@ -473,3 +467,7 @@ class _SettleSheetState extends State<_SettleSheet> {
     );
   }
 }
+
+
+
+
