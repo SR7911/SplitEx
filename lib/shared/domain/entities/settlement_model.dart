@@ -11,6 +11,9 @@ class SettlementModel {
   final DateTime createdAt;
   final DateTime? confirmedAt;
 
+  /// The expense month being settled, which may precede the payment date.
+  final String? ledgerMonth;
+
   const SettlementModel({
     required this.id,
     required this.roomId,
@@ -21,5 +24,10 @@ class SettlementModel {
     this.upiRef,
     required this.createdAt,
     this.confirmedAt,
+    this.ledgerMonth,
   });
+
+  String get effectiveMonth =>
+      ledgerMonth ??
+      '${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}';
 }

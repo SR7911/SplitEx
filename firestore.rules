@@ -15,7 +15,19 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null;
       allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId || roomAdminUnlink(userId);
+
+      function roomAdminUnlink(userId) {
+        let before = resource.data.get('rooms', []);
+        let after = request.resource.data.get('rooms', []);
+        let removed = before.removeAll(after);
+        return request.auth != null
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rooms'])
+          && after.toSet().difference(before.toSet()).size() == 0 && removed.size() == 1
+          && get(/databases/$(database)/documents/rooms/$(removed[0])).data.adminId == request.auth.uid
+          && userId in get(/databases/$(database)/documents/rooms/$(removed[0])).data.memberIds
+          && !(userId in getAfter(/databases/$(database)/documents/rooms/$(removed[0])).data.memberIds);
+      }
       allow delete: if isDeveloper();
 
       // Personal transactions - owner only
@@ -108,67 +120,158 @@ service cloud.firestore {
       }
     }
 
-    // Rooms collection
+    // Active membership controls entries; durable participants retain history.
     match /rooms/{roomId} {
+      function participants(data) {
+        return data.get('participantIds', []).toSet().union(data.memberIds.toSet());
+      }
+      function beforeRoom() {
+        return get(/databases/$(database)/documents/rooms/$(roomId)).data;
+      }
+      function afterRoom() {
+        return getAfter(/databases/$(database)/documents/rooms/$(roomId)).data;
+      }
+      function readable() {
+        return request.auth != null && request.auth.uid in participants(beforeRoom());
+      }
+      function openRoom() {
+        return !beforeRoom().get('isArchived', false) && !beforeRoom().get('isLocked', false);
+      }
+      function writer() {
+        return readable() && openRoom() && request.auth.uid in beforeRoom().memberIds;
+      }
+      function versionAdvanced() {
+        return afterRoom().get('ledgerVersion', 0) == beforeRoom().get('ledgerVersion', 0) + 1;
+      }
+      function amountValid(data) {
+        return data.amount is number && data.amount > 0 && data.amount < 1000000000;
+      }
+      function splitValid(data, allowed) {
+        return data.splitAmong is list && data.splitAmong.size() > 0
+          && data.splitAmong.size() == data.splitAmong.toSet().size()
+          && data.splitAmong.toSet().difference(allowed).size() == 0;
+      }
+      function stableHistory() {
+        return request.resource.data.participantIds.toSet() == participants(resource.data)
+            .union(request.resource.data.memberIds.toSet());
+      }
+      function stableLegacyBills() {
+        return request.resource.data.legacyBillMemberIds == resource.data.get('legacyBillMemberIds', resource.data.memberIds);
+      }
+      function joining() {
+        return !resource.data.get('isArchived', false) && !resource.data.get('isLocked', false)
+          && !(request.auth.uid in resource.data.memberIds)
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['memberIds', 'participantIds', 'legacyBillMemberIds', 'ledgerVersion'])
+          && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().union([request.auth.uid].toSet())
+          && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
+          && request.resource.data.memberIds.size() <= 10 && stableHistory() && stableLegacyBills();
+      }
+      function leaving() {
+        let removed = resource.data.memberIds.removeAll(request.resource.data.memberIds);
+        return request.auth.uid in resource.data.memberIds
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['memberIds', 'participantIds', 'legacyBillMemberIds', 'ledgerVersion', 'isArchived', 'archivedAt', 'archivedBy'])
+          && removed.size() == 1
+          && request.resource.data.memberIds.size() == resource.data.memberIds.size() - 1
+          && request.resource.data.memberIds.toSet().difference(resource.data.memberIds.toSet()).size() == 0
+          && (removed[0] == request.auth.uid || request.auth.uid == resource.data.adminId)
+          && (removed[0] != resource.data.adminId || request.resource.data.memberIds.size() == 0)
+          && (request.resource.data.memberIds.size() == 0
+              ? request.resource.data.isArchived == true && request.resource.data.archivedBy == request.auth.uid && request.resource.data.archivedAt == request.time
+              : request.resource.data.get('isArchived', false) == resource.data.get('isArchived', false)
+                && request.resource.data.get('archivedAt', null) == resource.data.get('archivedAt', null)
+                && request.resource.data.get('archivedBy', null) == resource.data.get('archivedBy', null))
+          && stableHistory() && stableLegacyBills();
+      }
+      function transferring() {
+        return request.auth.uid == resource.data.adminId && request.auth.uid in resource.data.memberIds
+          && !resource.data.get('isArchived', false) && request.resource.data.adminId in resource.data.memberIds
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['adminId', 'ledgerVersion']);
+      }
+      function archiving() {
+        return request.auth.uid == resource.data.adminId
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['isArchived', 'archivedAt', 'archivedBy', 'participantIds', 'memberIds', 'ledgerVersion'])
+          && (request.auth.uid in resource.data.memberIds ||
+              (resource.data.memberIds.size() == 0 && resource.data.get('isArchived', false) && !request.resource.data.isArchived))
+          && (request.resource.data.memberIds == resource.data.memberIds ||
+              (resource.data.memberIds.size() == 0 && !request.resource.data.isArchived && request.resource.data.memberIds == [request.auth.uid]))
+          && (request.resource.data.isArchived
+              ? request.resource.data.archivedAt == request.time && request.resource.data.archivedBy == request.auth.uid
+              : request.resource.data.archivedAt == null && request.resource.data.archivedBy == null)
+          && stableHistory();
+      }
+      function ledgerTouch() {
+        return request.auth.uid in participants(resource.data)
+          && !resource.data.get('isArchived', false) && !resource.data.get('isLocked', false)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ledgerVersion']);
+      }
+      function restoringHistory() {
+        return request.auth.uid == resource.data.adminId
+          && request.auth.uid in resource.data.memberIds
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantIds', 'ledgerVersion'])
+          && request.resource.data.participantIds.toSet().hasAll(participants(resource.data));
+      }
+      // Authenticated lookup supports invite codes and legacy room discovery.
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null &&
-        (request.auth.uid in resource.data.memberIds ||
-         (request.auth.uid in request.resource.data.memberIds &&
-          !(request.auth.uid in resource.data.memberIds)));
-      allow delete: if request.auth != null &&
-        request.auth.uid == resource.data.adminId;
+      allow create: if request.auth != null && request.resource.data.adminId == request.auth.uid
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.participantIds == [request.auth.uid] && request.resource.data.isArchived == false;
+      allow update: if request.auth != null
+        && request.resource.data.get('ledgerVersion', 0) == resource.data.get('ledgerVersion', 0) + 1
+        && (joining() || leaving() || transferring() || archiving() || ledgerTouch() || restoringHistory());
+      allow delete: if false;
 
-      // Expenses subcollection - members can read/create, creator or room admin can edit/delete
       match /expenses/{expenseId} {
-        allow read: if isDeveloper() || (request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
-        allow create: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
-        allow update: if request.auth != null &&
-          (request.auth.uid == resource.data.createdBy ||
-           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId);
-        allow delete: if isDeveloper() || (request.auth != null &&
-          (request.auth.uid == resource.data.createdBy ||
-           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId));
+        allow read: if readable() || isDeveloper();
+        allow create: if writer() && versionAdvanced() && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.paidBy in beforeRoom().memberIds && amountValid(request.resource.data)
+          && splitValid(request.resource.data, beforeRoom().memberIds.toSet());
+        allow update: if writer() && versionAdvanced()
+          && (request.auth.uid == resource.data.createdBy || request.auth.uid == beforeRoom().adminId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['title', 'amount', 'category', 'date', 'splitType', 'splitAmong', 'month', 'updatedAt'])
+          && amountValid(request.resource.data)
+          && splitValid(request.resource.data, beforeRoom().memberIds.toSet().union(resource.data.splitAmong.toSet()));
+        allow delete: if writer() && versionAdvanced()
+          && (request.auth.uid == resource.data.createdBy || request.auth.uid == beforeRoom().adminId);
       }
-
-      // Bills subcollection - members can read/create, payer or room admin can edit/delete
       match /bills/{billId} {
-        allow read: if isDeveloper() || (request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
-        allow create: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
-        allow update: if request.auth != null &&
-          (request.auth.uid == resource.data.paidBy ||
-           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId);
-        allow delete: if isDeveloper() || (request.auth != null &&
-          (request.auth.uid == resource.data.paidBy ||
-           request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.adminId));
+        allow read: if readable() || isDeveloper();
+        allow create: if writer() && versionAdvanced() && request.resource.data.paidBy == request.auth.uid
+          && amountValid(request.resource.data) && splitValid(request.resource.data, beforeRoom().memberIds.toSet());
+        allow update: if writer() && versionAdvanced()
+          && (request.auth.uid == resource.data.paidBy || request.auth.uid == beforeRoom().adminId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['type', 'amount', 'date', 'month'])
+          && amountValid(request.resource.data);
+        allow delete: if writer() && versionAdvanced()
+          && (request.auth.uid == resource.data.paidBy || request.auth.uid == beforeRoom().adminId);
       }
-
-      // Settlements subcollection
       match /settlements/{settlementId} {
-        allow read: if isDeveloper() || (request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
-        allow create: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
-        allow update: if request.auth != null &&
-          (request.auth.uid == resource.data.fromUserId ||
-           request.auth.uid == resource.data.toUserId);
-        allow delete: if isDeveloper();
+        allow read: if readable() || isDeveloper();
+        allow create: if readable() && openRoom() && versionAdvanced()
+          && request.resource.data.fromUserId == request.auth.uid && request.resource.data.toUserId in participants(beforeRoom())
+          && request.resource.data.fromUserId != request.resource.data.toUserId
+          && request.resource.data.roomId == roomId && request.resource.data.status == 'pending' && amountValid(request.resource.data);
+        allow update: if readable() && openRoom() && versionAdvanced() && resource.data.status == 'pending'
+          && ((request.auth.uid == resource.data.toUserId && request.resource.data.status == 'confirmed'
+                && request.resource.data.confirmedAt == request.time
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'confirmedAt']))
+            || (request.auth.uid == resource.data.fromUserId && request.resource.data.status == 'cancelled'
+                && request.resource.data.cancelledAt == request.time
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']))
+            || (request.auth.uid == resource.data.fromUserId
+                && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upiRef'])));
+        allow delete: if false;
       }
-
-      // Activities subcollection
       match /activities/{activityId} {
-        allow read: if isDeveloper() || (request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds);
-        allow create: if request.auth != null &&
-          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
-        allow update, delete: if isDeveloper();
+        allow read: if readable() || isDeveloper();
+        allow create: if request.auth != null && request.resource.data.performedBy == request.auth.uid
+          && (request.auth.uid in participants(beforeRoom()) || request.auth.uid in participants(afterRoom()));
+        allow update, delete: if false;
       }
     }
-
     // Notifications collection
     match /notifications/{notificationId} {
       allow read: if isDeveloper() || (request.auth != null &&

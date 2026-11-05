@@ -7,7 +7,11 @@ import 'package:split_ex/modules/room/presentation/providers/room_provider.dart'
 import 'package:split_ex/modules/room/presentation/widgets/receipt_picker.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
-void showAddBillSheet(BuildContext context, {required String roomId, DateTime? initialDate}) {
+void showAddBillSheet(
+  BuildContext context, {
+  required String roomId,
+  DateTime? initialDate,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -58,13 +62,18 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
+    if (room == null) return;
+    final userId = ref.read(currentUserIdProvider);
+    if (!room.canWrite(userId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This room is read-only for you.')),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
 
-    final room = ref.read(currentRoomProvider);
-    if (room == null) return;
-
     final List<String> splitAmong = room.memberIds;
-    final userId = ref.read(currentUserIdProvider);
     final bill = BillModel(
       id: '',
       type: _billType,
@@ -83,7 +92,9 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
       if (mounted) Navigator.pop(context);
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -116,7 +127,9 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                     height: 5,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -124,7 +137,11 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                 // Header
                 Row(
                   children: [
-                    Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.primary, size: 24),
+                    Icon(
+                      Icons.receipt_long,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       'Add Bill',
@@ -143,11 +160,18 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.category, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                        Icon(
+                          Icons.category,
+                          size: 18,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Bill type',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -156,21 +180,40 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                       width: double.infinity,
                       child: SegmentedButton<BillType>(
                         segments: const [
-                          ButtonSegment(value: BillType.rent, label: Text('Rent'), icon: Icon(Icons.home, size: 18)),
-                          ButtonSegment(value: BillType.electricity, label: Text('EB'), icon: Icon(Icons.bolt, size: 18)),
-                          ButtonSegment(value: BillType.water, label: Text('Water'), icon: Icon(Icons.water_drop, size: 18)),
+                          ButtonSegment(
+                            value: BillType.rent,
+                            label: Text('Rent'),
+                            icon: Icon(Icons.home, size: 18),
+                          ),
+                          ButtonSegment(
+                            value: BillType.electricity,
+                            label: Text('EB'),
+                            icon: Icon(Icons.bolt, size: 18),
+                          ),
+                          ButtonSegment(
+                            value: BillType.water,
+                            label: Text('Water'),
+                            icon: Icon(Icons.water_drop, size: 18),
+                          ),
                         ],
                         selected: {_billType},
-                        onSelectionChanged: (v) => setState(() => _billType = v.first),
+                        onSelectionChanged: (v) =>
+                            setState(() => _billType = v.first),
                         style: ButtonStyle(
                           visualDensity: VisualDensity.compact,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: MaterialStateProperty.resolveWith((states) {
-                            if (states.contains(MaterialState.selected)) return Theme.of(context).colorScheme.primary;
+                          backgroundColor: MaterialStateProperty.resolveWith((
+                            states,
+                          ) {
+                            if (states.contains(MaterialState.selected))
+                              return Theme.of(context).colorScheme.primary;
                             return Colors.transparent;
                           }),
-                          foregroundColor: MaterialStateProperty.resolveWith((states) {
-                            if (states.contains(MaterialState.selected)) return Colors.white;
+                          foregroundColor: MaterialStateProperty.resolveWith((
+                            states,
+                          ) {
+                            if (states.contains(MaterialState.selected))
+                              return Colors.white;
                             return Theme.of(context).colorScheme.onSurface;
                           }),
                         ),
@@ -187,15 +230,30 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   decoration: InputDecoration(
                     labelText: 'Amount (₹)',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    prefixIcon: Icon(
+                      Icons.currency_rupee,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Enter amount';
-                    if (double.tryParse(v) == null || double.parse(v) <= 0) return 'Enter valid amount';
+                    if (double.tryParse(v) == null || double.parse(v) <= 0)
+                      return 'Enter valid amount';
                     return null;
                   },
                 ),
@@ -206,19 +264,34 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   onTap: _pickDate,
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                        Icon(
+                          Icons.calendar_today,
+                          size: 18,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           DateFormat('dd MMM yyyy').format(_date),
-                          style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.normal,
+                            fontSize: 14,
+                          ),
                         ),
                       ],
                     ),
@@ -229,7 +302,8 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                 // Receipt picker
                 Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ReceiptPicker(
@@ -245,11 +319,23 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
                   onPressed: _isLoading ? null : _save,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
                   child: _isLoading
-                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Add Bill', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Add Bill',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ],
             ),

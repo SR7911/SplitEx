@@ -3,8 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/app/auth/models/user_model.dart';
 import 'package:split_ex/app/auth/services/auth_service.dart';
 import 'package:split_ex/app/auth/services/user_service.dart';
+import 'package:split_ex/modules/room/dependencies.dart';
+import 'package:split_ex/modules/room/domain/use_cases/ensure_room_exit_before_account_deletion.dart';
 
-final authServiceProvider = Provider<AuthService>((ref) => AuthService());
+final authServiceProvider = Provider<AuthService>(
+  (ref) => AuthService(
+    beforeDeleteAccount: (userId) => EnsureRoomExitBeforeAccountDeletion(
+      ref.read(roomServiceProvider),
+    )(userId),
+  ),
+);
 
 final userServiceProvider = Provider<UserService>((ref) => UserService());
 

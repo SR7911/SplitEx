@@ -15,21 +15,61 @@ class FirestoreBillRepository implements BillRepository {
   }
 
   Future<void> addBill(String roomId, BillModel bill) async {
-    await _ref(roomId).add(BillFirestoreMapper.toMap(bill));
+    await _source.writeOpenLedger(roomId, (transaction) async {
+      transaction.set(_ref(roomId).doc(), BillFirestoreMapper.toMap(bill));
+    });
   }
 
   Future<void> updateBill(
     String roomId,
     String billId,
-    RoomBillUpdate changes,
-  ) async {
-    await _ref(
-      roomId,
-    ).doc(billId).update(BillFirestoreMapper.toUpdateMap(changes));
+    RoomBillUpdate changes, {
+    required String performedBy,
+  }) async {
+    if (!changes.amount.isFinite ||
+        changes.amount <= 0 ||
+        (changes.amount * 100 - (changes.amount * 100).round()).abs() >
+            0.000001) {
+      throw Exception(
+        'Enter a positive amount with at most two decimal places.',
+      );
+    }
+    await _source.db.runTransaction((transaction) async {
+      final roomRef = _source.rooms.doc(roomId);
+      final room = (await transaction.get(roomRef)).data();
+      final billRef = _ref(roomId).doc(billId);
+      final bill = (await transaction.get(billRef)).data();
+      if (room == null ||
+          bill == null ||
+          room['isArchived'] == true ||
+          room['isLocked'] == true) {
+        throw Exception('This bill cannot be edited.');
+      }
+      if (!List<String>.from(room['memberIds'] ?? []).contains(performedBy) ||
+          (bill['paidBy'] != performedBy && room['adminId'] != performedBy)) {
+        throw Exception('Only the active payer or admin can edit this bill.');
+      }
+      transaction.update(billRef, BillFirestoreMapper.toUpdateMap(changes));
+      transaction.update(roomRef, {'ledgerVersion': FieldValue.increment(1)});
+      transaction.set(_source.activities(roomId).doc(), {
+        'type': 'billEdited',
+        'performedBy': performedBy,
+        'description': 'Edited ${changes.type.name} bill',
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'billId': billId,
+          'amount': changes.amount,
+          'paidBy': bill['paidBy'],
+          'splitAmong': bill['splitAmong'] ?? [],
+        },
+      });
+    });
   }
 
   Future<void> deleteBill(String roomId, String billId) async {
-    await _ref(roomId).doc(billId).delete();
+    await _source.writeOpenLedger(roomId, (transaction) async {
+      transaction.delete(_ref(roomId).doc(billId));
+    });
   }
 
   Stream<List<BillModel>> getBillsStream(String roomId, String month) {

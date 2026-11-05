@@ -2,6 +2,7 @@ import 'package:split_ex/shared/domain/entities/debt.dart';
 import 'package:split_ex/modules/room/domain/entities/bill_model.dart';
 import 'package:split_ex/modules/room/domain/entities/debt_transaction.dart';
 import 'package:split_ex/modules/room/domain/entities/expense_model.dart';
+import 'package:split_ex/shared/domain/entities/settlement_model.dart';
 
 abstract interface class RoomReceiptExporter {
   Future<String> generateMonthlyReceiptPath({
@@ -14,6 +15,7 @@ abstract interface class RoomReceiptExporter {
     required int memberCount,
     Map<String, Map<String, List<DebtTransaction>>>? detailedDebtsMap,
     List<String>? memberIds,
+    List<SettlementModel> settlements = const [],
   });
 
   Future<void> sharePdfPath(String path, {String? text});

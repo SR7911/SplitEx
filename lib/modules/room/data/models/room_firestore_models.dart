@@ -16,6 +16,13 @@ class RoomFirestoreMapper {
     createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     currentMonth: map['currentMonth'] ?? '',
     isLocked: map['isLocked'] ?? false,
+    participantIds: List<String>.from(
+      map['participantIds'] ?? map['memberIds'] ?? [],
+    ),
+    legacyBillMemberIds: map['legacyBillMemberIds'] == null
+        ? null
+        : List<String>.from(map['legacyBillMemberIds']),
+    isArchived: map['isArchived'] ?? false,
   );
 
   static Map<String, dynamic> toMap(RoomModel room) => {
@@ -26,6 +33,10 @@ class RoomFirestoreMapper {
     'createdAt': FieldValue.serverTimestamp(),
     'currentMonth': room.currentMonth,
     'isLocked': room.isLocked,
+    'participantIds': room.historicalMemberIds,
+    'isArchived': room.isArchived,
+    if (room.legacyBillMemberIds != null)
+      'legacyBillMemberIds': room.legacyBillMemberIds,
   };
 }
 
@@ -95,7 +106,7 @@ class BillFirestoreMapper {
     month: map['month'] ?? '',
     date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
     receiptUrl: map['receiptUrl'],
-    splitType: map['splitType'],
+    splitType: map['splitType'] ?? 'equal',
     splitAmong: List<String>.from(map['splitAmong'] ?? []),
     createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
   );

@@ -18,7 +18,9 @@ class FirestoreExpenseRepository implements ExpenseRepository {
 
   Future<ExpenseModel> addExpense(String roomId, ExpenseModel expense) async {
     final doc = _expensesRef(roomId).doc();
-    await doc.set(ExpenseFirestoreMapper.toMap(expense));
+    await _source.writeOpenLedger(roomId, (transaction) async {
+      transaction.set(doc, ExpenseFirestoreMapper.toMap(expense));
+    });
     await _tracker.trackWrites(1);
     return ExpenseFirestoreMapper.fromMap(
       ExpenseFirestoreMapper.toMap(expense)..['createdAt'] = Timestamp.now(),
@@ -31,14 +33,19 @@ class FirestoreExpenseRepository implements ExpenseRepository {
     String expenseId,
     RoomExpenseUpdate changes,
   ) async {
-    await _expensesRef(
-      roomId,
-    ).doc(expenseId).update(ExpenseFirestoreMapper.toUpdateMap(changes));
+    await _source.writeOpenLedger(roomId, (transaction) async {
+      transaction.update(
+        _expensesRef(roomId).doc(expenseId),
+        ExpenseFirestoreMapper.toUpdateMap(changes),
+      );
+    });
     await _tracker.trackWrites(1);
   }
 
   Future<void> deleteExpense(String roomId, String expenseId) async {
-    await _expensesRef(roomId).doc(expenseId).delete();
+    await _source.writeOpenLedger(roomId, (transaction) async {
+      transaction.delete(_expensesRef(roomId).doc(expenseId));
+    });
     await _tracker.trackWrites(1);
   }
 

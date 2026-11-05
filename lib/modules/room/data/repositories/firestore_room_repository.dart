@@ -22,6 +22,9 @@ class FirestoreRoomRepository implements RoomRepository {
 
   @override
   Future<RoomModel> createRoom(String name, String userId) async {
+    name = name.trim();
+    if (name.isEmpty || userId.isEmpty)
+      throw Exception('Enter a room name and sign in first.');
     final id = source.rooms.doc().id;
     final now = DateTime.now();
     final room = RoomModel(
@@ -51,12 +54,24 @@ class FirestoreRoomRepository implements RoomRepository {
 
   @override
   Stream<List<RoomModel>> getUserRoomsStream(String userId) => source.rooms
-      .where('memberIds', arrayContains: userId)
+      .where(
+        Filter.or(
+          Filter('memberIds', arrayContains: userId),
+          Filter('participantIds', arrayContains: userId),
+        ),
+      )
       .snapshots()
       .map(
-        (snapshot) => snapshot.docs
-            .map((doc) => RoomFirestoreMapper.fromMap(doc.data(), doc.id))
-            .toList(),
+        (snapshot) =>
+            snapshot.docs
+                .map((doc) => RoomFirestoreMapper.fromMap(doc.data(), doc.id))
+                .toList()
+              ..sort((a, b) {
+                final aActive = a.isMember(userId) && !a.isArchived;
+                final bActive = b.isMember(userId) && !b.isArchived;
+                if (aActive != bActive) return aActive ? -1 : 1;
+                return b.createdAt.compareTo(a.createdAt);
+              }),
       );
 
   @override
@@ -70,9 +85,27 @@ class FirestoreRoomRepository implements RoomRepository {
       );
 
   @override
-  Future<void> removeMember(String roomId, String userId) =>
-      source.removeMember(roomId, userId);
+  Future<void> removeMember(
+    String roomId,
+    String userId, {
+    required String performedBy,
+  }) => source.removeMember(roomId, userId, performedBy: performedBy);
   @override
   Future<void> leaveRoom(String roomId, String userId) =>
-      source.removeMember(roomId, userId);
+      source.removeMember(roomId, userId, performedBy: userId);
+
+  @override
+  Future<void> transferAdmin(
+    String roomId,
+    String adminId,
+    String newAdminId,
+  ) => source.transferAdmin(roomId, adminId, newAdminId);
+
+  @override
+  Future<void> setArchived(String roomId, String userId, bool archived) =>
+      source.setArchived(roomId, userId, archived);
+
+  @override
+  Future<void> restoreHistoricalParticipants(String roomId, String userId) =>
+      source.restoreHistoricalParticipants(roomId, userId);
 }

@@ -68,7 +68,7 @@ void main() {
         'memberIds': ['alice', 'missing-user'],
       });
 
-      await rooms.removeMember(room.id, 'missing-user');
+      await rooms.removeMember(room.id, 'missing-user', performedBy: 'alice');
       final stored = await db.collection('rooms').doc(room.id).get();
       expect(stored.data()?['memberIds'], ['alice']);
       expect(

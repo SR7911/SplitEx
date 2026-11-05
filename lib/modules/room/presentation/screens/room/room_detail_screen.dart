@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -22,19 +22,20 @@ import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/settlement_provider.dart';
 
 // -- Shared design tokens --
-const _kGreen  = Color(0xFF22C55E);
-const _kRed    = Color(0xFFEF4444);
-const _kAmber  = Color(0xFFF59E0B);
+const _kGreen = Color(0xFF22C55E);
+const _kRed = Color(0xFFEF4444);
+const _kAmber = Color(0xFFF59E0B);
 const _kIndigo = Color(0xFF6366F1);
-const _kBlue   = Color(0xFF3B82F6);
-const _kTeal   = Color(0xFF14B8A6);
+const _kBlue = Color(0xFF3B82F6);
+const _kTeal = Color(0xFF14B8A6);
 const _kPurple = Color(0xFF8B5CF6);
 const _kPalette = [_kBlue, _kGreen, _kAmber, _kIndigo, _kTeal, _kPurple, _kRed];
 
 BoxDecoration _cardDeco(BuildContext context) {
-  final cs     = Theme.of(context).colorScheme;
+  final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return BoxDecoration(
     color: isDark ? cs.surfaceContainerHigh : cs.surface,
@@ -49,11 +50,17 @@ BoxDecoration _cardDeco(BuildContext context) {
     ],
   );
 }
+
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
   final DateTime selectedMonthInHome;
   final int initialTabIndex;
-  const RoomDetailScreen({super.key, required this.roomId, required this.selectedMonthInHome, this.initialTabIndex = 0});
+  const RoomDetailScreen({
+    super.key,
+    required this.roomId,
+    required this.selectedMonthInHome,
+    this.initialTabIndex = 0,
+  });
 
   @override
   ConsumerState<RoomDetailScreen> createState() => _RoomDetailScreenState();
@@ -66,7 +73,11 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTabIndex);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
     _tabController.addListener(() => setState(() {}));
     // _selectedMonth = widget.selectedMonthInHome;
   }
@@ -80,8 +91,8 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
   String get _monthKey => DateFormat('yyyy-MM').format(_selectedMonth);
 
   void _prevMonth() => setState(() {
-        _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
-      });
+    _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+  });
 
   void _nextMonth() {
     final now = DateTime.now();
@@ -110,28 +121,53 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
   }
 
   Future<void> _generateReceipt(BuildContext context, WidgetRef ref) async {
-    final room = ref.read(currentRoomProvider);
+    final receiptMonth = _monthKey;
+    final room = await ref.read(roomStreamProvider(widget.roomId).future);
     if (room == null) return;
+    if (!context.mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Generating receipt...')),
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Generating receipt...')));
+
+    final expenses = await ref.read(
+      monthExpensesProvider(
+        MonthRoomKey(roomId: widget.roomId, month: receiptMonth),
+      ).future,
     );
 
-    final expenses = ref.read(monthExpensesProvider(
-      MonthRoomKey(roomId: widget.roomId, month: _monthKey),
-    )).valueOrNull ?? [];
+    final bills = await ref.read(
+      billsStreamProvider(
+        MonthBillKey(roomId: widget.roomId, month: receiptMonth),
+      ).future,
+    );
 
-    final bills = ref.read(billsStreamProvider(
-      MonthBillKey(roomId: widget.roomId, month: _monthKey),
-    )).valueOrNull ?? [];
+    final settlements = await ref.read(
+      settlementsStreamProvider(widget.roomId).future,
+    );
+    final participantIds = ref.read(
+      monthParticipantIdsProvider(
+        MonthBalanceKey(roomId: widget.roomId, month: receiptMonth),
+      ),
+    );
 
-    final debts = ref.read(monthSimplifiedDebtsProvider(MonthBalanceKey(roomId: widget.roomId, month: _monthKey)));
-    final detailedMap = ref.read(detailedDebtsMapProvider(MonthBalanceKey(roomId: widget.roomId, month: _monthKey)));
+    final debts = ref.read(
+      monthPairDebtsProvider(
+        MonthBalanceKey(roomId: widget.roomId, month: receiptMonth),
+      ),
+    );
+    final detailedMap = ref.read(
+      detailedDebtsMapProvider(
+        MonthBalanceKey(roomId: widget.roomId, month: receiptMonth),
+      ),
+    );
 
-    final membersAsync = ref.read(userProfilesByIdsProvider(room.memberIds));
+    final members = await ref.read(
+      userProfilesByIdsProvider(participantIds).future,
+    );
     final nameMap = <String, String>{};
-    if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
+    {
+      for (final m in members) {
         nameMap[m.uid] = m.name;
       }
     }
@@ -139,41 +175,77 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
     final generator = ref.read(roomReceiptExporterProvider);
     final filePath = await generator.generateMonthlyReceiptPath(
       roomName: room.name,
-      month: _monthKey,
+      month: receiptMonth,
       expenses: expenses,
       bills: bills,
       nameMap: nameMap,
       debts: debts,
-      memberCount: room.memberIds.length,
+      memberCount: participantIds.length,
       detailedDebtsMap: detailedMap,
-      memberIds: room.memberIds,
+      memberIds: participantIds,
+      settlements: settlements
+          .where((s) => s.effectiveMonth == receiptMonth)
+          .toList(),
     );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
     await generator.sharePdfPath(
       filePath,
-      text: 'SplitEx Monthly Receipt - ${room.name} ($_monthKey)',
+      text: 'SplitEx Monthly Receipt - ${room.name} ($receiptMonth)',
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final room = ref.watch(currentRoomProvider);
+    final roomAsync = ref.watch(roomStreamProvider(widget.roomId));
+    final room = roomAsync.valueOrNull;
+    final userId = ref.watch(currentUserIdProvider);
+    if (roomAsync.isLoading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (roomAsync.hasError || room == null || !room.canRead(userId)) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Room')),
+        body: const Center(child: Text('Unable to load this room.')),
+      );
+    }
 
     return Scaffold(
       appBar: _GradientTabAppBar(
-        title: room?.name ?? 'Room',
+        title: room.name,
         tabController: _tabController,
         onAnalytics: () => _showAnalyticsSheet(context),
-        onReceipt: () => _generateReceipt(context, ref),
+        onReceipt: () async {
+          try {
+            await _generateReceipt(context, ref);
+          } catch (e) {
+            if (context.mounted)
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Unable to export receipt: $e')),
+              );
+          }
+        },
         onActivity: () => context.push('/room/${widget.roomId}/activity'),
+        onSettings: () => context.push('/room/${widget.roomId}/settings'),
       ),
       body: GradientBody(
         child: Column(
           children: [
-            _MonthSelector(month: _selectedMonth, onPrev: _prevMonth, onNext: _nextMonth),
+            if (room.isArchived || !room.isMember(userId))
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Text(
+                  room.isArchived
+                      ? 'Archived room · history preserved. Restore in Room Settings to make changes.'
+                      : 'Former member · your history and outstanding balances are preserved.',
+                ),
+              ),
+            _MonthSelector(
+              month: _selectedMonth,
+              onPrev: _prevMonth,
+              onNext: _nextMonth,
+            ),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -187,14 +259,22 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
           ],
         ),
       ),
-      floatingActionButton: _tabController.index == 2
+      floatingActionButton: _tabController.index == 2 || !room.canWrite(userId)
           ? null
           : FloatingActionButton(
               onPressed: () {
                 if (_tabController.index == 0) {
-                  showAddExpenseSheet(context, roomId: widget.roomId, initialDate: _selectedMonth);
+                  showAddExpenseSheet(
+                    context,
+                    roomId: widget.roomId,
+                    initialDate: _selectedMonth,
+                  );
                 } else if (_tabController.index == 1) {
-                  showAddBillSheet(context, roomId: widget.roomId, initialDate: _selectedMonth);
+                  showAddBillSheet(
+                    context,
+                    roomId: widget.roomId,
+                    initialDate: _selectedMonth,
+                  );
                 }
               },
               child: const Icon(Icons.add),
@@ -204,12 +284,14 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
 }
 
 // ========== GRADIENT TAB APP BAR ==========
-class _GradientTabAppBar extends StatelessWidget implements PreferredSizeWidget {
+class _GradientTabAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   final String title;
   final TabController tabController;
   final VoidCallback onAnalytics;
   final VoidCallback onReceipt;
   final VoidCallback onActivity;
+  final VoidCallback onSettings;
 
   const _GradientTabAppBar({
     required this.title,
@@ -217,10 +299,12 @@ class _GradientTabAppBar extends StatelessWidget implements PreferredSizeWidget 
     required this.onAnalytics,
     required this.onReceipt,
     required this.onActivity,
+    required this.onSettings,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + kTextTabBarHeight);
+  Size get preferredSize =>
+      const Size.fromHeight(kToolbarHeight + kTextTabBarHeight);
 
   @override
   Widget build(BuildContext context) {
@@ -243,9 +327,26 @@ class _GradientTabAppBar extends StatelessWidget implements PreferredSizeWidget 
         elevation: 0,
         title: Text(title),
         actions: [
-          IconButton(icon: const Icon(Icons.bar_chart), tooltip: 'Analytics', onPressed: onAnalytics),
-          IconButton(icon: const Icon(Icons.receipt_long), tooltip: 'Generate Receipt', onPressed: onReceipt),
-          IconButton(icon: const Icon(Icons.history), tooltip: 'Activity Log', onPressed: onActivity),
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: 'Analytics',
+            onPressed: onAnalytics,
+          ),
+          IconButton(
+            icon: const Icon(Icons.receipt_long),
+            tooltip: 'Generate Receipt',
+            onPressed: onReceipt,
+          ),
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Activity Log',
+            onPressed: onActivity,
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Room Settings',
+            onPressed: onSettings,
+          ),
         ],
         bottom: TabBar(
           controller: tabController,
@@ -268,12 +369,32 @@ class _AnalyticsSheet extends ConsumerWidget {
   final String monthKey;
   final ScrollController scrollController;
 
-  const _AnalyticsSheet({required this.roomId, required this.monthKey, required this.scrollController});
+  const _AnalyticsSheet({
+    required this.roomId,
+    required this.monthKey,
+    required this.scrollController,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final expenses = ref.watch(monthExpensesProvider(MonthRoomKey(roomId: roomId, month: monthKey))).valueOrNull ?? [];
-    final bills = ref.watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: monthKey))).valueOrNull ?? [];
+    final expenses =
+        ref
+            .watch(
+              monthExpensesProvider(
+                MonthRoomKey(roomId: roomId, month: monthKey),
+              ),
+            )
+            .valueOrNull ??
+        [];
+    final bills =
+        ref
+            .watch(
+              billsStreamProvider(
+                MonthBillKey(roomId: roomId, month: monthKey),
+              ),
+            )
+            .valueOrNull ??
+        [];
     final expTotal = expenses.fold<double>(0, (s, e) => s + e.amount);
     final billTotal = bills.fold<double>(0, (s, e) => s + e.amount);
     final total = expTotal + billTotal;
@@ -283,31 +404,50 @@ class _AnalyticsSheet extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.analytics_outlined, size: 64, color: Colors.grey.shade400),
+            Icon(
+              Icons.analytics_outlined,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
             const SizedBox(height: 12),
-            Text('No data this month', style: TextStyle(color: Colors.grey.shade500)),
+            Text(
+              'No data this month',
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
           ],
         ),
       );
     }
 
     final catTotals = <String, double>{};
-    for (final e in expenses) catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
-    for (final e in bills) catTotals[e.typeName] = (catTotals[e.typeName] ?? 0) + e.amount;
-    final catEntries = catTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in expenses)
+      catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
+    for (final e in bills)
+      catTotals[e.typeName] = (catTotals[e.typeName] ?? 0) + e.amount;
+    final catEntries = catTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
     final dailyTotals = <int, double>{};
-    for (final e in expenses) dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
-    for (final e in bills) dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
+    for (final e in expenses)
+      dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
+    for (final e in bills)
+      dailyTotals[e.date.day] = (dailyTotals[e.date.day] ?? 0) + e.amount;
     final days = dailyTotals.keys.toList()..sort();
     final maxY = dailyTotals.values.fold<double>(0, (a, b) => a > b ? a : b);
 
     final memberTotals = <String, double>{};
-    for (final e in expenses) memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
-    for (final e in bills) memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
-    final membersSorted = memberTotals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    for (final e in expenses)
+      memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
+    for (final e in bills)
+      memberTotals[e.paidBy] = (memberTotals[e.paidBy] ?? 0) + e.amount;
+    final membersSorted = memberTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
-    final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
+    final members = ref.watch(
+      monthParticipantIdsProvider(
+        MonthBalanceKey(roomId: roomId, month: monthKey),
+      ),
+    );
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
@@ -324,19 +464,43 @@ class _AnalyticsSheet extends ConsumerWidget {
         // Drag handle
         Center(
           child: Container(
-            width: 40, height: 4,
+            width: 40,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(color: cs.outline.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(
+              color: cs.outline.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
         ),
         // Title
         Row(
           children: [
-            Container(width: 3, height: 18, decoration: BoxDecoration(color: _kIndigo, borderRadius: BorderRadius.circular(2))),
+            Container(
+              width: 3,
+              height: 18,
+              decoration: BoxDecoration(
+                color: _kIndigo,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             const SizedBox(width: 8),
-            Text('Analytics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            Text(
+              'Analytics',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: cs.onSurface,
+              ),
+            ),
             const Spacer(),
-            Text(monthKey, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.45))),
+            Text(
+              monthKey,
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.45),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -347,9 +511,17 @@ class _AnalyticsSheet extends ConsumerWidget {
           child: Row(
             children: [
               _StatCell(label: 'Expenses', value: _fmt(expTotal), color: _kRed),
-              VerticalDivider(width: 1, thickness: 1, color: cs.outline.withValues(alpha: 0.12)),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: cs.outline.withValues(alpha: 0.12),
+              ),
               _StatCell(label: 'Bills', value: _fmt(billTotal), color: _kAmber),
-              VerticalDivider(width: 1, thickness: 1, color: cs.outline.withValues(alpha: 0.12)),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: cs.outline.withValues(alpha: 0.12),
+              ),
               _StatCell(label: 'Total', value: _fmt(total), color: _kIndigo),
             ],
           ),
@@ -365,21 +537,37 @@ class _AnalyticsSheet extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: 110, height: 110,
+                width: 110,
+                height: 110,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    PieChart(PieChartData(
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 32,
-                      sections: catEntries.asMap().entries.map((e) => PieChartSectionData(
-                        value: e.value.value,
-                        color: _kPalette[e.key % _kPalette.length],
-                        title: '',
-                        radius: 22,
-                      )).toList(),
-                    )),
-                    Text(_fmt(total), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: cs.onSurface)),
+                    PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 32,
+                        sections: catEntries
+                            .asMap()
+                            .entries
+                            .map(
+                              (e) => PieChartSectionData(
+                                value: e.value.value,
+                                color: _kPalette[e.key % _kPalette.length],
+                                title: '',
+                                radius: 22,
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                    Text(
+                      _fmt(total),
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -389,18 +577,47 @@ class _AnalyticsSheet extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: catEntries.take(6).map((entry) {
                     final idx = catEntries.indexOf(entry);
-                    final pct = total > 0 ? (entry.value / total * 100).round() : 0;
+                    final pct = total > 0
+                        ? (entry.value / total * 100).round()
+                        : 0;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Row(
                         children: [
-                          Container(width: 8, height: 8, decoration: BoxDecoration(color: _kPalette[idx % _kPalette.length], borderRadius: BorderRadius.circular(2))),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(entry.key, style: const TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(color: _kPalette[idx % _kPalette.length].withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
-                            child: Text('$pct%', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kPalette[idx % _kPalette.length])),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _kPalette[idx % _kPalette.length],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              entry.key,
+                              style: const TextStyle(fontSize: 11),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _kPalette[idx % _kPalette.length]
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '$pct%',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: _kPalette[idx % _kPalette.length],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -422,17 +639,43 @@ class _AnalyticsSheet extends ConsumerWidget {
             decoration: _cardDeco(context),
             child: Row(
               children: [
-                Container(width: 3, decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)))),
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(20),
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Expanded(child: Text(entry.key, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-                            Text(_fmt(entry.value), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+                            Expanded(
+                              child: Text(
+                                entry.key,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _fmt(entry.value),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: color,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 5),
@@ -441,7 +684,9 @@ class _AnalyticsSheet extends ConsumerWidget {
                           child: LinearProgressIndicator(
                             value: pct.toDouble(),
                             minHeight: 4,
-                            backgroundColor: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),
+                            backgroundColor: isDark
+                                ? Colors.white12
+                                : Colors.black.withValues(alpha: 0.06),
                             valueColor: AlwaysStoppedAnimation(color),
                           ),
                         ),
@@ -463,33 +708,54 @@ class _AnalyticsSheet extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
             child: SizedBox(
               height: 140,
-              child: BarChart(BarChartData(
-                alignment: BarChartAlignment.spaceAround,
-                maxY: maxY * 1.25,
-                titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (v, _) => Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(v.toInt().toString(), style: const TextStyle(fontSize: 9)),
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: maxY * 1.25,
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
                     ),
-                  )),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (v, _) => Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            v.toInt().toString(),
+                            style: const TextStyle(fontSize: 9),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  barGroups: days
+                      .map(
+                        (day) => BarChartGroupData(
+                          x: day,
+                          barRods: [
+                            BarChartRodData(
+                              toY: dailyTotals[day]!,
+                              width: 10,
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(5),
+                              ),
+                              color: _kTeal,
+                            ),
+                          ],
+                        ),
+                      )
+                      .toList(),
                 ),
-                gridData: const FlGridData(show: false),
-                borderData: FlBorderData(show: false),
-                barGroups: days.map((day) => BarChartGroupData(
-                  x: day,
-                  barRods: [BarChartRodData(
-                    toY: dailyTotals[day]!,
-                    width: 10,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
-                    color: _kTeal,
-                  )],
-                )).toList(),
-              )),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -506,26 +772,50 @@ class _AnalyticsSheet extends ConsumerWidget {
               decoration: _cardDeco(context),
               child: Row(
                 children: [
-                  Container(width: 3, height: 60, decoration: BoxDecoration(color: _kPurple, borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)))),
+                  Container(
+                    width: 3,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: _kPurple,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(20),
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: _kPurple.withValues(alpha: 0.12),
-                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _kPurple)),
+                    child: Text(
+                      name.isNotEmpty ? name[0].toUpperCase() : '?',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _kPurple,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        Text(
+                          name,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: pct,
                             minHeight: 4,
-                            backgroundColor: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.06),
+                            backgroundColor: isDark
+                                ? Colors.white12
+                                : Colors.black.withValues(alpha: 0.06),
                             valueColor: const AlwaysStoppedAnimation(_kPurple),
                           ),
                         ),
@@ -538,8 +828,21 @@ class _AnalyticsSheet extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(_fmt(entry.value), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPurple)),
-                        Text('${(pct * 100).round()}%', style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45))),
+                        Text(
+                          _fmt(entry.value),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _kPurple,
+                          ),
+                        ),
+                        Text(
+                          '${(pct * 100).round()}%',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cs.onSurface.withValues(alpha: 0.45),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -557,7 +860,11 @@ class _StatCell extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _StatCell({required this.label, required this.value, required this.color});
+  const _StatCell({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -565,9 +872,24 @@ class _StatCell extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5))),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
         ],
       ),
     );
@@ -583,9 +905,23 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 3, height: 16, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        Container(
+          width: 3,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
         const SizedBox(width: 8),
-        Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
       ],
     );
   }
@@ -596,14 +932,20 @@ class _MonthSelector extends StatelessWidget {
   final DateTime month;
   final VoidCallback onPrev;
   final VoidCallback onNext;
-  const _MonthSelector({required this.month, required this.onPrev, required this.onNext});
+  const _MonthSelector({
+    required this.month,
+    required this.onPrev,
+    required this.onNext,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isCurrentMonth = month.year == DateTime.now().year && month.month == DateTime.now().month;
-    final cs     = Theme.of(context).colorScheme;
+    final isCurrentMonth =
+        month.year == DateTime.now().year &&
+        month.month == DateTime.now().month;
+    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    const onCard     = Colors.white;
+    const onCard = Colors.white;
     final onCardMuted = Colors.white.withValues(alpha: 0.65);
 
     return Padding(
@@ -614,8 +956,14 @@ class _MonthSelector extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           gradient: LinearGradient(
             colors: isDark
-                ? [cs.primary.withValues(alpha: 0.55), cs.primary.withValues(alpha: 0.35)]
-                : [cs.primary.withValues(alpha: 0.85), cs.primary.withValues(alpha: 0.65)],
+                ? [
+                    cs.primary.withValues(alpha: 0.55),
+                    cs.primary.withValues(alpha: 0.35),
+                  ]
+                : [
+                    cs.primary.withValues(alpha: 0.85),
+                    cs.primary.withValues(alpha: 0.65),
+                  ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -636,28 +984,46 @@ class _MonthSelector extends StatelessWidget {
               children: [
                 Text(
                   DateFormat('MMMM yyyy').format(month),
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: onCard),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: onCard,
+                  ),
                 ),
-                if (isCurrentMonth) ...[  
+                if (isCurrentMonth) ...[
                   const SizedBox(height: 3),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
                       'Current Month',
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: onCard, letterSpacing: 0.4),
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: onCard,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                   ),
-                ] else ...[  
+                ] else ...[
                   const SizedBox(height: 2),
-                  Text(DateFormat('yyyy').format(month), style: TextStyle(fontSize: 10, color: onCardMuted)),
+                  Text(
+                    DateFormat('yyyy').format(month),
+                    style: TextStyle(fontSize: 10, color: onCardMuted),
+                  ),
                 ],
               ],
             ),
-            _NavBtn(onTap: isCurrentMonth ? null : onNext, icon: Icons.chevron_right),
+            _NavBtn(
+              onTap: isCurrentMonth ? null : onNext,
+              icon: Icons.chevron_right,
+            ),
           ],
         ),
       ),
@@ -676,12 +1042,17 @@ class _NavBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 34, height: 34,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: enabled ? 0.18 : 0.07),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, size: 20, color: Colors.white.withValues(alpha: enabled ? 0.9 : 0.3)),
+        child: Icon(
+          icon,
+          size: 20,
+          color: Colors.white.withValues(alpha: enabled ? 0.9 : 0.3),
+        ),
       ),
     );
   }
@@ -708,7 +1079,10 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
   _SortOption _sortOption = _SortOption.timeDesc;
 
   bool get _hasActiveFilters =>
-      _filterUser != null || _filterCategory != null || _filterDateFrom != null || _filterDateTo != null;
+      _filterUser != null ||
+      _filterCategory != null ||
+      _filterDateFrom != null ||
+      _filterDateTo != null;
 
   void _clearFilters() => setState(() {
     _filterUser = null;
@@ -720,17 +1094,25 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
   List<ExpenseModel> _applyFiltersAndSort(List<ExpenseModel> expenses) {
     var filtered = expenses.where((e) {
       if (_filterUser != null && e.paidBy != _filterUser) return false;
-      if (_filterCategory != null && e.category != _filterCategory) return false;
-      if (_filterDateFrom != null && e.date.isBefore(_filterDateFrom!)) return false;
-      if (_filterDateTo != null && e.date.isAfter(_filterDateTo!.add(const Duration(days: 1)))) return false;
+      if (_filterCategory != null && e.category != _filterCategory)
+        return false;
+      if (_filterDateFrom != null && e.date.isBefore(_filterDateFrom!))
+        return false;
+      if (_filterDateTo != null &&
+          e.date.isAfter(_filterDateTo!.add(const Duration(days: 1))))
+        return false;
       return true;
     }).toList();
 
     switch (_sortOption) {
-      case _SortOption.timeDesc: filtered.sort((a, b) => b.date.compareTo(a.date));
-      case _SortOption.timeAsc: filtered.sort((a, b) => a.date.compareTo(b.date));
-      case _SortOption.amountDesc: filtered.sort((a, b) => b.amount.compareTo(a.amount));
-      case _SortOption.amountAsc: filtered.sort((a, b) => a.amount.compareTo(b.amount));
+      case _SortOption.timeDesc:
+        filtered.sort((a, b) => b.date.compareTo(a.date));
+      case _SortOption.timeAsc:
+        filtered.sort((a, b) => a.date.compareTo(b.date));
+      case _SortOption.amountDesc:
+        filtered.sort((a, b) => b.amount.compareTo(a.amount));
+      case _SortOption.amountAsc:
+        filtered.sort((a, b) => a.amount.compareTo(b.amount));
     }
     return filtered;
   }
@@ -767,11 +1149,20 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final expensesAsync = ref.watch(monthExpensesProvider(MonthRoomKey(roomId: widget.roomId, month: widget.month)));
+    final expensesAsync = ref.watch(
+      monthExpensesProvider(
+        MonthRoomKey(roomId: widget.roomId, month: widget.month),
+      ),
+    );
     final userId = ref.read(currentUserIdProvider);
-    final room = ref.watch(currentRoomProvider);
-    final isAdmin = room?.isAdmin(userId) ?? false;
-    final members = room?.memberIds ?? [];
+    final room = ref.watch(roomStreamProvider(widget.roomId)).valueOrNull;
+    final isAdmin =
+        (room?.isAdmin(userId) ?? false) && (room?.canWrite(userId) ?? false);
+    final members = ref.watch(
+      monthParticipantIdsProvider(
+        MonthBalanceKey(roomId: widget.roomId, month: widget.month),
+      ),
+    );
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
@@ -788,7 +1179,9 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+              color:
+                  Theme.of(context).cardTheme.color ??
+                  Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -810,11 +1203,15 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
                           GestureDetector(
                             onTap: _clearFilters,
                             child: Chip(
-                              label: const Text('Clear', style: TextStyle(fontSize: 11)),
+                              label: const Text(
+                                'Clear',
+                                style: TextStyle(fontSize: 11),
+                              ),
                               deleteIcon: const Icon(Icons.close, size: 14),
                               onDeleted: _clearFilters,
                               visualDensity: VisualDensity.compact,
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
                             ),
                           ),
                         ],
@@ -831,13 +1228,17 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
                     decoration: BoxDecoration(
                       color: _hasActiveFilters
                           ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          : Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
                       Icons.tune,
                       size: 20,
-                      color: _hasActiveFilters ? Colors.white : Theme.of(context).iconTheme.color,
+                      color: _hasActiveFilters
+                          ? Colors.white
+                          : Theme.of(context).iconTheme.color,
                     ),
                   ),
                 ),
@@ -854,13 +1255,27 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
             data: (expenses) {
               final filtered = _applyFiltersAndSort(expenses);
               if (filtered.isEmpty) {
-                return Center(child: Text(_hasActiveFilters ? 'No expenses match filters' : 'No expenses this month'));
+                return Center(
+                  child: Text(
+                    _hasActiveFilters
+                        ? 'No expenses match filters'
+                        : 'No expenses this month',
+                  ),
+                );
               }
               return ListView(
                 padding: const EdgeInsets.all(12),
-                children: filtered.map((e) => _ExpenseTile(
-                  expense: e, isAdmin: isAdmin, userId: userId, roomId: widget.roomId, nameMap: nameMap,
-                )).toList(),
+                children: filtered
+                    .map(
+                      (e) => _ExpenseTile(
+                        expense: e,
+                        isAdmin: isAdmin,
+                        userId: userId,
+                        roomId: widget.roomId,
+                        nameMap: nameMap,
+                      ),
+                    )
+                    .toList(),
               );
             },
           ),
@@ -890,7 +1305,8 @@ class _FilterBottomSheet extends StatefulWidget {
   final DateTime? filterDateFrom;
   final DateTime? filterDateTo;
   final _SortOption sortOption;
-  final void Function(String?, String?, DateTime?, DateTime?, _SortOption) onApply;
+  final void Function(String?, String?, DateTime?, DateTime?, _SortOption)
+  onApply;
   final VoidCallback onClear;
 
   const _FilterBottomSheet({
@@ -940,8 +1356,10 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
     );
     if (picked != null) {
       setState(() {
-        if (isFrom) _from = picked;
-        else _to = picked;
+        if (isFrom)
+          _from = picked;
+        else
+          _to = picked;
       });
     }
   }
@@ -949,7 +1367,12 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -966,10 +1389,21 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
           Text('Paid by', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8, runSpacing: 4,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              ChoiceChip(label: const Text('All'), selected: _user == null, onSelected: (_) => setState(() => _user = null)),
-              ...widget.nameMap.entries.map((e) => ChoiceChip(label: Text(e.value), selected: _user == e.key, onSelected: (_) => setState(() => _user = e.key))),
+              ChoiceChip(
+                label: const Text('All'),
+                selected: _user == null,
+                onSelected: (_) => setState(() => _user = null),
+              ),
+              ...widget.nameMap.entries.map(
+                (e) => ChoiceChip(
+                  label: Text(e.value),
+                  selected: _user == e.key,
+                  onSelected: (_) => setState(() => _user = e.key),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -977,10 +1411,21 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
           Text('Category', style: Theme.of(context).textTheme.labelLarge),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8, runSpacing: 4,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              ChoiceChip(label: const Text('All'), selected: _category == null, onSelected: (_) => setState(() => _category = null)),
-              ...RoomConstants.expenseCategories.map((c) => ChoiceChip(label: Text(c), selected: _category == c, onSelected: (_) => setState(() => _category = c))),
+              ChoiceChip(
+                label: const Text('All'),
+                selected: _category == null,
+                onSelected: (_) => setState(() => _category = null),
+              ),
+              ...RoomConstants.expenseCategories.map(
+                (c) => ChoiceChip(
+                  label: Text(c),
+                  selected: _category == c,
+                  onSelected: (_) => setState(() => _category = c),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -989,11 +1434,36 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: OutlinedButton(onPressed: () => _pickDate(true), child: Text(_from != null ? DateFormat('dd MMM').format(_from!) : 'From'))),
-              const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('\u2014')),
-              Expanded(child: OutlinedButton(onPressed: () => _pickDate(false), child: Text(_to != null ? DateFormat('dd MMM').format(_to!) : 'To'))),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _pickDate(true),
+                  child: Text(
+                    _from != null
+                        ? DateFormat('dd MMM').format(_from!)
+                        : 'From',
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text('\u2014'),
+              ),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _pickDate(false),
+                  child: Text(
+                    _to != null ? DateFormat('dd MMM').format(_to!) : 'To',
+                  ),
+                ),
+              ),
               if (_from != null || _to != null)
-                IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => setState(() { _from = null; _to = null; })),
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () => setState(() {
+                    _from = null;
+                    _to = null;
+                  }),
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -1003,10 +1473,28 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
           Wrap(
             spacing: 8,
             children: [
-              ChoiceChip(label: const Text('Newest'), selected: _sort == _SortOption.timeDesc, onSelected: (_) => setState(() => _sort = _SortOption.timeDesc)),
-              ChoiceChip(label: const Text('Oldest'), selected: _sort == _SortOption.timeAsc, onSelected: (_) => setState(() => _sort = _SortOption.timeAsc)),
-              ChoiceChip(label: const Text('Amount \u2191'), selected: _sort == _SortOption.amountAsc, onSelected: (_) => setState(() => _sort = _SortOption.amountAsc)),
-              ChoiceChip(label: const Text('Amount \u2193'), selected: _sort == _SortOption.amountDesc, onSelected: (_) => setState(() => _sort = _SortOption.amountDesc)),
+              ChoiceChip(
+                label: const Text('Newest'),
+                selected: _sort == _SortOption.timeDesc,
+                onSelected: (_) => setState(() => _sort = _SortOption.timeDesc),
+              ),
+              ChoiceChip(
+                label: const Text('Oldest'),
+                selected: _sort == _SortOption.timeAsc,
+                onSelected: (_) => setState(() => _sort = _SortOption.timeAsc),
+              ),
+              ChoiceChip(
+                label: const Text('Amount \u2191'),
+                selected: _sort == _SortOption.amountAsc,
+                onSelected: (_) =>
+                    setState(() => _sort = _SortOption.amountAsc),
+              ),
+              ChoiceChip(
+                label: const Text('Amount \u2193'),
+                selected: _sort == _SortOption.amountDesc,
+                onSelected: (_) =>
+                    setState(() => _sort = _SortOption.amountDesc),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1014,7 +1502,8 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => widget.onApply(_user, _category, _from, _to, _sort),
+              onPressed: () =>
+                  widget.onApply(_user, _category, _from, _to, _sort),
               child: const Text('Apply'),
             ),
           ),
@@ -1031,14 +1520,27 @@ class _ExpenseTile extends ConsumerWidget {
   final String roomId;
   final Map<String, String> nameMap;
 
-  const _ExpenseTile({required this.expense, required this.isAdmin, required this.userId, required this.roomId, required this.nameMap});
+  const _ExpenseTile({
+    required this.expense,
+    required this.isAdmin,
+    required this.userId,
+    required this.roomId,
+    required this.nameMap,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final canEdit = expense.createdBy == userId || isAdmin;
-    final icon = RoomConstants.categoryIcons[expense.category] ?? Icons.receipt_long;
-    final paidByName = expense.paidBy == userId ? 'You' : (nameMap[expense.paidBy] ?? expense.paidBy);
-    final hasReceipt = expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty;
+    final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+    final canDelete =
+        (room?.canWrite(userId) ?? false) &&
+        (expense.createdBy == userId || isAdmin);
+    final icon =
+        RoomConstants.categoryIcons[expense.category] ?? Icons.receipt_long;
+    final paidByName = expense.paidBy == userId
+        ? 'You'
+        : (nameMap[expense.paidBy] ?? expense.paidBy);
+    final hasReceipt =
+        expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty;
 
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1048,7 +1550,8 @@ class _ExpenseTile extends ConsumerWidget {
       child: ListTile(
         tileColor: Colors.transparent,
         leading: Container(
-          width: 40, height: 40,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
             borderRadius: BorderRadius.circular(12),
@@ -1056,25 +1559,35 @@ class _ExpenseTile extends ConsumerWidget {
           child: Center(child: Icon(icon, size: 20, color: cs.primary)),
         ),
         title: Text(expense.title),
-        subtitle: Text('${expense.category} • ${DateFormat('dd MMM').format(expense.date)} • $paidByName'),
+        subtitle: Text(
+          '${expense.category} • ${DateFormat('dd MMM').format(expense.date)} • $paidByName',
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (hasReceipt)
               IconButton(
-                icon: Icon(Icons.visibility, size: 20, color: const Color(0xFF10B981)),
+                icon: Icon(
+                  Icons.visibility,
+                  size: 20,
+                  color: const Color(0xFF10B981),
+                ),
                 tooltip: 'View Receipt',
                 onPressed: () => _showReceipt(context, expense.receiptUrl!),
               ),
-            Text('₹${expense.amount.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary)),
+            Text(
+              '₹${expense.amount.toStringAsFixed(0)}',
+              style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
+            ),
           ],
         ),
-        onTap: canEdit ? () => showViewExpenseSheet(context, roomId: roomId, expense: expense) : null,
+        onTap: () =>
+            showViewExpenseSheet(context, roomId: roomId, expense: expense),
       ),
     );
 
     // Dismissible wrapper unchanged (only passes the tile)
-    if (!isAdmin) return tile;
+    if (!canDelete) return tile;
     return Dismissible(
       key: Key(expense.id),
       direction: DismissDirection.endToStart,
@@ -1087,19 +1600,38 @@ class _ExpenseTile extends ConsumerWidget {
         ),
         child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
       ),
-      confirmDismiss: (_) async => await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Delete Expense'),
-          content: Text('Delete "${expense.title}"?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
-          ],
-        ),
-      ),
-      onDismissed: (_) {
-        ref.read(deleteRoomExpenseProvider)(roomId, expense, userId);
+      confirmDismiss: (_) async {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete Expense'),
+            content: Text('Delete "${expense.title}"?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        );
+        if (confirmed == true) {
+          try {
+            await ref.read(deleteRoomExpenseProvider)(roomId, expense, userId);
+          } catch (e) {
+            if (context.mounted)
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Unable to delete expense: $e')),
+              );
+          }
+        }
+        return false;
       },
       child: tile,
     );
@@ -1167,12 +1699,19 @@ class _BillsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final billsAsync = ref.watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: month)));
-    final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
+    final billsAsync = ref.watch(
+      billsStreamProvider(MonthBillKey(roomId: roomId, month: month)),
+    );
+    final members = ref.watch(
+      monthParticipantIdsProvider(
+        MonthBalanceKey(roomId: roomId, month: month),
+      ),
+    );
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final userId = ref.read(currentUserIdProvider);
-    final room = ref.watch(currentRoomProvider);
-    final isAdmin = room?.isAdmin(userId) ?? false;
+    final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+    final isAdmin =
+        (room?.isAdmin(userId) ?? false) && (room?.canWrite(userId) ?? false);
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
       for (final m in membersAsync.value!) {
@@ -1184,13 +1723,17 @@ class _BillsTab extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (bills) {
-        if (bills.isEmpty) return const Center(child: Text('No bills this month'));
+        if (bills.isEmpty)
+          return const Center(child: Text('No bills this month'));
         return ListView(
           padding: const EdgeInsets.all(12),
           children: bills.map((bill) {
             final paidBy = nameMap[bill.paidBy] ?? bill.paidBy;
-            final icon = switch (bill.type) { BillType.rent => Icons.home, BillType.electricity => Icons.bolt, BillType.water => Icons.water_drop };
-            final cs = Theme.of(context).colorScheme;
+            final icon = switch (bill.type) {
+              BillType.rent => Icons.home,
+              BillType.electricity => Icons.bolt,
+              BillType.water => Icons.water_drop,
+            };
             final isDark = Theme.of(context).brightness == Brightness.dark;
             final billColor = switch (bill.type) {
               BillType.rent => const Color(0xFF6366F1),
@@ -1203,7 +1746,8 @@ class _BillsTab extends ConsumerWidget {
               child: ListTile(
                 tileColor: Colors.transparent,
                 leading: Container(
-                  width: 40, height: 40,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     color: billColor.withValues(alpha: isDark ? 0.18 : 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -1211,13 +1755,24 @@ class _BillsTab extends ConsumerWidget {
                   child: Center(child: Icon(icon, size: 20, color: billColor)),
                 ),
                 title: Text(bill.typeName),
-                subtitle: Text('Paid by $paidBy • ${DateFormat('dd MMM').format(bill.date)}'),
-                trailing: Text('₹${bill.amount.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.bold, color: billColor)),
-                onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
+                subtitle: Text(
+                  'Paid by $paidBy • ${DateFormat('dd MMM').format(bill.date)}',
+                ),
+                trailing: Text(
+                  '₹${bill.amount.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: billColor,
+                  ),
+                ),
+                onTap: () =>
+                    showViewBillSheet(context, roomId: roomId, bill: bill),
               ),
             );
 
-            if (!isAdmin) return card;
+            if (!(room?.canWrite(userId) ?? false) ||
+                !(isAdmin || bill.paidBy == userId))
+              return card;
 
             return Dismissible(
               key: Key(bill.id),
@@ -1232,25 +1787,41 @@ class _BillsTab extends ConsumerWidget {
                 child: const Icon(Icons.delete, color: Colors.white),
               ),
               confirmDismiss: (_) async {
-                return await showDialog<bool>(
+                final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('Delete Bill'),
                     content: Text('Delete "${bill.typeName}"?'),
                     actions: [
                       TextButton(
-                          onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel')),
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                        child: const Text(
+                          'Delete',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
                     ],
                   ),
                 );
-              },
-              onDismissed: (_) {
-                ref.read(deleteRoomBillProvider)(roomId, bill, userId);
+                if (confirmed == true) {
+                  try {
+                    await ref.read(deleteRoomBillProvider)(
+                      roomId,
+                      bill,
+                      userId,
+                    );
+                  } catch (e) {
+                    if (context.mounted)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Unable to delete bill: $e')),
+                      );
+                  }
+                }
+                return false;
               },
               child: card,
             );
@@ -1320,7 +1891,26 @@ class _SettlementsTab extends ConsumerWidget {
     final userId = ref.watch(currentUserIdProvider);
     final balanceKey = MonthBalanceKey(roomId: roomId, month: month);
     final detailedMap = ref.watch(detailedDebtsMapProvider(balanceKey));
-    final members = ref.watch(currentRoomProvider)?.memberIds ?? [];
+    final expenseState = ref.watch(
+      monthExpensesProvider(MonthRoomKey(roomId: roomId, month: month)),
+    );
+    final billState = ref.watch(
+      billsStreamProvider(MonthBillKey(roomId: roomId, month: month)),
+    );
+    final paymentState = ref.watch(settlementsStreamProvider(roomId));
+    if (expenseState.hasError || billState.hasError || paymentState.hasError) {
+      return const Center(
+        child: Text('Unable to load balances. Please try again.'),
+      );
+    }
+    if (expenseState.isLoading ||
+        billState.isLoading ||
+        paymentState.isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final members = ref.watch(monthParticipantIdsProvider(balanceKey));
+    final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+    final payments = paymentState.valueOrNull ?? [];
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
@@ -1338,7 +1928,7 @@ class _SettlementsTab extends ConsumerWidget {
     }
 
     if (pairs.isEmpty) {
-      return const Center(child: Text('No members in this room'));
+      return const Center(child: Text('No expenses or payments this month'));
     }
 
     return ListView(
@@ -1351,6 +1941,11 @@ class _SettlementsTab extends ConsumerWidget {
           nameMap: nameMap,
           userId: userId,
           roomId: roomId,
+          month: month,
+          canSettle: room != null && !room.isArchived && !room.isLocked,
+          settlements: payments
+              .where((s) => s.effectiveMonth == month)
+              .toList(),
         );
       }).toList(),
     );

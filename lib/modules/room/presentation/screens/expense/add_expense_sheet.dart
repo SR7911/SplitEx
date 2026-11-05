@@ -4,12 +4,17 @@ import 'package:split_ex/modules/room/dependencies.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/modules/room/presentation/config/room_constants.dart';
 import 'package:split_ex/modules/room/domain/entities/expense_model.dart';
+import 'package:split_ex/modules/room/domain/policies/split_calculator.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
 import 'package:split_ex/modules/room/presentation/widgets/receipt_picker.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
 
-void showAddExpenseSheet(BuildContext context, {required String roomId, DateTime? initialDate}) {
+void showAddExpenseSheet(
+  BuildContext context, {
+  required String roomId,
+  DateTime? initialDate,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -65,10 +70,16 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final room = ref.read(currentRoomProvider);
+    final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
     if (room == null) return;
 
     final userId = ref.read(currentUserIdProvider);
+    if (!room.canWrite(userId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This room is read-only for you.')),
+      );
+      return;
+    }
     List<String> splitAmong;
 
     switch (_splitType) {
@@ -116,9 +127,9 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
       if (mounted) Navigator.pop(context);
     } on Exception catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.toString())));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -127,7 +138,7 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final room = ref.watch(currentRoomProvider);
+    final room = ref.watch(roomStreamProvider(widget.roomId)).valueOrNull;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
@@ -152,7 +163,9 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                     height: 5,
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
@@ -160,7 +173,11 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                 // Header
                 Row(
                   children: [
-                    Icon(Icons.add_circle_outline, color: Theme.of(context).colorScheme.primary, size: 24),
+                    Icon(
+                      Icons.add_circle_outline,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
+                    ),
                     const SizedBox(width: 10),
                     Text(
                       'Add Expense',
@@ -179,15 +196,35 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   decoration: InputDecoration(
                     labelText: 'Title',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.receipt_long, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    prefixIcon: Icon(
+                      Icons.receipt_long,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
                     hintText: 'e.g. Groceries, Electricity',
-                    hintStyle: TextStyle(fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                    hintStyle: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty ? 'Enter title' : null,
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Enter title' : null,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
@@ -199,11 +236,25 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   decoration: InputDecoration(
                     labelText: 'Amount (₹)',
                     labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(Icons.currency_rupee, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                    prefixIcon: Icon(
+                      Icons.currency_rupee,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
                     filled: true,
-                    fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    fillColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Enter amount';
@@ -224,16 +275,43 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                         value: _category,
                         decoration: InputDecoration(
                           labelText: 'Category',
-                          labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                          prefixIcon: Icon(Icons.category, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)),
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.normal,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.category,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.5),
+                          ),
                           filled: true,
-                          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          fillColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.5),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
                         ),
                         items: RoomConstants.expenseCategories
-                            .map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 14))))
+                            .map(
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(
+                                  c,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            )
                             .toList(),
                         onChanged: (v) => setState(() => _category = v!),
                         isExpanded: true,
@@ -244,19 +322,34 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.calendar_today, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                            Icon(
+                              Icons.calendar_today,
+                              size: 18,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               DateFormat('dd MMM yyyy').format(_date),
-                              style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.normal,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
@@ -269,7 +362,8 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                 // Receipt picker
                 Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: ReceiptPicker(
@@ -288,13 +382,18 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.splitscreen_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                          Icon(
+                            Icons.splitscreen_rounded,
+                            size: 18,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Split method',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -303,21 +402,39 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                         width: double.infinity,
                         child: SegmentedButton<SplitType>(
                           segments: const [
-                            ButtonSegment(value: SplitType.equal, label: Text('Equal')),
-                            ButtonSegment(value: SplitType.dynamic, label: Text('Custom')),
-                            ButtonSegment(value: SplitType.oneToOne, label: Text('1-to-1')),
+                            ButtonSegment(
+                              value: SplitType.equal,
+                              label: Text('Equal'),
+                            ),
+                            ButtonSegment(
+                              value: SplitType.dynamic,
+                              label: Text('Custom'),
+                            ),
+                            ButtonSegment(
+                              value: SplitType.oneToOne,
+                              label: Text('1-to-1'),
+                            ),
                           ],
                           selected: {_splitType},
-                          onSelectionChanged: (v) => setState(() { _splitType = v.first; _selectedMembers = [];}),
+                          onSelectionChanged: (v) => setState(() {
+                            _splitType = v.first;
+                            _selectedMembers = [];
+                          }),
                           style: ButtonStyle(
                             visualDensity: VisualDensity.compact,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            backgroundColor: MaterialStateProperty.resolveWith((states) {
-                              if (states.contains(MaterialState.selected)) return Theme.of(context).colorScheme.primary;
+                            backgroundColor: MaterialStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(MaterialState.selected))
+                                return Theme.of(context).colorScheme.primary;
                               return Colors.transparent;
                             }),
-                            foregroundColor: MaterialStateProperty.resolveWith((states) {
-                              if (states.contains(MaterialState.selected)) return Colors.white;
+                            foregroundColor: MaterialStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(MaterialState.selected))
+                                return Colors.white;
                               return Theme.of(context).colorScheme.onSurface;
                             }),
                           ),
@@ -332,7 +449,10 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   const SizedBox(height: 20),
                   Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.all(12),
@@ -341,13 +461,21 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.people_alt_rounded, size: 18, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                            Icon(
+                              Icons.people_alt_rounded,
+                              size: 18,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
                             const SizedBox(width: 8),
                             Text(
                               _splitType == SplitType.oneToOne
                                   ? 'Who owes the full amount?'
                                   : 'Share with:',
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -364,11 +492,23 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                   onPressed: _isLoading ? null : _save,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
                   child: _isLoading
-                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Add Expense', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Add Expense',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -410,21 +550,25 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
                 if (_splitType == SplitType.oneToOne) {
                   _selectedMembers = checked ? [memberId] : [];
                 } else {
-                  if (checked) {
-                    _selectedMembers.addAll([memberId, userId]);
-                    _selectedMembers = _selectedMembers.toSet().toList();
-                  } else {
-                    _selectedMembers = _selectedMembers
-                        .where((id) => id != memberId && id != userId)
-                        .toList();
-                  }
+                  _selectedMembers = SplitCalculator.updateDynamicParticipants(
+                    selected: _selectedMembers,
+                    payerId: userId,
+                    memberId: memberId,
+                    included: checked,
+                  );
                 }
               });
             },
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            selectedColor: Theme.of(
+              context,
+            ).colorScheme.primary.withValues(alpha: 0.2),
             checkmarkColor: Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
           );
         }).toList(),
       ),

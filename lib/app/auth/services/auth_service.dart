@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
+  final Future<void> Function(String userId)? beforeDeleteAccount;
+  AuthService({this.beforeDeleteAccount});
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
@@ -14,7 +16,10 @@ class AuthService {
   }
 
   Future<UserCredential> signUpWithEmail(String email, String password) {
-    return _auth.createUserWithEmailAndPassword(email: email, password: password);
+    return _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
   }
 
   Future<UserCredential?> signInWithGoogle() async {
@@ -35,7 +40,10 @@ class AuthService {
   }
 
   Future<void> deleteAccount() async {
-    await _auth.currentUser?.delete();
+    final user = _auth.currentUser;
+    if (user == null) return;
+    await beforeDeleteAccount?.call(user.uid);
+    await user.delete();
   }
 
   Future<void> signOut() async {

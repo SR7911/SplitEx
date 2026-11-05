@@ -12,22 +12,70 @@ import 'package:split_ex/modules/notifications/providers/notification_provider.d
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/expense_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/bill_provider.dart';
 
 class SettlementScreen extends ConsumerWidget {
   final String roomId;
   final Debt debt;
   final Map<String, String> nameMap;
+  final String? ledgerMonth;
 
   const SettlementScreen({
     super.key,
     required this.roomId,
     required this.debt,
     required this.nameMap,
+    this.ledgerMonth,
   });
+
+  String get _month =>
+      ledgerMonth ?? DateFormat('yyyy-MM').format(DateTime.now());
+
+  bool _canPay(WidgetRef ref) {
+    final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+    final expenses = ref
+        .watch(
+          monthExpensesProvider(MonthRoomKey(roomId: roomId, month: _month)),
+        )
+        .valueOrNull;
+    final bills = ref
+        .watch(billsStreamProvider(MonthBillKey(roomId: roomId, month: _month)))
+        .valueOrNull;
+    final payments = ref.watch(settlementsStreamProvider(roomId)).valueOrNull;
+    if (room == null ||
+        room.isArchived ||
+        room.isLocked ||
+        expenses == null ||
+        bills == null ||
+        payments == null)
+      return false;
+    var remaining = BalanceService().pairBalance(
+      from: debt.from,
+      to: debt.to,
+      expenses: expenses,
+      bills: bills,
+      legacyBillMemberIds: room.billFallbackMemberIds,
+    );
+    for (final s in payments.where(
+      (s) =>
+          s.effectiveMonth == _month && s.status != SettlementStatus.cancelled,
+    )) {
+      final forward = s.fromUserId == debt.from && s.toUserId == debt.to;
+      final reverse = s.fromUserId == debt.to && s.toUserId == debt.from;
+      if ((forward || reverse) && s.status == SettlementStatus.pending)
+        return false;
+      if (forward) remaining -= s.amount;
+      if (reverse) remaining += s.amount;
+    }
+    return debt.amount > 0.005 && debt.amount <= remaining + 0.005;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserIdProvider);
+    final canPay = _canPay(ref);
     final isDebtor = debt.from == userId;
     final isCreditor = debt.to == userId;
     final otherPartyName = isDebtor
@@ -42,78 +90,101 @@ class SettlementScreen extends ConsumerWidget {
       ),
       body: GradientBody(
         child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Amount card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(
-                      isDebtor ? Icons.payment : Icons.request_page,
-                      size: 48,
-                      color: isDebtor ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      isDebtor ? 'Pay $otherPartyName' : 'Receive from $otherPartyName',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '₹${debt.amount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isDebtor ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary,
-                          ),
-                    ),
-                  ],
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Amount card
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Icon(
+                        isDebtor ? Icons.payment : Icons.request_page,
+                        size: 48,
+                        color: isDebtor
+                            ? Theme.of(context).colorScheme.error
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        isDebtor
+                            ? 'Pay $otherPartyName'
+                            : 'Receive from $otherPartyName',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '₹${debt.amount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.headlineLarge
+                            ?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isDebtor
+                                  ? Theme.of(context).colorScheme.error
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Different buttons for debtor vs creditor
-            if (isDebtor) ...[
-              FilledButton.icon(
-                onPressed: () => _launchUpi(context, ref, otherPartyName),
-                icon: const Icon(Icons.account_balance_wallet),
-                label: const Text('Pay via UPI'),
-                style: FilledButton.styleFrom(padding: const EdgeInsets.all(16)),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => _markAsPaid(context, ref),
-                icon: const Icon(Icons.check),
-                label: const Text('Mark as Paid (Cash/Bank)'),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
-              ),
-            ] else if (isCreditor) ...[
-              OutlinedButton.icon(
-                onPressed: () => _sendReminder(context, ref),
-                icon: const Icon(Icons.notifications_active),
-                label: const Text('Send Reminder'),
-                style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
-              ),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Back'),
+              // Different buttons for debtor vs creditor
+              if (isDebtor) ...[
+                FilledButton.icon(
+                  onPressed: canPay
+                      ? () => _launchUpi(context, ref, otherPartyName)
+                      : null,
+                  icon: const Icon(Icons.account_balance_wallet),
+                  label: const Text('Pay via UPI'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: canPay ? () => _markAsPaid(context, ref) : null,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Mark as Paid (Cash/Bank)'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                  ),
+                ),
+              ] else if (isCreditor) ...[
+                OutlinedButton.icon(
+                  onPressed: () => _sendReminder(context, ref),
+                  icon: const Icon(Icons.notifications_active),
+                  label: const Text('Send Reminder'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Back'),
+                ),
+              ],
+
+              const SizedBox(height: 24),
+              AppSectionHeader(title: 'Settlement History'),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _SettlementHistory(
+                  roomId: roomId,
+                  nameMap: nameMap,
+                  memberA: debt.from,
+                  memberB: debt.to,
+                  month: _month,
+                ),
               ),
             ],
-
-            const SizedBox(height: 24),
-            AppSectionHeader(title: 'Settlement History'),
-            const SizedBox(height: 8),
-            Expanded(child: _SettlementHistory(roomId: roomId, nameMap: nameMap)),
-          ],
+          ),
         ),
       ),
-      )
     );
   }
 
@@ -124,14 +195,17 @@ class SettlementScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Send Reminder'),
         content: Text(
-            'Remind ${nameMap[debt.from] ?? debt.from} to pay ₹${debt.amount.toStringAsFixed(0)}?'),
+          'Remind ${nameMap[debt.from] ?? debt.from} to pay ₹${debt.amount.toStringAsFixed(0)}?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Send')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Send'),
+          ),
         ],
       ),
     );
@@ -147,24 +221,33 @@ class SettlementScreen extends ConsumerWidget {
         amount: debt.amount,
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reminder sent!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Reminder sent!')));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send reminder: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send reminder: $e')));
       }
     }
   }
 
-  Future<void> _launchUpi(BuildContext context, WidgetRef ref, String payeeName) async {
+  Future<void> _launchUpi(
+    BuildContext context,
+    WidgetRef ref,
+    String payeeName,
+  ) async {
     // First check if the debt might already be settled (avoid duplicate)
-    final existingSettlements = ref.read(settlementsStreamProvider(roomId)).valueOrNull ?? [];
+    final existingSettlements =
+        ref.read(settlementsStreamProvider(roomId)).valueOrNull ?? [];
     final alreadySettled = existingSettlements.any(
-      (s) => s.fromUserId == debt.from && s.toUserId == debt.to && s.amount == debt.amount && s.status == SettlementStatus.confirmed,
+      (s) =>
+          s.fromUserId == debt.from &&
+          s.toUserId == debt.to &&
+          s.effectiveMonth == _month &&
+          s.status == SettlementStatus.pending,
     );
     if (alreadySettled) {
       if (!context.mounted) return;
@@ -195,7 +278,9 @@ class SettlementScreen extends ConsumerWidget {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Cannot Initiate UPI Payment'),
-          content: Text(errorMsg ?? '${nameMap[debt.to] ?? debt.to} has not set a UPI ID.'),
+          content: Text(
+            errorMsg ?? '${nameMap[debt.to] ?? debt.to} has not set a UPI ID.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -215,8 +300,10 @@ class SettlementScreen extends ConsumerWidget {
     }
 
     // Attempt to launch UPI app
-    final launched = await ref.read(upiServiceProvider).launchPayment(
-          upiId: upiId!,
+    final launched = await ref
+        .read(upiServiceProvider)
+        .launchPayment(
+          upiId: upiId,
           payeeName: payeeName,
           amount: debt.amount,
           note: 'SplitEx settlement',
@@ -231,7 +318,9 @@ class SettlementScreen extends ConsumerWidget {
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
           title: const Text('Payment Initiated'),
-          content: const Text('Has the payment been completed successfully in the UPI app?'),
+          content: const Text(
+            'Has the payment been completed successfully in the UPI app?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -246,17 +335,21 @@ class SettlementScreen extends ConsumerWidget {
       );
 
       if (paymentConfirmed == true) {
-        await _createSettlement(ref);
+        if (!await _createSettlement(context, ref)) return;
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Settlement recorded!')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Settlement recorded!')));
           Navigator.pop(context);
         }
       } else {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Settlement not recorded. You can try again or mark as paid manually.')),
+            const SnackBar(
+              content: Text(
+                'Settlement not recorded. You can try again or mark as paid manually.',
+              ),
+            ),
           );
         }
       }
@@ -266,7 +359,9 @@ class SettlementScreen extends ConsumerWidget {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('No UPI App Found'),
-          content: const Text('No UPI app detected on this device. You can mark the payment as done manually.'),
+          content: const Text(
+            'No UPI app detected on this device. You can mark the payment as done manually.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -287,9 +382,14 @@ class SettlementScreen extends ConsumerWidget {
 
   Future<void> _markAsPaid(BuildContext context, WidgetRef ref) async {
     // Check again for duplicate settlement
-    final existingSettlements = ref.read(settlementsStreamProvider(roomId)).valueOrNull ?? [];
+    final existingSettlements =
+        ref.read(settlementsStreamProvider(roomId)).valueOrNull ?? [];
     final alreadySettled = existingSettlements.any(
-      (s) => s.fromUserId == debt.from && s.toUserId == debt.to && s.amount == debt.amount && s.status == SettlementStatus.confirmed,
+      (s) =>
+          s.fromUserId == debt.from &&
+          s.toUserId == debt.to &&
+          s.effectiveMonth == _month &&
+          s.status == SettlementStatus.pending,
     );
     if (alreadySettled) {
       if (!context.mounted) return;
@@ -305,24 +405,27 @@ class SettlementScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Confirm Payment'),
         content: Text(
-            'Mark ₹${debt.amount.toStringAsFixed(2)} as paid to ${nameMap[debt.to] ?? debt.to}?'),
+          'Mark ₹${debt.amount.toStringAsFixed(2)} as paid to ${nameMap[debt.to] ?? debt.to}?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Confirm')),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirm'),
+          ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      await _createSettlement(ref);
+      if (!await _createSettlement(context, ref)) return;
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settlement recorded!')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Settlement recorded!')));
         // Wait a moment so user sees the success message, then pop
         await Future.delayed(const Duration(milliseconds: 800));
         if (context.mounted) Navigator.pop(context);
@@ -330,26 +433,47 @@ class SettlementScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _createSettlement(WidgetRef ref) async {
-    final settlement = SettlementModel(
-      id: '',
-      roomId: roomId,
-      fromUserId: debt.from,
-      toUserId: debt.to,
-      amount: debt.amount,
-      createdAt: DateTime.now(),
-    );
-    await ref.read(recordRoomSettlementProvider)(roomId, settlement,
-      payerName: nameMap[debt.from] ?? debt.from,
-      payeeName: nameMap[debt.to] ?? debt.to,
-    );
+  Future<bool> _createSettlement(BuildContext context, WidgetRef ref) async {
+    try {
+      final settlement = SettlementModel(
+        id: '',
+        roomId: roomId,
+        fromUserId: debt.from,
+        toUserId: debt.to,
+        amount: double.parse(debt.amount.toStringAsFixed(2)),
+        ledgerMonth: _month,
+        createdAt: DateTime.now(),
+      );
+      await ref.read(recordRoomSettlementProvider)(
+        roomId,
+        settlement,
+        payerName: nameMap[debt.from] ?? debt.from,
+        payeeName: nameMap[debt.to] ?? debt.to,
+      );
+      return true;
+    } catch (e) {
+      if (context.mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to record payment: $e')));
+      return false;
+    }
   }
 }
 
 class _SettlementHistory extends ConsumerWidget {
   final String roomId;
   final Map<String, String> nameMap;
-  const _SettlementHistory({required this.roomId, required this.nameMap});
+  final String memberA;
+  final String memberB;
+  final String month;
+  const _SettlementHistory({
+    required this.roomId,
+    required this.nameMap,
+    required this.memberA,
+    required this.memberB,
+    required this.month,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -358,7 +482,15 @@ class _SettlementHistory extends ConsumerWidget {
     return settlementsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Text('Error: $e'),
-      data: (settlements) {
+      data: (allSettlements) {
+        final settlements = allSettlements
+            .where(
+              (s) =>
+                  s.effectiveMonth == month &&
+                  ((s.fromUserId == memberA && s.toUserId == memberB) ||
+                      (s.fromUserId == memberB && s.toUserId == memberA)),
+            )
+            .toList();
         if (settlements.isEmpty) {
           return const Center(child: Text('No settlements yet'));
         }
@@ -372,18 +504,22 @@ class _SettlementHistory extends ConsumerWidget {
             final isCancelled = s.status == SettlementStatus.cancelled;
             final isConfirmed = s.status == SettlementStatus.confirmed;
             final userId = ref.watch(currentUserIdProvider);
-            final canConfirm = isPending && s.toUserId == userId;
-            final canCancel = isPending && s.fromUserId == userId;
+            final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+            final open = room != null && !room.isArchived && !room.isLocked;
+            final canConfirm = open && isPending && s.toUserId == userId;
+            final canCancel = open && isPending && s.fromUserId == userId;
 
             return Card(
               child: ListTile(
                 leading: Icon(
-                  isPending ? Icons.hourglass_top : (isCancelled ? Icons.cancel : Icons.check_circle),
+                  isPending
+                      ? Icons.hourglass_top
+                      : (isCancelled ? Icons.cancel : Icons.check_circle),
                   color: isPending
                       ? Theme.of(context).colorScheme.tertiary
                       : isCancelled
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.primary,
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.primary,
                 ),
                 title: Text('$from → $to'),
                 subtitle: Text(
@@ -396,12 +532,17 @@ class _SettlementHistory extends ConsumerWidget {
                       FilledButton(
                         onPressed: () async {
                           try {
-                            await ref.read(confirmRoomSettlementProvider)(roomId, s, userId,
+                            await ref.read(confirmRoomSettlementProvider)(
+                              roomId,
+                              s,
+                              userId,
                               payerName: nameMap[s.fromUserId] ?? s.fromUserId,
                               payeeName: nameMap[s.toUserId] ?? s.toUserId,
                             );
                           } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed: $e')),
+                            );
                           }
                         },
                         child: const Text('Confirm'),
@@ -413,35 +554,80 @@ class _SettlementHistory extends ConsumerWidget {
                             context: context,
                             builder: (ctx) => AlertDialog(
                               title: const Text('Cancel Settlement'),
-                              content: const Text('Are you sure you want to cancel this pending settlement?'),
+                              content: const Text(
+                                'Are you sure you want to cancel this pending settlement?',
+                              ),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-                                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes, Cancel')),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('No'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Yes, Cancel'),
+                                ),
                               ],
                             ),
                           );
                           if (confirm == true) {
                             try {
-                              await ref.read(settlementServiceProvider).cancelSettlement(roomId, s.id);
+                              await ref
+                                  .read(settlementServiceProvider)
+                                  .cancelSettlement(
+                                    roomId,
+                                    s.id,
+                                    performedBy: userId,
+                                  );
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Settlement cancelled')),
+                                  const SnackBar(
+                                    content: Text('Settlement cancelled'),
+                                  ),
                                 );
                               }
                             } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to cancel: $e')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to cancel: $e')),
+                              );
                             }
                           }
                         },
-                        icon: Icon(Icons.cancel, size: 18, color: Theme.of(context).colorScheme.error),
-                        label: Text('Cancel', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                        icon: Icon(
+                          Icons.cancel,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        label: Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                       ),
                     if (isConfirmed)
-                      Text('Done ✓', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Done ✓',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     if (isCancelled)
-                      Text('Cancelled', style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Cancelled',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     if (isPending && !canConfirm && !canCancel)
-                      Text('Pending', style: TextStyle(color: Theme.of(context).colorScheme.tertiary, fontWeight: FontWeight.bold)),
+                      Text(
+                        'Pending',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.tertiary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                   ],
                 ),
               ),

@@ -4,6 +4,7 @@ import 'package:split_ex/app/auth/providers/auth_provider.dart';
 import 'package:split_ex/modules/room/presentation/providers/dashboard_provider.dart';
 import 'package:split_ex/modules/notifications/providers/notification_provider.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/expense_provider.dart';
 import 'package:split_ex/modules/room/presentation/screens/settlement/settlement_screen.dart';
 import 'package:split_ex/modules/room/presentation/screens/settlement/upi_id_dialog.dart';
 import 'package:split_ex/modules/room/domain/policies/balance_service.dart';
@@ -31,7 +32,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => UpiIdDialog(userId: ref.read(currentUserIdProvider), allowSkip: true),
+        builder: (_) => UpiIdDialog(
+          userId: ref.read(currentUserIdProvider),
+          allowSkip: true,
+        ),
       );
     }
   }
@@ -40,7 +44,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final balance = ref.watch(currentUserBalanceProvider(widget.roomId));
     final userDebts = ref.watch(currentUserDebtsProvider(widget.roomId));
-    final allDebts = ref.watch(simplifiedDebtsProvider(widget.roomId));
+    final allDebts = ref.watch(
+      monthPairDebtsProvider(
+        MonthBalanceKey(
+          roomId: widget.roomId,
+          month: ref.watch(currentMonthProvider),
+        ),
+      ),
+    );
     final userId = ref.watch(currentUserIdProvider);
     final roomAsync = ref.watch(roomStreamProvider(widget.roomId));
 
@@ -53,7 +64,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (room) {
           if (room == null) return const Center(child: Text('Room not found'));
-          final members = room.memberIds;
+          final members = room.historicalMemberIds;
           final membersAsync = ref.watch(userProfilesByIdsProvider(members));
 
           return membersAsync.when(
@@ -72,27 +83,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   _BalanceSummaryCard(balance: balance),
                   const SizedBox(height: 20),
                   if (userDebts.isNotEmpty) ...[
-                    Text('Your Settlements', style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      'Your Settlements',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 8),
-                    ...userDebts.map((d) => _DebtTile(
-                          debt: d,
-                          currentUserId: userId,
-                          nameMap: nameMap,
-                          roomId: widget.roomId,
-                        )),
+                    ...userDebts.map(
+                      (d) => _DebtTile(
+                        debt: d,
+                        currentUserId: userId,
+                        nameMap: nameMap,
+                        roomId: widget.roomId,
+                      ),
+                    ),
                   ],
                   const SizedBox(height: 20),
-                  Text('All Settlements', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    'All Settlements',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 8),
                   if (allDebts.isEmpty)
                     const Text('All settled up! 🎉')
                   else
-                    ...allDebts.map((d) => _DebtTile(
-                          debt: d,
-                          currentUserId: userId,
-                          nameMap: nameMap,
-                          roomId: widget.roomId,
-                        )),
+                    ...allDebts.map(
+                      (d) => _DebtTile(
+                        debt: d,
+                        currentUserId: userId,
+                        nameMap: nameMap,
+                        roomId: widget.roomId,
+                      ),
+                    ),
                 ],
               );
             },
@@ -117,14 +138,18 @@ class _BalanceSummaryCard extends StatelessWidget {
     final color = isPositive
         ? const Color(0xFF10B981)
         : isNegative
-            ? const Color(0xFFF43F5E)
-            : cs.primary;
-    final label = isPositive ? 'You are owed' : isNegative ? 'You owe' : 'All settled up!';
+        ? const Color(0xFFF43F5E)
+        : cs.primary;
+    final label = isPositive
+        ? 'You are owed'
+        : isNegative
+        ? 'You owe'
+        : 'All settled up!';
     final icon = isPositive
         ? Icons.arrow_downward_rounded
         : isNegative
-            ? Icons.arrow_upward_rounded
-            : Icons.check_circle_rounded;
+        ? Icons.arrow_upward_rounded
+        : Icons.check_circle_rounded;
     final displayAmount = balance.abs();
 
     return Container(
@@ -158,7 +183,11 @@ class _BalanceSummaryCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.65), fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.onSurface.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 if (isPositive || isNegative)
@@ -167,13 +196,21 @@ class _BalanceSummaryCard extends StatelessWidget {
                     duration: const Duration(milliseconds: 600),
                     builder: (_, v, __) => Text(
                       '₹${v.toStringAsFixed(2)}',
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: color),
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
                     ),
                   )
                 else
                   Text(
                     'Great job! 🎉',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: color),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
                   ),
               ],
             ),
@@ -199,8 +236,12 @@ class _DebtTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fromName = debt.from == currentUserId ? 'You' : (nameMap[debt.from] ?? debt.from);
-    final toName = debt.to == currentUserId ? 'You' : (nameMap[debt.to] ?? debt.to);
+    final fromName = debt.from == currentUserId
+        ? 'You'
+        : (nameMap[debt.from] ?? debt.from);
+    final toName = debt.to == currentUserId
+        ? 'You'
+        : (nameMap[debt.to] ?? debt.to);
     final canRemind = debt.to == currentUserId;
     final canSettle = debt.from == currentUserId;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -212,7 +253,8 @@ class _DebtTile extends ConsumerWidget {
       child: ListTile(
         tileColor: Colors.transparent,
         leading: Container(
-          width: 40, height: 40,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             color: color.withValues(alpha: isDark ? 0.2 : 0.12),
             borderRadius: BorderRadius.circular(12),
@@ -242,17 +284,16 @@ class _DebtTile extends ConsumerWidget {
           children: [
             Text(
               '₹${debt.amount.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, color: color),
             ),
             if (canRemind)
               IconButton(
                 icon: const Icon(Icons.notifications_active, size: 20),
                 tooltip: 'Send Reminder',
                 onPressed: () {
-                  final helper = NotificationHelper(ref.read(notificationServiceProvider));
+                  final helper = NotificationHelper(
+                    ref.read(notificationServiceProvider),
+                  );
                   helper.sendReminder(
                     roomId: roomId,
                     fromName: nameMap[currentUserId] ?? 'You',

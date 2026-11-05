@@ -6,6 +6,7 @@ import 'package:split_ex/modules/room/dependencies.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/modules/room/presentation/config/room_constants.dart';
 import 'package:split_ex/modules/room/domain/entities/expense_model.dart';
+import 'package:split_ex/modules/room/domain/policies/split_calculator.dart';
 import 'package:split_ex/modules/room/domain/entities/room_expense_update.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
@@ -49,7 +50,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
     super.initState();
     _titleController = TextEditingController(text: widget.expense.title);
     _amountController = TextEditingController(
-      text: widget.expense.amount.toStringAsFixed(0),
+      text: widget.expense.amount.toStringAsFixed(2),
     );
     _category = widget.expense.category;
     _date = widget.expense.date;
@@ -66,9 +67,10 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
 
   bool get _canEdit {
     final userId = ref.read(currentUserIdProvider);
-    final room = ref.read(currentRoomProvider);
-    return widget.expense.createdBy == userId ||
-        (room?.isAdmin(userId) ?? false);
+    final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
+    return (room?.canWrite(userId) ?? false) &&
+        (widget.expense.createdBy == userId ||
+            (room?.isAdmin(userId) ?? false));
   }
 
   Future<void> _pickDate() async {
@@ -83,17 +85,20 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
   }
 
   Future<void> _save() async {
+    if (!_canEdit) return;
     if (_titleController.text.trim().isEmpty ||
         _amountController.text.trim().isEmpty)
       return;
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) return;
 
-    final room = ref.read(currentRoomProvider);
+    final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
     List<String> splitAmong;
     switch (_splitType) {
       case SplitType.equal:
-        splitAmong = room?.memberIds ?? widget.expense.splitAmong;
+        splitAmong = _splitType == widget.expense.splitType
+            ? widget.expense.splitAmong
+            : (room?.memberIds ?? widget.expense.splitAmong);
         break;
       case SplitType.dynamic:
         if (_selectedMembers.isEmpty) {
@@ -119,8 +124,17 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
     final userId = ref.read(currentUserIdProvider);
     try {
       await ref.read(editRoomExpenseProvider)(
-        widget.roomId, widget.expense,
-        RoomExpenseUpdate(title: _titleController.text.trim(), amount: amount, category: _category, date: _date, splitType: _splitType, splitAmong: splitAmong, month: DateFormat('yyyy-MM').format(_date)),
+        widget.roomId,
+        widget.expense,
+        RoomExpenseUpdate(
+          title: _titleController.text.trim(),
+          amount: amount,
+          category: _category,
+          date: _date,
+          splitType: _splitType,
+          splitAmong: splitAmong,
+          month: DateFormat('yyyy-MM').format(_date),
+        ),
         userId,
       );
       if (mounted) Navigator.pop(context);
@@ -203,8 +217,12 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final room = ref.watch(currentRoomProvider);
-    final members = room?.memberIds ?? [];
+    final room = ref.watch(roomStreamProvider(widget.roomId)).valueOrNull;
+    final members = {
+      ...?room?.memberIds,
+      ...widget.expense.splitAmong,
+      widget.expense.paidBy,
+    }.toList();
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
@@ -599,7 +617,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            _buildMemberChips(room.memberIds),
+                            _buildMemberChips(members),
                           ],
                         ),
                       ),
@@ -645,7 +663,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
   }
 
   Widget _buildMemberChips(List<String> memberIds) {
-    final userId = ref.read(currentUserIdProvider);
+    final userId = widget.expense.paidBy;
     final membersAsync = ref.watch(userProfilesByIdsProvider(memberIds));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
@@ -670,17 +688,12 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
               if (_splitType == SplitType.oneToOne) {
                 _selectedMembers = checked ? [memberId] : [];
               } else {
-                if (checked) {
-                  _selectedMembers = {
-                    ..._selectedMembers,
-                    memberId,
-                    userId,
-                  }.toList();
-                } else {
-                  _selectedMembers = _selectedMembers
-                      .where((id) => id != memberId && id != userId)
-                      .toList();
-                }
+                _selectedMembers = SplitCalculator.updateDynamicParticipants(
+                  selected: _selectedMembers,
+                  payerId: userId,
+                  memberId: memberId,
+                  included: checked,
+                );
               }
             });
           },

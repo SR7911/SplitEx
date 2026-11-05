@@ -16,6 +16,7 @@ class SettlementFirestoreMapper {
         upiRef: map['upiRef'],
         createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
         confirmedAt: (map['confirmedAt'] as Timestamp?)?.toDate(),
+        ledgerMonth: map['ledgerMonth'],
       );
 
   static Map<String, dynamic> toMap(SettlementModel settlement) => {
@@ -26,5 +27,6 @@ class SettlementFirestoreMapper {
     'status': settlement.status.name,
     'upiRef': settlement.upiRef,
     'createdAt': FieldValue.serverTimestamp(),
+    if (settlement.ledgerMonth != null) 'ledgerMonth': settlement.ledgerMonth,
   };
 }

@@ -17,55 +17,64 @@ class ActivityScreen extends ConsumerWidget {
     final activitiesAsync = ref.watch(activitiesStreamProvider(roomId));
     final roomAsync = ref.watch(roomStreamProvider(roomId));
 
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      appBar: const AppHeader(showBack: true, title: 'Activity Log', showNotification: false),
-      body: GradientBody(child: activitiesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (activities) {
-          if (activities.isEmpty) {
-            return const AppEmptyState(
-              icon: Icons.history_rounded,
-              title: 'No activity yet',
-              subtitle: 'Actions in this room will appear here',
-            );
-          }
-
-          final members = roomAsync.valueOrNull?.memberIds ?? [];
-          final membersAsync = ref.watch(userProfilesByIdsProvider(members));
-          final nameMap = <String, String>{};
-          if (membersAsync.hasValue) {
-            for (final m in membersAsync.value!) {
-              nameMap[m.uid] = m.name;
-            }
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: activities.length,
-            itemBuilder: (context, index) {
-              final activity = activities[index];
-              final showDateSeparator = index == 0 ||
-                  !_isSameDay(activities[index - 1].createdAt, activity.createdAt);
-
-              return Column(
-                children: [
-                  if (showDateSeparator)
-                    _DateSeparator(date: activity.createdAt),
-                  _ActivityTile(
-                    activity: activity,
-                    nameMap: nameMap,
-                  ),
-                ],
+      appBar: const AppHeader(
+        showBack: true,
+        title: 'Activity Log',
+        showNotification: false,
+      ),
+      body: GradientBody(
+        child: activitiesAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+          data: (activities) {
+            if (activities.isEmpty) {
+              return const AppEmptyState(
+                icon: Icons.history_rounded,
+                title: 'No activity yet',
+                subtitle: 'Actions in this room will appear here',
               );
-            },
-          );
-        },
-      )),
+            }
+
+            final members = {
+              ...?roomAsync.valueOrNull?.historicalMemberIds,
+              for (final activity in activities) activity.performedBy,
+            }.toList();
+            final membersAsync = ref.watch(userProfilesByIdsProvider(members));
+            final nameMap = <String, String>{};
+            if (membersAsync.hasValue) {
+              for (final m in membersAsync.value!) {
+                nameMap[m.uid] = m.name;
+              }
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: activities.length,
+              itemBuilder: (context, index) {
+                final activity = activities[index];
+                final showDateSeparator =
+                    index == 0 ||
+                    !_isSameDay(
+                      activities[index - 1].createdAt,
+                      activity.createdAt,
+                    );
+
+                return Column(
+                  children: [
+                    if (showDateSeparator)
+                      _DateSeparator(date: activity.createdAt),
+                    _ActivityTile(activity: activity, nameMap: nameMap),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ),
     );
   }
+
   static bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
@@ -97,7 +106,11 @@ class _DateSeparator extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               _label(),
-              style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.5), fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.5),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Expanded(child: Divider(color: cs.outlineVariant, thickness: 0.5)),
@@ -113,34 +126,34 @@ class _ActivityTile extends StatelessWidget {
   const _ActivityTile({required this.activity, required this.nameMap});
 
   IconData get _icon => switch (activity.type) {
-        ActivityType.expenseAdded => Icons.add_circle,
-        ActivityType.expenseEdited => Icons.edit,
-        ActivityType.expenseDeleted => Icons.delete,
-        ActivityType.settlementCreated => Icons.payment,
-        ActivityType.settlementConfirmed => Icons.check_circle,
-        ActivityType.memberJoined => Icons.person_add,
-        ActivityType.memberLeft => Icons.person_remove,
-        ActivityType.roomCreated => Icons.home,
-        ActivityType.roomSettingsChanged => Icons.settings,
-        ActivityType.billAdded => Icons.add_circle_outline,
-        ActivityType.billEdited => Icons.edit,
-        ActivityType.billDeleted => Icons.delete_outline,
-      };
+    ActivityType.expenseAdded => Icons.add_circle,
+    ActivityType.expenseEdited => Icons.edit,
+    ActivityType.expenseDeleted => Icons.delete,
+    ActivityType.settlementCreated => Icons.payment,
+    ActivityType.settlementConfirmed => Icons.check_circle,
+    ActivityType.memberJoined => Icons.person_add,
+    ActivityType.memberLeft => Icons.person_remove,
+    ActivityType.roomCreated => Icons.home,
+    ActivityType.roomSettingsChanged => Icons.settings,
+    ActivityType.billAdded => Icons.add_circle_outline,
+    ActivityType.billEdited => Icons.edit,
+    ActivityType.billDeleted => Icons.delete_outline,
+  };
 
   Color get _color => switch (activity.type) {
-        ActivityType.expenseAdded => Colors.green,
-        ActivityType.expenseEdited => Colors.blue,
-        ActivityType.expenseDeleted => Colors.red,
-        ActivityType.settlementCreated => Colors.orange,
-        ActivityType.settlementConfirmed => Colors.green,
-        ActivityType.memberJoined => Colors.teal,
-        ActivityType.memberLeft => Colors.grey,
-        ActivityType.roomCreated => Colors.purple,
-        ActivityType.roomSettingsChanged => Colors.amber,
-        ActivityType.billAdded => Colors.green,
-        ActivityType.billEdited => Colors.blue,
-        ActivityType.billDeleted => Colors.red,
-      };
+    ActivityType.expenseAdded => Colors.green,
+    ActivityType.expenseEdited => Colors.blue,
+    ActivityType.expenseDeleted => Colors.red,
+    ActivityType.settlementCreated => Colors.orange,
+    ActivityType.settlementConfirmed => Colors.green,
+    ActivityType.memberJoined => Colors.teal,
+    ActivityType.memberLeft => Colors.grey,
+    ActivityType.roomCreated => Colors.purple,
+    ActivityType.roomSettingsChanged => Colors.amber,
+    ActivityType.billAdded => Colors.green,
+    ActivityType.billEdited => Colors.blue,
+    ActivityType.billDeleted => Colors.red,
+  };
 
   String _actionText() {
     final actor = nameMap[activity.performedBy] ?? activity.performedBy;
@@ -150,7 +163,9 @@ class _ActivityTile extends StatelessWidget {
     if (meta != null && meta.isNotEmpty) {
       final title = meta['title'] ?? '';
       final amount = meta['amount'];
-      final amountStr = amount != null ? ' \u20B9${(amount as num).toStringAsFixed(0)}' : '';
+      final amountStr = amount != null
+          ? ' \u20B9${(amount as num).toStringAsFixed(0)}'
+          : '';
 
       return switch (activity.type) {
         ActivityType.expenseAdded => '$actor added "$title"$amountStr',
@@ -189,13 +204,19 @@ class _ActivityTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (amount != null)
-              _detailRow('Amount', '\u20B9${(amount as num).toStringAsFixed(2)}'),
+              _detailRow(
+                'Amount',
+                '\u20B9${(amount as num).toStringAsFixed(2)}',
+              ),
             _detailRow('Category', category),
             _detailRow('Paid by', paidByName),
             if (date.isNotEmpty) _detailRow('Date', date),
             if (splitNames.isNotEmpty) _detailRow('Split among', splitNames),
             if (splitAmount > 0)
-              _detailRow('Per person', '\u20B9${splitAmount.toStringAsFixed(2)}'),
+              _detailRow(
+                'Per person',
+                '\u20B9${splitAmount.toStringAsFixed(2)}',
+              ),
           ],
         ),
         actions: [
@@ -216,7 +237,10 @@ class _ActivityTile extends StatelessWidget {
         children: [
           SizedBox(
             width: 90,
-            child: Text('$label:', style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
           Expanded(child: Text(value)),
         ],
@@ -227,7 +251,8 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeStr = DateFormat('dd MMM, hh:mm a').format(activity.createdAt);
-    final hasDetails = activity.metadata != null && activity.metadata!.isNotEmpty;
+    final hasDetails =
+        activity.metadata != null && activity.metadata!.isNotEmpty;
 
     return InkWell(
       onTap: hasDetails ? () => _showDetails(context) : null,
@@ -241,7 +266,11 @@ class _ActivityTile extends StatelessWidget {
                 backgroundColor: _color.withValues(alpha: 0.15),
                 child: Icon(_icon, size: 18, color: _color),
               ),
-              Container(width: 2, height: 40, color: Theme.of(context).colorScheme.outlineVariant),
+              Container(
+                width: 2,
+                height: 40,
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ],
           ),
           const SizedBox(width: 12),
@@ -259,16 +288,17 @@ class _ActivityTile extends StatelessWidget {
                   Text(
                     timeStr,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
                   if (hasDetails)
                     Text(
                       'Tap for details',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                 ],
               ),

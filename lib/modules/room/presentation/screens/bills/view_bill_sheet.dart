@@ -44,7 +44,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
   void initState() {
     super.initState();
     _amountController = TextEditingController(
-      text: widget.bill.amount.toStringAsFixed(0),
+      text: widget.bill.amount.toStringAsFixed(2),
     );
     _billType = widget.bill.type;
     _date = widget.bill.date;
@@ -58,8 +58,9 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
 
   bool get _canEdit {
     final userId = ref.read(currentUserIdProvider);
-    final room = ref.read(currentRoomProvider);
-    return widget.bill.paidBy == userId || (room?.isAdmin(userId) ?? false);
+    final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
+    return (room?.canWrite(userId) ?? false) &&
+        (widget.bill.paidBy == userId || (room?.isAdmin(userId) ?? false));
   }
 
   Future<void> _pickDate() async {
@@ -74,6 +75,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
   }
 
   Future<void> _save() async {
+    if (!_canEdit) return;
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) return;
 
@@ -90,6 +92,7 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
               date: _date,
               month: DateFormat('yyyy-MM').format(_date),
             ),
+            performedBy: ref.read(currentUserIdProvider),
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -166,8 +169,12 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final room = ref.watch(currentRoomProvider);
-    final members = room?.memberIds ?? [];
+    final room = ref.watch(roomStreamProvider(widget.roomId)).valueOrNull;
+    final members = {
+      ...?room?.historicalMemberIds,
+      ...widget.bill.splitAmong,
+      widget.bill.paidBy,
+    }.toList();
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {

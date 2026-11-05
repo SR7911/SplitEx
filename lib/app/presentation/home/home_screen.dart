@@ -51,8 +51,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final userName = profile?.name ?? 'User';
 
     return Scaffold(
-      appBar: AppHeader(showDate: true, showHamburger: true, showNotification: true),
-      drawer: _AppDrawer(userName: userName, userId: userId, isDeveloper: isDeveloper),
+      appBar: AppHeader(
+        showDate: true,
+        showHamburger: true,
+        showNotification: true,
+      ),
+      drawer: _AppDrawer(
+        userName: userName,
+        userId: userId,
+        isDeveloper: isDeveloper,
+      ),
       body: GradientBody(
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
@@ -85,7 +93,11 @@ class _AppDrawer extends ConsumerWidget {
   final String userName;
   final String userId;
   final bool isDeveloper;
-  const _AppDrawer({required this.userName, required this.userId, required this.isDeveloper});
+  const _AppDrawer({
+    required this.userName,
+    required this.userId,
+    required this.isDeveloper,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,7 +105,6 @@ class _AppDrawer extends ConsumerWidget {
     final rooms = ref.watch(userRoomsProvider).valueOrNull ?? [];
     final hasRoom = rooms.isNotEmpty;
     final firstRoom = hasRoom ? rooms.first : null;
-    final isAdmin = firstRoom != null && firstRoom.isAdmin(userId);
 
     return Drawer(
       child: SafeArea(
@@ -101,7 +112,12 @@ class _AppDrawer extends ConsumerWidget {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.base),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.xl,
+                AppSpacing.xl,
+                AppSpacing.base,
+              ),
               child: Row(
                 children: [
                   CircleAvatar(
@@ -109,7 +125,11 @@ class _AppDrawer extends ConsumerWidget {
                     backgroundColor: cs.primary.withValues(alpha: 0.12),
                     child: Text(
                       userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.primary),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
@@ -117,7 +137,10 @@ class _AppDrawer extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(userName, style: AppTextStyles.sectionHeader(context)),
+                        Text(
+                          userName,
+                          style: AppTextStyles.sectionHeader(context),
+                        ),
                         Text('SplitEx', style: AppTextStyles.caption(context)),
                       ],
                     ),
@@ -133,13 +156,14 @@ class _AppDrawer extends ConsumerWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 children: [
-                  if (firstRoom != null && isAdmin)
+                  if (firstRoom != null)
                     _DrawerTile(
                       icon: Icons.settings_outlined,
                       label: 'Room Settings',
                       onTap: () {
                         Navigator.pop(context);
-                        ref.read(currentRoomProvider.notifier).state = firstRoom;
+                        ref.read(currentRoomProvider.notifier).state =
+                            firstRoom;
                         context.push('/room/${firstRoom.id}/settings');
                       },
                     ),
@@ -156,14 +180,19 @@ class _AppDrawer extends ConsumerWidget {
                   _DrawerTile(
                     icon: Icons.notifications_outlined,
                     label: 'Notifications',
-                    onTap: () { Navigator.pop(context); context.push('/notifications'); },
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/notifications');
+                    },
                   ),
                   _DrawerTile(
                     icon: Icons.settings_outlined,
                     label: 'Settings',
-                    onTap: () { Navigator.pop(context); context.push('/settings'); },
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/settings');
+                    },
                   ),
-
                 ],
               ),
             ),
@@ -171,7 +200,10 @@ class _AppDrawer extends ConsumerWidget {
             // Sign out at bottom
             Divider(color: AppColors.divider(context), height: 1),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
               child: _DrawerTile(
                 icon: Icons.logout_rounded,
                 label: 'Sign Out',
@@ -196,7 +228,13 @@ class _DrawerTile extends StatelessWidget {
   final String? subtitle;
   final Color? color;
   final VoidCallback? onTap;
-  const _DrawerTile({required this.icon, required this.label, this.subtitle, this.color, this.onTap});
+  const _DrawerTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.color,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -211,14 +249,22 @@ class _DrawerTile extends StatelessWidget {
       child: ListTile(
         tileColor: Colors.transparent,
         dense: true,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-        leading: Icon(icon, size: 20, color: effectiveColor.withValues(alpha: onTap != null ? 0.75 : 0.4)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        leading: Icon(
+          icon,
+          size: 20,
+          color: effectiveColor.withValues(alpha: onTap != null ? 0.75 : 0.4),
+        ),
         title: Text(
           label,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: onTap != null ? effectiveColor : effectiveColor.withValues(alpha: 0.4),
+            color: onTap != null
+                ? effectiveColor
+                : effectiveColor.withValues(alpha: 0.4),
           ),
         ),
         subtitle: subtitle != null
@@ -236,10 +282,22 @@ class _BottomNavBar extends StatelessWidget {
   const _BottomNavBar({required this.selectedIndex, required this.onTap});
 
   static const _items = [
-    (icon: Icons.account_balance_wallet_outlined, activeIcon: Icons.account_balance_wallet_rounded, label: 'Personal'),
-    (icon: Icons.groups_outlined, activeIcon: Icons.groups_rounded, label: 'Groups'),
+    (
+      icon: Icons.account_balance_wallet_outlined,
+      activeIcon: Icons.account_balance_wallet_rounded,
+      label: 'Personal',
+    ),
+    (
+      icon: Icons.groups_outlined,
+      activeIcon: Icons.groups_rounded,
+      label: 'Groups',
+    ),
     (icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Room'),
-    (icon: Icons.track_changes_outlined, activeIcon: Icons.track_changes_rounded, label: 'Tracker'),
+    (
+      icon: Icons.track_changes_outlined,
+      activeIcon: Icons.track_changes_rounded,
+      label: 'Tracker',
+    ),
   ];
 
   @override
@@ -258,7 +316,9 @@ class _BottomNavBar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isDark ? cs.surfaceContainerHigh : cs.surface,
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: cs.outline.withOpacity(isDark ? 0.15 : 0.08)),
+                border: Border.all(
+                  color: cs.outline.withOpacity(isDark ? 0.15 : 0.08),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: cs.primary.withOpacity(isDark ? 0.15 : 0.06),
@@ -308,12 +368,22 @@ class _BottomNavBar extends StatelessWidget {
                                   duration: const Duration(milliseconds: 280),
                                   width: selected ? 4 : 0,
                                   height: selected ? 4 : 0,
-                                  margin: EdgeInsets.only(bottom: selected ? 3 : 0),
+                                  margin: EdgeInsets.only(
+                                    bottom: selected ? 3 : 0,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: cs.primary,
                                     shape: BoxShape.circle,
                                     boxShadow: selected
-                                        ? [BoxShadow(color: cs.primary.withOpacity(0.6), blurRadius: 6, spreadRadius: 1)]
+                                        ? [
+                                            BoxShadow(
+                                              color: cs.primary.withOpacity(
+                                                0.6,
+                                              ),
+                                              blurRadius: 6,
+                                              spreadRadius: 1,
+                                            ),
+                                          ]
                                         : [],
                                   ),
                                 ),
@@ -323,7 +393,9 @@ class _BottomNavBar extends StatelessWidget {
                                     selected ? item.activeIcon : item.icon,
                                     key: ValueKey(selected),
                                     size: 22,
-                                    color: selected ? cs.primary : cs.onSurface.withOpacity(0.4),
+                                    color: selected
+                                        ? cs.primary
+                                        : cs.onSurface.withOpacity(0.4),
                                   ),
                                 ),
                                 const SizedBox(height: 3),
@@ -331,8 +403,12 @@ class _BottomNavBar extends StatelessWidget {
                                   duration: const Duration(milliseconds: 200),
                                   style: TextStyle(
                                     fontSize: 10,
-                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                                    color: selected ? cs.primary : cs.onSurface.withOpacity(0.4),
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                    color: selected
+                                        ? cs.primary
+                                        : cs.onSurface.withOpacity(0.4),
                                     letterSpacing: selected ? 0.2 : 0,
                                   ),
                                   child: Text(item.label),

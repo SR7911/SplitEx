@@ -14,12 +14,12 @@ import 'package:split_ex/modules/room/presentation/providers/settlement_provider
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
-const _kGreen  = Color(0xFF22C55E);
-const _kRed    = Color(0xFFEF4444);
-const _kBlue   = Color(0xFF3B82F6);
-const _kAmber  = Color(0xFFF59E0B);
+const _kGreen = Color(0xFF22C55E);
+const _kRed = Color(0xFFEF4444);
+const _kBlue = Color(0xFF3B82F6);
+const _kAmber = Color(0xFFF59E0B);
 const _kIndigo = Color(0xFF6366F1);
-const _kTeal   = Color(0xFF14B8A6);
+const _kTeal = Color(0xFF14B8A6);
 const _kPurple = Color(0xFF8B5CF6);
 
 const _kPalette = [_kBlue, _kGreen, _kAmber, _kIndigo, _kTeal, _kPurple, _kRed];
@@ -30,8 +30,8 @@ class RoomListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final roomsAsync = ref.watch(userRoomsProvider);
-    final profile   = ref.watch(userProfileProvider).valueOrNull;
-    final userName  = profile?.name ?? 'User';
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final userName = profile?.name ?? 'User';
 
     return Stack(
       children: [
@@ -61,12 +61,20 @@ class RoomListScreen extends ConsumerWidget {
                 const SizedBox(height: 20),
                 _RoomQuickActions(),
                 const SizedBox(height: 20),
-                AppSectionHeader(title: 'Your Rooms', actionLabel: null, onAction: null),
+                AppSectionHeader(
+                  title: 'Your Rooms',
+                  actionLabel: null,
+                  onAction: null,
+                ),
                 const SizedBox(height: 14),
-                ...rooms.asMap().entries.map((entry) => Padding(
-                  padding: EdgeInsets.only(bottom: entry.key == rooms.length - 1 ? 0 : 10),
-                  child: _RoomCard(room: entry.value, index: entry.key),
-                )),
+                ...rooms.asMap().entries.map(
+                  (entry) => Padding(
+                    padding: EdgeInsets.only(
+                      bottom: entry.key == rooms.length - 1 ? 0 : 10,
+                    ),
+                    child: _RoomCard(room: entry.value, index: entry.key),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 _RecentRoomActivities(),
               ],
@@ -74,7 +82,8 @@ class RoomListScreen extends ConsumerWidget {
           },
         ),
         Positioned(
-          bottom: 16, right: 16,
+          bottom: 16,
+          right: 16,
           child: FloatingActionButton(
             onPressed: () => context.push('/create-room'),
             child: const Icon(Icons.add),
@@ -104,7 +113,7 @@ class _GreetingHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs    = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final count = ref.watch(unreadCountProvider).valueOrNull ?? 0;
     return Row(
       children: [
@@ -114,12 +123,17 @@ class _GreetingHeader extends ConsumerWidget {
             children: [
               Text(
                 'My Rooms',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 4),
               Text(
                 'Manage shared living expenses',
-                style: TextStyle(fontSize: 13, color: cs.onSurface.withValues(alpha: 0.5)),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withValues(alpha: 0.5),
+                ),
               ),
             ],
           ),
@@ -150,34 +164,33 @@ class _RoomHeroCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark      = Theme.of(context).brightness == Brightness.dark;
-    final month       = DateFormat('yyyy-MM').format(DateTime.now());
-    final netBalance  = ref.watch(monthOverallBalanceProvider(month));
-    final isOwed      = netBalance > 0.01;
-    final owes        = netBalance < -0.01;
-    final isSettled   = !isOwed && !owes;
-    final activeRooms = rooms.where((r) => !r.isLocked).length;
-    final totalMembers = rooms.fold<int>(0, (s, r) => s + r.memberIds.length);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final month = DateFormat('yyyy-MM').format(DateTime.now());
+    final netBalance = ref.watch(monthOverallBalanceProvider(month));
+    final isOwed = netBalance > 0.01;
+    final owes = netBalance < -0.01;
+    final isSettled = !isOwed && !owes;
 
     final gradientColors = isOwed
         ? (isDark
-            ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
-            : [const Color(0xFF059669), const Color(0xFF0D9488)])
+              ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
+              : [const Color(0xFF059669), const Color(0xFF0D9488)])
         : owes
-            ? (isDark
-                ? [const Color(0xFF7F1D1D), const Color(0xFF831843)]
-                : [const Color(0xFFDC2626), const Color(0xFFDB2777)])
-            : (isDark
-                ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
-                : [const Color(0xFF059669), const Color(0xFF0D9488)]);
+        ? (isDark
+              ? [const Color(0xFF7F1D1D), const Color(0xFF831843)]
+              : [const Color(0xFFDC2626), const Color(0xFFDB2777)])
+        : (isDark
+              ? [const Color(0xFF064E3B), const Color(0xFF065F46)]
+              : [const Color(0xFF059669), const Color(0xFF0D9488)]);
 
-    final onCard      = Colors.white;
+    final onCard = Colors.white;
     final onCardMuted = Colors.white.withValues(alpha: 0.85);
 
     // Total spent this month across all rooms for progress bar
     double totalSpent = 0;
     for (final room in rooms) {
-      final expenses = ref.watch(expensesStreamProvider(room.id)).valueOrNull ?? [];
+      final expenses =
+          ref.watch(expensesStreamProvider(room.id)).valueOrNull ?? [];
       totalSpent += expenses.fold<double>(0, (s, e) => s + e.amount);
     }
 
@@ -202,10 +215,12 @@ class _RoomHeroCard extends ConsumerWidget {
         child: Stack(
           children: [
             Positioned(
-              top: -40, right: -40,
+              top: -40,
+              right: -40,
               child: IgnorePointer(
                 child: Container(
-                  width: 160, height: 160,
+                  width: 160,
+                  height: 160,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white.withValues(alpha: 0.06),
@@ -214,10 +229,12 @@ class _RoomHeroCard extends ConsumerWidget {
               ),
             ),
             Positioned(
-              bottom: -30, left: -30,
+              bottom: -30,
+              left: -30,
               child: IgnorePointer(
                 child: Container(
-                  width: 110, height: 110,
+                  width: 110,
+                  height: 110,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white.withValues(alpha: 0.05),
@@ -233,7 +250,10 @@ class _RoomHeroCard extends ConsumerWidget {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
@@ -243,28 +263,55 @@ class _RoomHeroCard extends ConsumerWidget {
                           children: [
                             Icon(Icons.home_rounded, size: 12, color: onCard),
                             const SizedBox(width: 5),
-                            Text('Room Expenses', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: onCard)),
+                            Text(
+                              'Room Expenses',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: onCard,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          isSettled ? 'All Settled' : isOwed ? 'You\'re Owed' : 'You Owe',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: onCard),
+                          isSettled
+                              ? 'All Settled'
+                              : isOwed
+                              ? 'You\'re Owed'
+                              : 'You Owe',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: onCard,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    isSettled ? 'Net Balance' : isOwed ? 'You\'re Owed' : 'You Owe',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: onCardMuted, letterSpacing: 0.3),
+                    isSettled
+                        ? 'Net Balance'
+                        : isOwed
+                        ? 'You\'re Owed'
+                        : 'You Owe',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: onCardMuted,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TweenAnimationBuilder<double>(
@@ -274,20 +321,38 @@ class _RoomHeroCard extends ConsumerWidget {
                     builder: (context, value, _) => Text(
                       isSettled ? '₹0' : '₹${value.toStringAsFixed(0)}',
                       style: TextStyle(
-                        fontSize: 42, fontWeight: FontWeight.w800,
-                        color: onCard, letterSpacing: -1.5, height: 1.1,
+                        fontSize: 42,
+                        fontWeight: FontWeight.w800,
+                        color: onCard,
+                        letterSpacing: -1.5,
+                        height: 1.1,
                       ),
                     ),
                   ),
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      AppHeroChip(icon: Icons.home_rounded,         label: 'Rooms',   value: '${rooms.length}',                        onCard: onCard, onCardMuted: onCardMuted),
+                      AppHeroChip(
+                        icon: Icons.home_rounded,
+                        label: 'Rooms',
+                        value: '${rooms.length}',
+                        onCard: onCard,
+                        onCardMuted: onCardMuted,
+                      ),
                       const SizedBox(width: 10),
-                      AppHeroChip(icon: Icons.receipt_long_rounded,  label: 'Spent',   value: '₹${totalSpent.toStringAsFixed(0)}',      onCard: onCard, onCardMuted: onCardMuted),
+                      AppHeroChip(
+                        icon: Icons.receipt_long_rounded,
+                        label: 'Spent',
+                        value: '₹${totalSpent.toStringAsFixed(0)}',
+                        onCard: onCard,
+                        onCardMuted: onCardMuted,
+                      ),
                       const Spacer(),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(14),
@@ -296,12 +361,31 @@ class _RoomHeroCard extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isSettled ? Icons.check_circle_rounded : isOwed ? Icons.south_rounded : Icons.north_rounded,
-                              size: 16, color: onCard,
+                              isSettled
+                                  ? Icons.check_circle_rounded
+                                  : isOwed
+                                  ? Icons.south_rounded
+                                  : Icons.north_rounded,
+                              size: 16,
+                              color: onCard,
                             ),
                             const SizedBox(height: 2),
-                            Text(isSettled ? '✓' : isOwed ? '+' : '-', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: onCard)),
-                            Text('net', style: TextStyle(fontSize: 9, color: onCardMuted)),
+                            Text(
+                              isSettled
+                                  ? '✓'
+                                  : isOwed
+                                  ? '+'
+                                  : '-',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: onCard,
+                              ),
+                            ),
+                            Text(
+                              'net',
+                              style: TextStyle(fontSize: 9, color: onCardMuted),
+                            ),
                           ],
                         ),
                       ),
@@ -312,34 +396,47 @@ class _RoomHeroCard extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('₹${totalSpent.toStringAsFixed(0)} spent this month', style: TextStyle(fontSize: 10, color: onCardMuted)),
-                        Text('${rooms.length} room${rooms.length != 1 ? 's' : ''}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: onCard)),
+                        Text(
+                          '₹${totalSpent.toStringAsFixed(0)} spent this month',
+                          style: TextStyle(fontSize: 10, color: onCardMuted),
+                        ),
+                        Text(
+                          '${rooms.length} room${rooms.length != 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: onCard,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Builder(builder: (_) {
-                      // Use net balance magnitude as a proxy: >5000 = high, >2000 = mid
-                      final absBalance = netBalance.abs();
-                      final spendLevel = totalSpent > 10000
-                          ? 1.0
-                          : totalSpent > 3000
-                              ? 0.65
-                              : 0.35;
-                      final barColor = owes
-                          ? const Color(0xFFFCA5A5)   // red-tinted when you owe
-                          : isOwed
-                              ? const Color(0xFF86EFAC) // green-tinted when owed
-                              : Colors.white.withValues(alpha: 0.9);
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: spendLevel,
-                          minHeight: 7,
-                          backgroundColor: Colors.white.withValues(alpha: 0.18),
-                          valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                        ),
-                      );
-                    }),
+                    Builder(
+                      builder: (_) {
+                        // Use net balance magnitude as a proxy: >5000 = high, >2000 = mid
+                        final spendLevel = totalSpent > 10000
+                            ? 1.0
+                            : totalSpent > 3000
+                            ? 0.65
+                            : 0.35;
+                        final barColor = owes
+                            ? const Color(0xFFFCA5A5) // red-tinted when you owe
+                            : isOwed
+                            ? const Color(0xFF86EFAC) // green-tinted when owed
+                            : Colors.white.withValues(alpha: 0.9);
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: spendLevel,
+                            minHeight: 7,
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.18,
+                            ),
+                            valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ],
               ),
@@ -360,15 +457,36 @@ class _RoomMiniStatRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final totalMembers = rooms.fold<int>(0, (s, r) => s + r.memberIds.length);
-    final lockedCount  = rooms.where((r) => r.isLocked).length;
+    final lockedCount = rooms.where((r) => r.isLocked).length;
 
     return Row(
       children: [
-        Expanded(child: AppMiniStatCard(label: 'Total Rooms',   value: '${rooms.length}', icon: Icons.home_rounded,    color: _kBlue)),
+        Expanded(
+          child: AppMiniStatCard(
+            label: 'Total Rooms',
+            value: '${rooms.length}',
+            icon: Icons.home_rounded,
+            color: _kBlue,
+          ),
+        ),
         const SizedBox(width: 10),
-        Expanded(child: AppMiniStatCard(label: 'Total Members', value: '$totalMembers',   icon: Icons.people_rounded,  color: _kTeal)),
+        Expanded(
+          child: AppMiniStatCard(
+            label: 'Total Members',
+            value: '$totalMembers',
+            icon: Icons.people_rounded,
+            color: _kTeal,
+          ),
+        ),
         const SizedBox(width: 10),
-        Expanded(child: AppMiniStatCard(label: 'Locked',        value: '$lockedCount',    icon: Icons.lock_rounded,    color: _kAmber)),
+        Expanded(
+          child: AppMiniStatCard(
+            label: 'Locked',
+            value: '$lockedCount',
+            icon: Icons.lock_rounded,
+            color: _kAmber,
+          ),
+        ),
       ],
     );
   }
@@ -382,24 +500,32 @@ class _RoomSummaryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs     = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final month  = DateFormat('yyyy-MM').format(DateTime.now());
 
     double totalSpent = 0;
-    int pendingCount  = 0;
+    int pendingCount = 0;
 
     for (final room in rooms) {
-      final expenses = ref.watch(expensesStreamProvider(room.id)).valueOrNull ?? [];
+      final expenses =
+          ref.watch(expensesStreamProvider(room.id)).valueOrNull ?? [];
       totalSpent += expenses.fold<double>(0, (s, e) => s + e.amount);
-      final userId = ref.watch(currentUserIdProvider);
-      final pending = ref.watch(pendingSettlementsProvider(room.id)).valueOrNull ?? [];
+      final pending =
+          ref.watch(pendingSettlementsProvider(room.id)).valueOrNull ?? [];
       pendingCount += pending.length;
     }
 
-    final spentRatio = totalSpent > 0 ? (totalSpent / (totalSpent + 1)).clamp(0.0, 1.0) : 0.0;
-    final statusColor = pendingCount == 0 ? _kGreen : pendingCount <= 2 ? _kAmber : _kRed;
-    final statusLabel = pendingCount == 0 ? 'All Settled' : '$pendingCount Pending';
+    final spentRatio = totalSpent > 0
+        ? (totalSpent / (totalSpent + 1)).clamp(0.0, 1.0)
+        : 0.0;
+    final statusColor = pendingCount == 0
+        ? _kGreen
+        : pendingCount <= 2
+        ? _kAmber
+        : _kRed;
+    final statusLabel = pendingCount == 0
+        ? 'All Settled'
+        : '$pendingCount Pending';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -421,7 +547,11 @@ class _RoomSummaryCard extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: AppSectionHeader(title: 'This Month', actionLabel: null, onAction: null),
+                child: AppSectionHeader(
+                  title: 'This Month',
+                  actionLabel: null,
+                  onAction: null,
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
@@ -429,7 +559,14 @@ class _RoomSummaryCard extends ConsumerWidget {
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(statusLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
               ),
             ],
           ),
@@ -473,7 +610,10 @@ class _RoomSummaryCard extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               '₹${totalSpent.toStringAsFixed(0)} across ${rooms.length} room${rooms.length != 1 ? 's' : ''} in ${DateFormat('MMMM').format(DateTime.now())}',
-              style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: 0.45),
+              ),
             ),
           ],
         ],
@@ -490,8 +630,12 @@ class _SummaryStatTile extends StatelessWidget {
   final bool isDark;
   final ColorScheme cs;
   const _SummaryStatTile({
-    required this.label, required this.value, required this.icon,
-    required this.color, required this.isDark, required this.cs,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.isDark,
+    required this.cs,
   });
 
   @override
@@ -506,8 +650,12 @@ class _SummaryStatTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, size: 16, color: color),
           ),
           const SizedBox(width: 10),
@@ -515,9 +663,23 @@ class _SummaryStatTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.5), fontWeight: FontWeight.w500)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
               ],
             ),
           ),
@@ -533,10 +695,30 @@ class _RoomQuickActions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      AppQuickActionTile(icon: Icons.add_rounded,              label: 'Create',   color: _kGreen,  onTap: () => context.push('/create-room')),
-      AppQuickActionTile(icon: Icons.login_rounded,            label: 'Join',     color: _kBlue,   onTap: () => context.push('/join-room')),
-      AppQuickActionTile(icon: Icons.handshake_outlined,       label: 'Settle',   color: _kTeal,   onTap: () => context.push('/settlement')),
-      AppQuickActionTile(icon: Icons.bar_chart_rounded,        label: 'Analytics',color: _kIndigo, onTap: () => context.push('/analytics')),
+      AppQuickActionTile(
+        icon: Icons.add_rounded,
+        label: 'Create',
+        color: _kGreen,
+        onTap: () => context.push('/create-room'),
+      ),
+      AppQuickActionTile(
+        icon: Icons.login_rounded,
+        label: 'Join',
+        color: _kBlue,
+        onTap: () => context.push('/join-room'),
+      ),
+      AppQuickActionTile(
+        icon: Icons.handshake_outlined,
+        label: 'Settle',
+        color: _kTeal,
+        onTap: () => context.push('/settlement'),
+      ),
+      AppQuickActionTile(
+        icon: Icons.bar_chart_rounded,
+        label: 'Analytics',
+        color: _kIndigo,
+        onTap: () => context.push('/analytics'),
+      ),
     ];
 
     return SizedBox(
@@ -560,10 +742,10 @@ class _RoomCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs      = Theme.of(context).colorScheme;
-    final isDark  = Theme.of(context).brightness == Brightness.dark;
-    final userId  = ref.read(currentUserIdProvider);
-    final accent  = _kPalette[index % _kPalette.length];
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userId = ref.read(currentUserIdProvider);
+    final accent = _kPalette[index % _kPalette.length];
     final isAdmin = room.isAdmin(userId);
 
     return InkWell(
@@ -577,7 +759,9 @@ class _RoomCard extends ConsumerWidget {
         child: Stack(
           children: [
             Positioned(
-              left: 0, top: 0, bottom: 0,
+              left: 0,
+              top: 0,
+              bottom: 0,
               child: Container(
                 width: 3,
                 decoration: BoxDecoration(
@@ -594,7 +778,8 @@ class _RoomCard extends ConsumerWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 46, height: 46,
+                    width: 46,
+                    height: 46,
                     decoration: BoxDecoration(
                       color: accent.withValues(alpha: isDark ? 0.15 : 0.1),
                       borderRadius: BorderRadius.circular(14),
@@ -602,7 +787,11 @@ class _RoomCard extends ConsumerWidget {
                     child: Center(
                       child: Text(
                         room.name[0].toUpperCase(),
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: accent),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: accent,
+                        ),
                       ),
                     ),
                   ),
@@ -613,32 +802,51 @@ class _RoomCard extends ConsumerWidget {
                       children: [
                         Text(
                           room.name,
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: cs.onSurface),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: cs.onSurface,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
                         Row(
                           children: [
-                            Icon(Icons.people_outline_rounded, size: 12, color: cs.onSurface.withValues(alpha: 0.4)),
+                            Icon(
+                              Icons.people_outline_rounded,
+                              size: 12,
+                              color: cs.onSurface.withValues(alpha: 0.4),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${room.memberIds.length} members',
-                              style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.45),
+                              ),
                             ),
                             Container(
                               margin: const EdgeInsets.symmetric(horizontal: 6),
-                              width: 3, height: 3,
+                              width: 3,
+                              height: 3,
                               decoration: BoxDecoration(
                                 color: cs.onSurface.withValues(alpha: 0.25),
                                 shape: BoxShape.circle,
                               ),
                             ),
-                            Icon(Icons.vpn_key_outlined, size: 11, color: cs.onSurface.withValues(alpha: 0.4)),
+                            Icon(
+                              Icons.vpn_key_outlined,
+                              size: 11,
+                              color: cs.onSurface.withValues(alpha: 0.4),
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               room.inviteCode,
-                              style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.45),
+                              ),
                             ),
                           ],
                         ),
@@ -648,26 +856,54 @@ class _RoomCard extends ConsumerWidget {
                   const SizedBox(width: 10),
                   if (room.isLocked)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: _kAmber.withValues(alpha: isDark ? 0.15 : 0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: _kAmber.withValues(alpha: 0.25)),
+                        border: Border.all(
+                          color: _kAmber.withValues(alpha: 0.25),
+                        ),
                       ),
-                      child: const Text('Locked', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _kAmber)),
+                      child: const Text(
+                        'Locked',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: _kAmber,
+                        ),
+                      ),
                     )
                   else if (isAdmin)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: accent.withValues(alpha: isDark ? 0.15 : 0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: accent.withValues(alpha: 0.25)),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.25),
+                        ),
                       ),
-                      child: Text('Admin', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accent)),
+                      child: Text(
+                        'Admin',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: accent,
+                        ),
+                      ),
                     )
                   else
-                    Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.3),
+                    ),
                 ],
               ),
             ),
@@ -683,8 +919,8 @@ class _RoomCard extends ConsumerWidget {
 class _RecentRoomActivities extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs         = Theme.of(context).colorScheme;
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final activities = ref.watch(recentActivitiesProvider);
 
     return Container(
@@ -704,7 +940,11 @@ class _RecentRoomActivities extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSectionHeader(title: 'Recent Activity', actionLabel: null, onAction: null),
+          AppSectionHeader(
+            title: 'Recent Activity',
+            actionLabel: null,
+            onAction: null,
+          ),
           const SizedBox(height: 14),
           if (activities.isEmpty)
             Padding(
@@ -713,15 +953,26 @@ class _RecentRoomActivities extends ConsumerWidget {
                 child: Column(
                   children: [
                     Container(
-                      width: 52, height: 52,
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Icon(Icons.history_rounded, size: 26, color: cs.onSurface.withValues(alpha: 0.3)),
+                      child: Icon(
+                        Icons.history_rounded,
+                        size: 26,
+                        color: cs.onSurface.withValues(alpha: 0.3),
+                      ),
                     ),
                     const SizedBox(height: 10),
-                    Text('No recent activity', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.4), fontSize: 13)),
+                    Text(
+                      'No recent activity',
+                      style: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -729,7 +980,7 @@ class _RecentRoomActivities extends ConsumerWidget {
           else
             ...activities.asMap().entries.map((entry) {
               final activity = entry.value;
-              final isLast   = entry.key == activities.length - 1;
+              final isLast = entry.key == activities.length - 1;
               return Padding(
                 padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
                 child: _ActivityRow(activity: activity, isDark: isDark, cs: cs),
@@ -745,35 +996,39 @@ class _ActivityRow extends StatelessWidget {
   final ActivityModel activity;
   final bool isDark;
   final ColorScheme cs;
-  const _ActivityRow({required this.activity, required this.isDark, required this.cs});
+  const _ActivityRow({
+    required this.activity,
+    required this.isDark,
+    required this.cs,
+  });
 
   IconData get _icon => switch (activity.type) {
-    ActivityType.expenseAdded       => Icons.add_circle_outline_rounded,
-    ActivityType.expenseEdited      => Icons.edit_outlined,
-    ActivityType.expenseDeleted     => Icons.delete_outline_rounded,
-    ActivityType.billAdded          => Icons.receipt_outlined,
-    ActivityType.billEdited         => Icons.edit_note_rounded,
-    ActivityType.billDeleted        => Icons.delete_outline_rounded,
-    ActivityType.settlementCreated  => Icons.handshake_outlined,
+    ActivityType.expenseAdded => Icons.add_circle_outline_rounded,
+    ActivityType.expenseEdited => Icons.edit_outlined,
+    ActivityType.expenseDeleted => Icons.delete_outline_rounded,
+    ActivityType.billAdded => Icons.receipt_outlined,
+    ActivityType.billEdited => Icons.edit_note_rounded,
+    ActivityType.billDeleted => Icons.delete_outline_rounded,
+    ActivityType.settlementCreated => Icons.handshake_outlined,
     ActivityType.settlementConfirmed => Icons.check_circle_outline_rounded,
-    ActivityType.memberJoined       => Icons.person_add_outlined,
-    ActivityType.memberLeft         => Icons.person_remove_outlined,
-    ActivityType.roomCreated        => Icons.home_outlined,
+    ActivityType.memberJoined => Icons.person_add_outlined,
+    ActivityType.memberLeft => Icons.person_remove_outlined,
+    ActivityType.roomCreated => Icons.home_outlined,
     ActivityType.roomSettingsChanged => Icons.settings_outlined,
   };
 
   Color get _accent => switch (activity.type) {
-    ActivityType.expenseAdded       => _kBlue,
-    ActivityType.expenseEdited      => _kIndigo,
-    ActivityType.expenseDeleted     => _kRed,
-    ActivityType.billAdded          => _kTeal,
-    ActivityType.billEdited         => _kTeal,
-    ActivityType.billDeleted        => _kRed,
-    ActivityType.settlementCreated  => _kAmber,
+    ActivityType.expenseAdded => _kBlue,
+    ActivityType.expenseEdited => _kIndigo,
+    ActivityType.expenseDeleted => _kRed,
+    ActivityType.billAdded => _kTeal,
+    ActivityType.billEdited => _kTeal,
+    ActivityType.billDeleted => _kRed,
+    ActivityType.settlementCreated => _kAmber,
     ActivityType.settlementConfirmed => _kGreen,
-    ActivityType.memberJoined       => _kGreen,
-    ActivityType.memberLeft         => _kAmber,
-    ActivityType.roomCreated        => _kBlue,
+    ActivityType.memberJoined => _kGreen,
+    ActivityType.memberLeft => _kAmber,
+    ActivityType.roomCreated => _kBlue,
     ActivityType.roomSettingsChanged => _kPurple,
   };
 
@@ -790,7 +1045,8 @@ class _ActivityRow extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 38, height: 38,
+            width: 38,
+            height: 38,
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(11),
@@ -804,14 +1060,21 @@ class _ActivityRow extends StatelessWidget {
               children: [
                 Text(
                   activity.description,
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface),
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   DateFormat('dd MMM • hh:mm a').format(activity.createdAt),
-                  style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: 0.45),
+                  ),
                 ),
               ],
             ),

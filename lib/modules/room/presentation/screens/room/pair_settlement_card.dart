@@ -3,15 +3,15 @@ import 'package:split_ex/modules/room/domain/entities/expense_model.dart';
 import 'package:split_ex/modules/room/presentation/providers/dashboard_provider.dart';
 import 'package:split_ex/modules/room/presentation/screens/settlement/settlement_screen.dart';
 import 'package:split_ex/modules/room/domain/policies/balance_service.dart';
+import 'package:split_ex/shared/domain/entities/settlement_model.dart';
 
-const _kGreen  = Color(0xFF22C55E);
-const _kRed    = Color(0xFFEF4444);
-const _kAmber  = Color(0xFFF59E0B);
-const _kBlue   = Color(0xFF3B82F6);
-const _kPalette = [Color(0xFF3B82F6), Color(0xFF22C55E), Color(0xFFF59E0B), Color(0xFF6366F1), Color(0xFF14B8A6), Color(0xFF8B5CF6), Color(0xFFEF4444)];
+const _kGreen = Color(0xFF22C55E);
+const _kRed = Color(0xFFEF4444);
+const _kAmber = Color(0xFFF59E0B);
+const _kBlue = Color(0xFF3B82F6);
 
 BoxDecoration _cardDeco(BuildContext context) {
-  final cs     = Theme.of(context).colorScheme;
+  final cs = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
   return BoxDecoration(
     color: isDark ? cs.surfaceContainerHigh : cs.surface,
@@ -34,6 +34,9 @@ class PairSettlementTimeline extends StatefulWidget {
   final Map<String, String> nameMap;
   final String userId;
   final String roomId;
+  final String month;
+  final bool canSettle;
+  final List<SettlementModel> settlements;
 
   const PairSettlementTimeline({
     super.key,
@@ -43,6 +46,9 @@ class PairSettlementTimeline extends StatefulWidget {
     required this.nameMap,
     required this.userId,
     required this.roomId,
+    required this.month,
+    this.canSettle = true,
+    this.settlements = const [],
   });
 
   @override
@@ -67,34 +73,56 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
 
     final totalOwedToA = aPaid.fold(0.0, (s, t) => s + t.userShare);
     final totalOwedToB = bPaid.fold(0.0, (s, t) => s + t.userShare);
-    final net = totalOwedToA - totalOwedToB; // positive: B owes A, negative: A owes B
+    double paidByB = 0;
+    double pending = 0;
+    for (final payment in widget.settlements) {
+      final bToA = payment.fromUserId == b && payment.toUserId == a;
+      final aToB = payment.fromUserId == a && payment.toUserId == b;
+      if (!bToA && !aToB) continue;
+      if (payment.status == SettlementStatus.confirmed)
+        paidByB += bToA ? payment.amount : -payment.amount;
+      if (payment.status == SettlementStatus.pending) pending += payment.amount;
+    }
+    final net = totalOwedToA - totalOwedToB - paidByB;
 
-    final bool currentUserIsDebtor = (net < 0 && widget.userId == a) || (net > 0 && widget.userId == b);
-    final bool showSettleButton = net.abs() > 0.01 && currentUserIsDebtor;
-    final bool currentUserIsCreditor = (net > 0 && widget.userId == a) || (net < 0 && widget.userId == b);
-    final bool showViewButton = net.abs() > 0.01 && currentUserIsCreditor;    
+    final bool currentUserIsDebtor =
+        (net < 0 && widget.userId == a) || (net > 0 && widget.userId == b);
+    final bool showSettleButton =
+        widget.canSettle &&
+        pending == 0 &&
+        net.abs() >= 0.01 &&
+        currentUserIsDebtor;
+    final bool showViewButton =
+        !showSettleButton && (widget.userId == a || widget.userId == b);
 
-    if (aPaid.isEmpty && bPaid.isEmpty) return const SizedBox.shrink();
+    if (aPaid.isEmpty && bPaid.isEmpty && paidByB == 0 && pending == 0)
+      return const SizedBox.shrink();
 
     // Combine all transactions into a single timeline (ordered by date descending)
     final allTransactions = <_TimelineTransaction>[];
     for (final txn in aPaid) {
-      allTransactions.add(_TimelineTransaction(
-        transaction: txn,
-        payerId: a,
-        otherId: b,
-        amountOwedByOther: txn.userShare,
-      ));
+      allTransactions.add(
+        _TimelineTransaction(
+          transaction: txn,
+          payerId: a,
+          otherId: b,
+          amountOwedByOther: txn.userShare,
+        ),
+      );
     }
     for (final txn in bPaid) {
-      allTransactions.add(_TimelineTransaction(
-        transaction: txn,
-        payerId: b,
-        otherId: a,
-        amountOwedByOther: txn.userShare,
-      ));
+      allTransactions.add(
+        _TimelineTransaction(
+          transaction: txn,
+          payerId: b,
+          otherId: a,
+          amountOwedByOther: txn.userShare,
+        ),
+      );
     }
-    allTransactions.sort((x, y) => y.transaction.date.compareTo(x.transaction.date));
+    allTransactions.sort(
+      (x, y) => y.transaction.date.compareTo(x.transaction.date),
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -112,27 +140,51 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                 children: [
                   // Avatar pair
                   SizedBox(
-                    width: 52, height: 32,
+                    width: 52,
+                    height: 32,
                     child: Stack(
                       children: [
                         Container(
-                          width: 32, height: 32,
+                          width: 32,
+                          height: 32,
                           decoration: BoxDecoration(
                             color: _kBlue.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Center(child: Text(nameA.isNotEmpty ? nameA[0].toUpperCase() : '?', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kBlue))),
+                          child: Center(
+                            child: Text(
+                              nameA.isNotEmpty ? nameA[0].toUpperCase() : '?',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kBlue,
+                              ),
+                            ),
+                          ),
                         ),
                         Positioned(
                           left: 20,
                           child: Container(
-                            width: 32, height: 32,
+                            width: 32,
+                            height: 32,
                             decoration: BoxDecoration(
                               color: _kAmber.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Theme.of(context).colorScheme.surface, width: 2),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.surface,
+                                width: 2,
+                              ),
                             ),
-                            child: Center(child: Text(nameB.isNotEmpty ? nameB[0].toUpperCase() : '?', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kAmber))),
+                            child: Center(
+                              child: Text(
+                                nameB.isNotEmpty ? nameB[0].toUpperCase() : '?',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: _kAmber,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -142,41 +194,59 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                   Expanded(
                     child: Text(
                       '$nameA ⇄ $nameB',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: net.abs() < 0.01
                           ? _kGreen.withValues(alpha: isDark ? 0.15 : 0.1)
                           : (net > 0
-                              ? _kGreen.withValues(alpha: isDark ? 0.15 : 0.1)
-                              : _kRed.withValues(alpha: isDark ? 0.15 : 0.1)),
+                                ? _kGreen.withValues(alpha: isDark ? 0.15 : 0.1)
+                                : _kRed.withValues(alpha: isDark ? 0.15 : 0.1)),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       net.abs() < 0.01
                           ? 'Settled ✓'
                           : (net > 0
-                              ? '$nameB owes ₹${net.toStringAsFixed(0)}'
-                              : '$nameA owes ₹${(-net).toStringAsFixed(0)}'),
+                                ? '$nameB owes ₹${net.toStringAsFixed(0)}'
+                                : '$nameA owes ₹${(-net).toStringAsFixed(0)}'),
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
-                        color: net.abs() < 0.01 ? _kGreen : (net > 0 ? _kGreen : _kRed),
+                        color: net.abs() < 0.01
+                            ? _kGreen
+                            : (net > 0 ? _kGreen : _kRed),
                       ),
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 18,
-                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
                 ],
               ),
             ),
           ),
           if (_expanded) ...[
-            Divider(height: 1, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.08)),
+            Divider(
+              height: 1,
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.08),
+            ),
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -197,18 +267,28 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Net balance', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45))),
+                        Text(
+                          'Net balance',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.45),
+                          ),
+                        ),
                         const SizedBox(height: 2),
                         Text(
                           net.abs() < 0.01
                               ? 'All settled'
                               : (net > 0
-                                  ? '$nameB owes $nameA ₹${net.toStringAsFixed(0)}'
-                                  : '$nameA owes $nameB ₹${(-net).toStringAsFixed(0)}'),
+                                    ? '$nameB owes $nameA ₹${net.toStringAsFixed(0)}'
+                                    : '$nameA owes $nameB ₹${(-net).toStringAsFixed(0)}'),
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: net.abs() < 0.01 ? _kGreen : (net > 0 ? _kGreen : _kRed),
+                            color: net.abs() < 0.01
+                                ? _kGreen
+                                : (net > 0 ? _kGreen : _kRed),
                           ),
                         ),
                       ],
@@ -220,23 +300,47 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                         final debt = net > 0
                             ? Debt(from: b, to: a, amount: net)
                             : Debt(from: a, to: b, amount: -net);
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => SettlementScreen(roomId: widget.roomId, debt: debt, nameMap: widget.nameMap),
-                        ));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SettlementScreen(
+                              roomId: widget.roomId,
+                              debt: debt,
+                              nameMap: widget.nameMap,
+                              ledgerMonth: widget.month,
+                            ),
+                          ),
+                        );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: _kGreen.withValues(alpha: isDark ? 0.15 : 0.1),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: _kGreen.withValues(alpha: 0.25)),
+                          border: Border.all(
+                            color: _kGreen.withValues(alpha: 0.25),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.payment_rounded, size: 16, color: _kGreen),
+                            const Icon(
+                              Icons.payment_rounded,
+                              size: 16,
+                              color: _kGreen,
+                            ),
                             const SizedBox(width: 6),
-                            const Text('Settle Up', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kGreen)),
+                            const Text(
+                              'Settle Up',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kGreen,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -247,23 +351,47 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                         final debt = net > 0
                             ? Debt(from: b, to: a, amount: net)
                             : Debt(from: a, to: b, amount: -net);
-                        Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => SettlementScreen(roomId: widget.roomId, debt: debt, nameMap: widget.nameMap),
-                        ));
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SettlementScreen(
+                              roomId: widget.roomId,
+                              debt: debt,
+                              nameMap: widget.nameMap,
+                              ledgerMonth: widget.month,
+                            ),
+                          ),
+                        );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.08),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: _kBlue.withValues(alpha: 0.2)),
+                          border: Border.all(
+                            color: _kBlue.withValues(alpha: 0.2),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.visibility_rounded, size: 16, color: _kBlue),
+                            const Icon(
+                              Icons.visibility_rounded,
+                              size: 16,
+                              color: _kBlue,
+                            ),
                             const SizedBox(width: 6),
-                            const Text('View', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kBlue)),
+                            const Text(
+                              'View',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _kBlue,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -298,7 +426,12 @@ class _TimelineTile extends StatelessWidget {
   final String userId;
   final bool isLast;
 
-  const _TimelineTile({required this.data, required this.nameMap, required this.userId, required this.isLast});
+  const _TimelineTile({
+    required this.data,
+    required this.nameMap,
+    required this.userId,
+    required this.isLast,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +449,9 @@ class _TimelineTile extends StatelessWidget {
     final creditorId = payerId;
     final amountOwed = data.amountOwedByOther;
 
-    final debtorDisplay = (debtorId == userId) ? 'You' : (nameMap[debtorId] ?? debtorId);
+    final debtorDisplay = (debtorId == userId)
+        ? 'You'
+        : (nameMap[debtorId] ?? debtorId);
     final pillText = '$debtorDisplay owes ₹${amountOwed.toStringAsFixed(0)}';
 
     final Color pillColor;
@@ -335,13 +470,18 @@ class _TimelineTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: cs.outline.withValues(alpha: 0.07))),
+          border: isLast
+              ? null
+              : Border(
+                  bottom: BorderSide(color: cs.outline.withValues(alpha: 0.07)),
+                ),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 38, height: 38,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: iconColor.withValues(alpha: isDark ? 0.12 : 0.08),
                 borderRadius: BorderRadius.circular(11),
@@ -359,19 +499,29 @@ class _TimelineTile extends StatelessWidget {
                 children: [
                   Text(
                     txn.title,
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: cs.onSurface),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: cs.onSurface,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 3),
                   Text(
                     '₹${txn.totalAmount.toStringAsFixed(0)} • $payerName • ${_formatDate(txn.date)}',
-                    style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.45)),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurface.withValues(alpha: 0.45),
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _splitText(txn),
-                    style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.35)),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: cs.onSurface.withValues(alpha: 0.35),
+                    ),
                   ),
                 ],
               ),
@@ -386,7 +536,11 @@ class _TimelineTile extends StatelessWidget {
               ),
               child: Text(
                 pillText,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: pillColor),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: pillColor,
+                ),
               ),
             ),
           ],
@@ -395,7 +549,12 @@ class _TimelineTile extends StatelessWidget {
     );
   }
 
-  void _showDetailDialog(BuildContext context, DebtTransaction txn, String payerName, String otherName) {
+  void _showDetailDialog(
+    BuildContext context,
+    DebtTransaction txn,
+    String payerName,
+    String otherName,
+  ) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -428,7 +587,10 @@ class _TimelineTile extends StatelessWidget {
             _detailRow('Date', _formatDate(txn.date)),
             _detailRow('Split type', _splitText(txn)),
             _detailRow('Split among', txn.splitAmong.length.toString()),
-            _detailRow('Split members', txn.splitAmong.map((id) => nameMap[id] ?? id).join(', ')),
+            _detailRow(
+              'Split members',
+              txn.splitAmong.map((id) => nameMap[id] ?? id).join(', '),
+            ),
             const Divider(height: 24),
             _detailRow(
               data.payerId == userId ? '${otherName} owes' : 'You owe',
@@ -449,7 +611,14 @@ class _TimelineTile extends StatelessWidget {
         builder: (context) => Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+            Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
             Text(
               value,
               style: highlight

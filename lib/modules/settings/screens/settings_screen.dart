@@ -18,13 +18,22 @@ class SettingsScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: const AppHeader(showBack: true, title: 'Settings', showNotification: false),
+      appBar: const AppHeader(
+        showBack: true,
+        title: 'Settings',
+        showNotification: false,
+      ),
       body: GradientBody(
         child: ListView(
           children: [
             // Profile card
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.base, AppSpacing.base, AppSpacing.base, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.base,
+                AppSpacing.base,
+                AppSpacing.base,
+                0,
+              ),
               child: Card(
                 child: ListTile(
                   tileColor: Colors.transparent,
@@ -36,13 +45,27 @@ class SettingsScreen extends ConsumerWidget {
                     radius: 22,
                     backgroundColor: cs.primary.withValues(alpha: 0.12),
                     child: Text(
-                      (profile?.name.isNotEmpty == true) ? profile!.name[0].toUpperCase() : 'U',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: cs.primary),
+                      (profile?.name.isNotEmpty == true)
+                          ? profile!.name[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
                     ),
                   ),
-                  title: Text(profile?.name ?? 'User', style: AppTextStyles.sectionHeader(context)),
-                  subtitle: Text(profile?.email ?? '', style: AppTextStyles.caption(context)),
-                  trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurface.withValues(alpha: 0.3)),
+                  title: Text(
+                    profile?.name ?? 'User',
+                    style: AppTextStyles.sectionHeader(context),
+                  ),
+                  subtitle: Text(
+                    profile?.email ?? '',
+                    style: AppTextStyles.caption(context),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: cs.onSurface.withValues(alpha: 0.3),
+                  ),
                   onTap: () => context.push('/settings/edit-profile'),
                 ),
               ),
@@ -93,7 +116,8 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsTile(
                       icon: Icons.widgets_outlined,
                       label: 'Home screen widget',
-                      subtitle: 'Nothing-inspired style, appearance and privacy',
+                      subtitle:
+                          'Nothing-inspired style, appearance and privacy',
                       onTap: () => context.push('/settings/widget'),
                     ),
                     _SettingsTile(
@@ -110,7 +134,8 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsTile(
                       icon: Icons.sms_outlined,
                       label: 'Bank SMS Recording',
-                      subtitle: 'Auto-record payments and review detected messages',
+                      subtitle:
+                          'Auto-record payments and review detected messages',
                       onTap: () => context.push('/settings/bank-sms'),
                     ),
                   ],
@@ -131,13 +156,15 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.description_outlined,
                       label: 'Terms of Service',
                       trailing: const Icon(Icons.open_in_new, size: 16),
-                      onTap: () => _openUrl(context, 'https://splitex.app/terms'),
+                      onTap: () =>
+                          _openUrl(context, 'https://splitex.app/terms'),
                     ),
                     _SettingsTile(
                       icon: Icons.privacy_tip_outlined,
                       label: 'Privacy Policy',
                       trailing: const Icon(Icons.open_in_new, size: 16),
-                      onTap: () => _openUrl(context, 'https://splitex.app/privacy'),
+                      onTap: () =>
+                          _openUrl(context, 'https://splitex.app/privacy'),
                     ),
                   ],
                 ),
@@ -186,14 +213,17 @@ class SettingsScreen extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Account'),
         content: const Text(
-            'This will permanently delete your account and all associated data. This action cannot be undone.'),
+          'This permanently deletes your sign-in account. Leave your rooms first and transfer admin duties where needed. Shared room history is preserved for its participants. This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               try {
@@ -201,9 +231,9 @@ class SettingsScreen extends ConsumerWidget {
                 if (context.mounted) context.go('/login');
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Failed: $e')));
                 }
               }
             },
@@ -223,9 +253,9 @@ class SettingsScreen extends ConsumerWidget {
 
   void _openUrl(BuildContext context, String url) async {
     // Uses url_launcher — already in pubspec
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening $url')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Opening $url')));
   }
 }
 
@@ -236,7 +266,12 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xs),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xl,
+        0,
+        AppSpacing.xl,
+        AppSpacing.xs,
+      ),
       child: Text(
         title.toUpperCase(),
         style: TextStyle(
@@ -283,10 +318,22 @@ class _SettingsTile extends StatelessWidget {
       ),
       title: Text(
         label,
-        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: effectiveColor == cs.error ? effectiveColor : cs.onSurface),
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: effectiveColor == cs.error ? effectiveColor : cs.onSurface,
+        ),
       ),
-      subtitle: subtitle != null ? Text(subtitle!, style: AppTextStyles.caption(context)) : null,
-      trailing: trailing ?? Icon(Icons.chevron_right_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+      subtitle: subtitle != null
+          ? Text(subtitle!, style: AppTextStyles.caption(context))
+          : null,
+      trailing:
+          trailing ??
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 18,
+            color: cs.onSurface.withValues(alpha: 0.3),
+          ),
       onTap: onTap,
     );
   }
@@ -384,11 +431,7 @@ class _BodyGradientTile extends ConsumerWidget {
           color: cs.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(
-          Icons.gradient_rounded,
-          size: 18,
-          color: cs.primary,
-        ),
+        child: Icon(Icons.gradient_rounded, size: 18, color: cs.primary),
       ),
       title: const Text('Screen Body Gradient'),
       subtitle: Text(

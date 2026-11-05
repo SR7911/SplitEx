@@ -13,9 +13,14 @@ void main() {
   late FirestoreRoomLedgerRepository ledger;
   final date = DateTime(2026, 10, 29);
 
-  setUp(() {
+  setUp(() async {
     db = FakeFirebaseFirestore();
     ledger = FirestoreRoomLedgerRepository(firestore: db);
+    await db.doc('rooms/room-1').set({
+      'adminId': 'alice',
+      'memberIds': ['alice', 'bob'],
+      'participantIds': ['alice', 'bob'],
+    });
   });
 
   const added = RoomActivityEntry(
@@ -162,6 +167,13 @@ void main() {
   });
 
   test('settlement and confirmation each commit their activity', () async {
+    await db.doc('rooms/room-1/expenses/original').set({
+      'title': 'Dinner',
+      'amount': 400,
+      'paidBy': 'bob',
+      'splitAmong': ['alice', 'bob'],
+      'month': '2026-10',
+    });
     final settlement = SettlementModel(
       id: '',
       roomId: 'room-1',

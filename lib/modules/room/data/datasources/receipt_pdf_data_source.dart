@@ -9,6 +9,7 @@ import 'package:split_ex/modules/room/domain/entities/expense_model.dart';
 import 'package:split_ex/modules/room/domain/entities/debt_transaction.dart';
 import 'package:split_ex/modules/room/domain/policies/balance_service.dart';
 import 'package:split_ex/modules/room/domain/repositories/room_receipt_exporter.dart';
+import 'package:split_ex/shared/domain/entities/settlement_model.dart';
 
 class ReceiptGenerator implements RoomReceiptExporter {
   @override
@@ -22,6 +23,7 @@ class ReceiptGenerator implements RoomReceiptExporter {
     required int memberCount,
     Map<String, Map<String, List<DebtTransaction>>>? detailedDebtsMap,
     List<String>? memberIds,
+    List<SettlementModel> settlements = const [],
   }) async {
     final file = await generateMonthlyReceipt(
       roomName: roomName,
@@ -33,6 +35,7 @@ class ReceiptGenerator implements RoomReceiptExporter {
       memberCount: memberCount,
       detailedDebtsMap: detailedDebtsMap,
       memberIds: memberIds,
+      settlements: settlements,
     );
     return file.path;
   }
@@ -52,6 +55,7 @@ class ReceiptGenerator implements RoomReceiptExporter {
     required int memberCount,
     Map<String, Map<String, List<DebtTransaction>>>? detailedDebtsMap,
     List<String>? memberIds,
+    List<SettlementModel> settlements = const [],
   }) async {
     final pdf = pw.Document();
     final monthLabel = _formatMonth(month);
@@ -62,7 +66,7 @@ class ReceiptGenerator implements RoomReceiptExporter {
 
     final pairWidgets =
         (detailedDebtsMap != null && memberIds != null && memberIds.length > 1)
-        ? _buildPairDetails(detailedDebtsMap, memberIds, nameMap)
+        ? _buildPairDetails(detailedDebtsMap, memberIds, nameMap, settlements)
         : <pw.Widget>[];
 
     pdf.addPage(
@@ -119,13 +123,36 @@ class ReceiptGenerator implements RoomReceiptExporter {
                   'Rs. ${grandTotal.toStringAsFixed(2)}',
                 ),
                 _summaryRow(
-                  'Per Person ($memberCount members)',
+                  'Average per participant ($memberCount people; actual shares vary)',
                   'Rs. ${perPerson.toStringAsFixed(2)}',
                 ),
               ],
             ),
           ),
           pw.SizedBox(height: 20),
+
+          if (settlements.isNotEmpty) ...[
+            pw.Text(
+              'Payment History',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            pw.TableHelper.fromTextArray(
+              headers: ['From', 'To', 'Amount', 'Status', 'Payment date'],
+              data: settlements
+                  .map(
+                    (s) => [
+                      nameMap[s.fromUserId] ?? s.fromUserId,
+                      nameMap[s.toUserId] ?? s.toUserId,
+                      'Rs. ${s.amount.toStringAsFixed(2)}',
+                      s.status.name,
+                      DateFormat('dd MMM yyyy').format(s.createdAt),
+                    ],
+                  )
+                  .toList(),
+            ),
+            pw.SizedBox(height: 20),
+          ],
 
           // Bills section
           if (bills.isNotEmpty) ...[
@@ -256,6 +283,7 @@ class ReceiptGenerator implements RoomReceiptExporter {
     Map<String, Map<String, List<DebtTransaction>>> detailedMap,
     List<String> memberIds,
     Map<String, String> nameMap,
+    List<SettlementModel> settlements,
   ) {
     final widgets = <pw.Widget>[];
     widgets.add(
@@ -282,7 +310,14 @@ class ReceiptGenerator implements RoomReceiptExporter {
 
         final totalOwedToA = aPaid.fold(0.0, (s, t) => s + t.userShare);
         final totalOwedToB = bPaid.fold(0.0, (s, t) => s + t.userShare);
-        final net = totalOwedToA - totalOwedToB;
+        var net = totalOwedToA - totalOwedToB;
+        for (final payment in settlements) {
+          if (payment.status != SettlementStatus.confirmed) continue;
+          if (payment.fromUserId == b && payment.toUserId == a)
+            net -= payment.amount;
+          if (payment.fromUserId == a && payment.toUserId == b)
+            net += payment.amount;
+        }
 
         final netLabel = net.abs() < 0.01
             ? 'Settled'
