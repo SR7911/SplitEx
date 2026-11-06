@@ -162,7 +162,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                 child: Text('Bank SMS recording is available on Android.'),
               )
             : ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppSpacing.base),
                 children: [
                   if (!widget.reviewOnly) ...[
                     Container(
@@ -215,7 +215,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     Container(
                       decoration: appCardDecoration(context),
                       child: SwitchListTile.adaptive(
@@ -232,11 +232,10 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                             : (value) => _run(() => _enableRcs(service, value)),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                   ] else ...[
                     Container(
                       decoration: appCardDecoration(context),
-                      padding: const EdgeInsets.all(AppSpacing.md),
                       child: AppFinanceTile(
                         icon: Icons.mark_email_read_outlined,
                         title: 'Detected Payments',
@@ -250,15 +249,11 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                   ],
                   Text(
                     'SMS and Google Messages RCS are separate. Clearing an RCS notification does not import it later. You can share a saved RCS message to SplitEx from Google Messages. Background processing needs internet and may be delayed by Android.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.5,
-                      color: cs.onSurface.withValues(alpha: .6),
-                    ),
+                    style: AppTextStyles.caption(context).copyWith(height: 1.5),
                   ),
                   if (service.enabled && !service.permission)
                     Padding(
@@ -299,25 +294,21 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                         : null,
                     onAction: null,
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           '${service.pendingCount} messages pending processing',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: cs.onSurface.withValues(alpha: .6),
-                          ),
+                          style: AppTextStyles.caption(context),
                         ),
                       ),
                       TextButton.icon(
                         style: TextButton.styleFrom(
-                          textStyle: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          textStyle: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.md,
                             vertical: AppSpacing.xs,
@@ -352,40 +343,41 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                     final color = debit
                         ? AppColors.error(context)
                         : AppColors.success(context);
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: appCardDecoration(context),
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: AppFinanceTile(
-                        onTap: busy
-                            ? null
-                            : () => showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                useSafeArea: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => _BankSmsReviewSheet(sms: sms),
-                              ),
-                        color: color,
-                        icon: debit
-                            ? Icons.call_made_rounded
-                            : Icons.call_received_rounded,
-                        title: sms.title,
-                        subtitle:
-                            '${sms.source == 'sms'
-                                ? sms.sender
-                                : sms.source == 'rcs'
-                                ? 'Google Messages alert'
-                                : 'Shared message'} · ${DateFormat('dd MMM').format(sms.date)}',
-                        value:
-                            '₹${NumberFormat('#,##0.##').format(sms.amount)}',
-                        detail: debit ? 'Debit' : 'Credit',
-                        action: IconButton(
-                          tooltip: 'Dismiss message',
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          onPressed: busy
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Container(
+                        decoration: appCardDecoration(context),
+                        child: AppFinanceTile(
+                          onTap: busy
                               ? null
-                              : () => _run(() => service.dismiss(sms)),
+                              : () => showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  useSafeArea: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => _BankSmsReviewSheet(sms: sms),
+                                ),
+                          color: color,
+                          icon: debit
+                              ? Icons.call_made_rounded
+                              : Icons.call_received_rounded,
+                          title: sms.title,
+                          subtitle:
+                              '${sms.source == 'sms'
+                                  ? sms.sender
+                                  : sms.source == 'rcs'
+                                  ? 'Google Messages alert'
+                                  : 'Shared message'} · ${DateFormat('dd MMM').format(sms.date)}',
+                          value:
+                              '₹${NumberFormat('#,##0.##').format(sms.amount)}',
+                          detail: debit ? 'Debit' : 'Credit',
+                          action: IconButton(
+                            tooltip: 'Dismiss message',
+                            icon: const Icon(Icons.close_rounded, size: 18),
+                            onPressed: busy
+                                ? null
+                                : () => _run(() => service.dismiss(sms)),
+                          ),
                         ),
                       ),
                     );
@@ -406,11 +398,7 @@ class _BankSmsSettingsScreenState extends ConsumerState<BankSmsSettingsScreen>
                     if (service.trustedSenders.isEmpty)
                       Text(
                         'Verify a message in Review and choose to trust its sender for future expenses.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.5,
-                          color: cs.onSurface.withValues(alpha: .6),
-                        ),
+                        style: AppTextStyles.caption(context).copyWith(height: 1.5),
                       ),
                     ...service.trustedSenders.map(
                       (sender) => Padding(

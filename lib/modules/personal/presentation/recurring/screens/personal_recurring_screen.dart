@@ -9,6 +9,7 @@ import 'package:split_ex/modules/personal/presentation/recurring/providers/perso
 import 'package:split_ex/modules/personal/presentation/transactions/screens/add_personal_transaction_screen.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
 
 /// Personal recurring entries backed by the domain repository.
 class PersonalRecurringScreen extends ConsumerWidget {
@@ -117,118 +118,73 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? cs.surfaceContainerHigh : cs.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
+    return PersonalFormSheet(
+      title: _isEdit ? 'Edit Recurring' : 'Add Recurring',
+      icon: Icons.repeat_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildField(context, controller: _titleCtrl, label: 'Title', icon: Icons.title),
+          const SizedBox(height: AppSpacing.md),
+          _buildField(context, controller: _amountCtrl, label: 'Amount (₹)', icon: Icons.currency_rupee, isNumber: true),
+          const SizedBox(height: AppSpacing.md),
+          Row(
             children: [
-              Center(
-                child: Container(
-                  width: 40, height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(2)),
+              Expanded(
+                child: _buildDropdown<String>(
+                  context,
+                  label: 'Category',
+                  value: _category,
+                  items: personalCategories,
+                  itemLabel: (v) => v,
+                  onChanged: (v) => setState(() => _category = v!),
                 ),
               ),
-              Row(
-                children: [
-                  Icon(Icons.repeat, color: cs.primary, size: 24),
-                  const SizedBox(width: 10),
-                  Text(
-                    _isEdit ? 'Edit Recurring' : 'Add Recurring',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: cs.primary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _buildField(context, controller: _titleCtrl, label: 'Title', icon: Icons.title),
-              const SizedBox(height: 14),
-              _buildField(context, controller: _amountCtrl, label: 'Amount (₹)', icon: Icons.currency_rupee, isNumber: true),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildDropdown<String>(
-                      context,
-                      label: 'Category',
-                      value: _category,
-                      items: personalCategories,
-                      itemLabel: (v) => v,
-                      onChanged: (v) => setState(() => _category = v!),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildDropdown<PersonalRecurringFrequency>(
-                      context,
-                      label: 'Frequency',
-                      value: _frequency,
-                      items: PersonalRecurringFrequency.values,
-                      itemLabel: (v) => v.name,
-                      onChanged: (v) => setState(() => _frequency = v!),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              _buildDayField(context),
-              const SizedBox(height: 14),
-              _buildEndDatePicker(context),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _loading ? null : _submit,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _buildDropdown<PersonalRecurringFrequency>(
+                  context,
+                  label: 'Frequency',
+                  value: _frequency,
+                  items: PersonalRecurringFrequency.values,
+                  itemLabel: (v) => v.name,
+                  onChanged: (v) => setState(() => _frequency = v!),
                 ),
-                child: _loading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(_isEdit ? 'Save Changes' : 'Save Recurring', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          _buildDayField(context),
+          const SizedBox(height: AppSpacing.md),
+          _buildEndDatePicker(context),
+          const SizedBox(height: AppSpacing.xl),
+          FilledButton(
+            onPressed: _loading ? null : _submit,
+            child: _loading
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(_isEdit ? 'Save Changes' : 'Save Recurring'),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildField(BuildContext context, {required TextEditingController controller, required String label, required IconData icon, bool isNumber = false}) {
-    final cs = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,
       keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 18),
-        filled: true,
-        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
       ),
     );
   }
 
   Widget _buildDropdown<T>(BuildContext context, {required String label, required T value, required List<T> items, required String Function(T) itemLabel, required ValueChanged<T?> onChanged}) {
-    final cs = Theme.of(context).colorScheme;
     return DropdownButtonFormField<T>(
       value: value,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      ),
+      decoration: InputDecoration(labelText: label),
       items: items.map((v) => DropdownMenuItem(value: v, child: Text(itemLabel(v), style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,
       isExpanded: true,
@@ -236,16 +192,12 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
   }
 
   Widget _buildDayField(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return TextFormField(
       initialValue: _dayOfMonth.toString(),
       keyboardType: TextInputType.number,
-      decoration: InputDecoration(
+      decoration: const InputDecoration(
         labelText: 'Day of month (1–31)',
-        prefixIcon: const Icon(Icons.event_repeat_rounded, size: 18),
-        filled: true,
-        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        prefixIcon: Icon(Icons.event_repeat_rounded, size: 18),
       ),
       onChanged: (v) => _dayOfMonth = int.tryParse(v) ?? _dayOfMonth,
     );
@@ -253,7 +205,19 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
 
   Widget _buildEndDatePicker(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return InkWell(
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(Icons.event_busy_outlined, size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
+      title: Text(
+        _endDate != null ? 'Ends: ${DateFormat('dd MMM yyyy').format(_endDate!)}' : 'End date (optional)',
+        style: TextStyle(fontSize: 14, color: _endDate != null ? cs.onSurface : cs.onSurface.withValues(alpha: 0.5)),
+      ),
+      trailing: _endDate != null
+          ? IconButton(
+              icon: Icon(Icons.close, size: 18, color: cs.onSurface.withValues(alpha: 0.4)),
+              onPressed: () => setState(() { _endDate = null; _clearEndDate = true; }),
+            )
+          : null,
       onTap: () async {
         final picked = await showDatePicker(
           context: context,
@@ -263,31 +227,6 @@ class _RecurringFormSheetState extends State<_RecurringFormSheet> {
         );
         if (picked != null) setState(() { _endDate = picked; _clearEndDate = false; });
       },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.event_busy, size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _endDate != null ? 'Ends: ${DateFormat('dd MMM yyyy').format(_endDate!)}' : 'End date (optional)',
-                style: TextStyle(fontSize: 14, color: _endDate != null ? null : cs.onSurface.withValues(alpha: 0.5)),
-              ),
-            ),
-            if (_endDate != null)
-              GestureDetector(
-                onTap: () => setState(() { _endDate = null; _clearEndDate = true; }),
-                child: Icon(Icons.close, size: 18, color: cs.onSurface.withValues(alpha: 0.4)),
-              ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -352,64 +291,44 @@ class _RecurringCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    const kGreen = Color(0xFF22C55E);
-    const kAmber = Color(0xFFF59E0B);
     final cs = Theme.of(context).colorScheme;
-    final color = isPast ? cs.onSurface.withValues(alpha: 0.4) : (item.active ? kGreen : kAmber);
+    final color = isPast
+        ? cs.onSurface.withValues(alpha: 0.4)
+        : (item.active ? AppColors.success(context) : AppColors.warning(context));
     final opacity = isPast ? 0.55 : 1.0;
 
-    return GestureDetector(
-      onTap: () => _showDetailSheet(context, ref),
-      child: Opacity(
-        opacity: opacity,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          clipBehavior: Clip.antiAlias,
-          decoration: appCardDecoration(context, accentColor: isPast ? null : color),
-          child: Row(
-            children: [
-              Container(
-                width: 44, height: 44,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: Icon(
-                  isPast ? Icons.history : (item.active ? Icons.autorenew_rounded : Icons.pause_circle_outline),
-                  color: color, size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Opacity(
+      opacity: opacity,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: AppFinanceTile(
+          onTap: () => _showDetailSheet(context, ref),
+          icon: isPast
+              ? Icons.history_rounded
+              : (item.active ? Icons.autorenew_rounded : Icons.pause_circle_outline),
+          color: color,
+          title: item.title,
+          subtitle: '${item.category} • ${item.frequency.name} • Day ${item.dayOfMonth}'
+              '${item.endDate != null ? (isPast ? ' • Ended ${DateFormat('dd MMM yyyy').format(item.endDate!)}' : ' • Ends ${DateFormat('dd MMM yyyy').format(item.endDate!)}') : ''}',
+          value: '₹${item.amount.toStringAsFixed(0)}',
+          valueColor: color,
+          badges: item.editHistory.isNotEmpty
+              ? Row(
                   children: [
-                    Row(
-                      children: [
-                        Text(item.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        if (item.editHistory.isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: const Color(0xFF3B82F6).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
-                            child: Text('${item.editHistory.length} edit${item.editHistory.length > 1 ? 's' : ''}', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF3B82F6))),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${item.category} • ${item.frequency.name} • Day ${item.dayOfMonth}',
-                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
-                    ),
-                    if (item.endDate != null)
-                      Text(
-                        isPast ? 'Ended: ${DateFormat('dd MMM yyyy').format(item.endDate!)}' : 'Ends: ${DateFormat('dd MMM yyyy').format(item.endDate!)}',
-                        style: TextStyle(fontSize: 10, color: isPast ? cs.onSurface.withValues(alpha: 0.4) : const Color(0xFFF59E0B)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
+                      child: Text(
+                        '${item.editHistory.length} edit${item.editHistory.length > 1 ? 's' : ''}',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: cs.primary),
+                      ),
+                    ),
                   ],
-                ),
-              ),
-              Text('₹${item.amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isPast ? cs.onSurface.withValues(alpha: 0.4) : color)),
-            ],
-          ),
+                )
+              : null,
         ),
       ),
     );
@@ -437,48 +356,30 @@ class _RecurringDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = isPast ? cs.onSurface.withValues(alpha: 0.4) : cs.primary;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: ListView(
-        shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    return PersonalFormSheet(
+      title: 'Recurring Details',
+      icon: Icons.repeat_rounded,
+      trailing: !isPast
+          ? IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              onPressed: () {
+                Navigator.pop(context);
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  useSafeArea: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => _RecurringFormSheet(existing: item, ref: ref),
+                );
+              },
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Center(
-            child: Container(
-              width: 40, height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          Row(
-            children: [
-              Icon(Icons.repeat, color: color, size: 24),
-              const SizedBox(width: 10),
-              Text('Recurring Details', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700, color: color)),
-              const Spacer(),
-              if (!isPast)
-                IconButton(
-                  icon: Icon(Icons.edit_outlined, color: cs.primary),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      useSafeArea: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => _RecurringFormSheet(existing: item, ref: ref),
-                    );
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
           _DetailRow(icon: Icons.title, label: 'Title', value: item.title),
           _DetailRow(icon: Icons.currency_rupee, label: 'Amount', value: '₹${item.amount.toStringAsFixed(0)}'),
           _DetailRow(icon: Icons.category, label: 'Category', value: item.category),
@@ -526,10 +427,9 @@ class _RecurringDetailSheet extends StatelessWidget {
                     },
                     icon: Icon(item.active ? Icons.pause : Icons.play_arrow, size: 18),
                     label: Text(item.active ? 'Pause' : 'Resume'),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
@@ -541,7 +441,7 @@ class _RecurringDetailSheet extends StatelessWidget {
                     },
                     icon: Icon(Icons.delete_outline, size: 18, color: cs.error),
                     label: Text('Delete', style: TextStyle(color: cs.error)),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), side: BorderSide(color: cs.error)),
+                    style: OutlinedButton.styleFrom(side: BorderSide(color: cs.error)),
                   ),
                 ),
               ],
