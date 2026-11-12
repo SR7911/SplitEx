@@ -1,7 +1,7 @@
 name: split_ex
 description: "SplitEx - Roommate Expense Splitting App"
 publish_to: 'none'
-version: 8.0.0+16
+version: 8.2.0+20
 
 environment:
   sdk: ^3.11.5

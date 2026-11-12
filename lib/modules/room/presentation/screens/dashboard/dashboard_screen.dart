@@ -12,6 +12,10 @@ import 'package:split_ex/modules/notifications/services/notification_helper.dart
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
+import 'package:split_ex/shared/ui/design_system/app_colors.dart';
+import 'package:split_ex/shared/ui/widgets/app_header.dart';
+
+const _kIndigo = Color(0xFF6366F1);
 
 class DashboardScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -58,67 +62,103 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpiId());
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
-      body: roomAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (room) {
-          if (room == null) return const Center(child: Text('Room not found'));
-          final members = room.historicalMemberIds;
-          final membersAsync = ref.watch(userProfilesByIdsProvider(members));
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: GradientBody(
+        child: roomAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+          data: (room) {
+            if (room == null) return const Center(child: Text('Room not found'));
+            final members = room.historicalMemberIds;
+            final membersAsync = ref.watch(userProfilesByIdsProvider(members));
 
-          return membersAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (memberList) {
-              final nameMap = <String, String>{};
-              for (final m in memberList) {
-                nameMap[m.uid] = m.name;
-              }
-              nameMap.putIfAbsent(userId, () => 'You');
+            return membersAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+              data: (memberList) {
+                final nameMap = <String, String>{};
+                for (final m in memberList) nameMap[m.uid] = m.name;
+                nameMap.putIfAbsent(userId, () => 'You');
+                final cs = Theme.of(context).colorScheme;
+                final isDark = Theme.of(context).brightness == Brightness.dark;
 
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _BalanceSummaryCard(balance: balance),
-                  const SizedBox(height: 20),
-                  if (userDebts.isNotEmpty) ...[
-                    Text(
-                      'Your Settlements',
-                      style: Theme.of(context).textTheme.titleMedium,
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.base, AppSpacing.base, AppSpacing.base, 100),
+                  children: [
+                    _BalanceSummaryCard(balance: balance),
+                    const SizedBox(height: AppSpacing.lg),
+                    AppSectionHeader(title: 'Room Members (${room.memberIds.length})'),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: room.memberIds.map((id) {
+                        final name = nameMap[id] ?? id;
+                        final isAdminMember = room.isAdmin(id);
+                        final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+                        final color = isAdminMember ? _kIndigo : cs.primary;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: isDark ? .10 : .06),
+                            borderRadius: BorderRadius.circular(AppRadius.xxl),
+                            border: Border.all(color: color.withValues(alpha: .15)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 11,
+                                backgroundColor: color.withValues(alpha: .12),
+                                child: Text(initial, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                              ),
+                              const SizedBox(width: AppSpacing.xs),
+                              Text(
+                                isAdminMember ? '$name · Admin' : name,
+                                style: AppTextStyles.label(context),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
-                    const SizedBox(height: 8),
-                    ...userDebts.map(
-                      (d) => _DebtTile(
-                        debt: d,
-                        currentUserId: userId,
-                        nameMap: nameMap,
-                        roomId: widget.roomId,
-                      ),
-                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    if (userDebts.isNotEmpty) ...[
+                      AppSectionHeader(title: 'Your Settlements'),
+                      const SizedBox(height: AppSpacing.sm),
+                      ...userDebts.map((d) => _DebtTile(
+                        debt: d, currentUserId: userId, nameMap: nameMap, roomId: widget.roomId,
+                      )),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    AppSectionHeader(title: 'All Settlements'),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (allDebts.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                        decoration: BoxDecoration(
+                          color: AppColors.success(context).withValues(alpha: isDark ? .08 : .05),
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          border: Border.all(color: AppColors.success(context).withValues(alpha: .15)),
+                        ),
+                        child: Center(
+                          child: Text('All settled up! 🎉', style: AppTextStyles.bodySmall(context)),
+                        ),
+                      )
+                    else
+                      ...allDebts.map((d) => _DebtTile(
+                        debt: d, currentUserId: userId, nameMap: nameMap, roomId: widget.roomId,
+                      )),
                   ],
-                  const SizedBox(height: 20),
-                  Text(
-                    'All Settlements',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  if (allDebts.isEmpty)
-                    const Text('All settled up! 🎉')
-                  else
-                    ...allDebts.map(
-                      (d) => _DebtTile(
-                        debt: d,
-                        currentUserId: userId,
-                        nameMap: nameMap,
-                        roomId: widget.roomId,
-                      ),
-                    ),
-                ],
-              );
-            },
-          );
-        },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -136,15 +176,11 @@ class _BalanceSummaryCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final color = isPositive
-        ? const Color(0xFF10B981)
+        ? AppColors.success(context)
         : isNegative
-        ? const Color(0xFFF43F5E)
+        ? AppColors.error(context)
         : cs.primary;
-    final label = isPositive
-        ? 'You are owed'
-        : isNegative
-        ? 'You owe'
-        : 'All settled up!';
+    final label = isPositive ? 'You are owed' : isNegative ? 'You owe' : 'All settled up!';
     final icon = isPositive
         ? Icons.arrow_downward_rounded
         : isNegative
@@ -156,15 +192,15 @@ class _BalanceSummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isDark
-              ? [color.withValues(alpha: 0.35), color.withValues(alpha: 0.2)]
+              ? [color.withValues(alpha: 0.35), color.withValues(alpha: 0.20)]
               : [color.withValues(alpha: 0.15), color.withValues(alpha: 0.06)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
       child: Row(
         children: [
           Container(
@@ -176,42 +212,24 @@ class _BalanceSummaryCard extends StatelessWidget {
             ),
             child: Icon(icon, color: color, size: 26),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.base),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: cs.onSurface.withValues(alpha: 0.65),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
+                Text(label, style: AppTextStyles.bodySmall(context)),
+                const SizedBox(height: AppSpacing.xs),
                 if (isPositive || isNegative)
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0, end: displayAmount),
                     duration: const Duration(milliseconds: 600),
                     builder: (_, v, __) => Text(
                       '₹${v.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                      ),
+                      style: AppTextStyles.stat(context).copyWith(color: color, fontSize: 26),
                     ),
                   )
                 else
-                  Text(
-                    'Great job! 🎉',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: color,
-                    ),
-                  ),
+                  Text('Great job! 🎉', style: AppTextStyles.statSmall(context).copyWith(color: color)),
               ],
             ),
           ),
@@ -236,64 +254,26 @@ class _DebtTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fromName = debt.from == currentUserId
-        ? 'You'
-        : (nameMap[debt.from] ?? debt.from);
-    final toName = debt.to == currentUserId
-        ? 'You'
-        : (nameMap[debt.to] ?? debt.to);
-    final canRemind = debt.to == currentUserId;
+    final fromName = debt.from == currentUserId ? 'You' : (nameMap[debt.from] ?? debt.from);
+    final toName   = debt.to == currentUserId   ? 'You' : (nameMap[debt.to]   ?? debt.to);
+    final canRemind = debt.to   == currentUserId;
     final canSettle = debt.from == currentUserId;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = canSettle ? const Color(0xFFF43F5E) : const Color(0xFF10B981);
+    final color = canSettle ? AppColors.error(context) : AppColors.success(context);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: appCardDecoration(context, accentColor: color),
-      child: ListTile(
-        tileColor: Colors.transparent,
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: isDark ? 0.2 : 0.12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(Icons.swap_horiz, color: color, size: 20),
-        ),
-        title: Text('$fromName → $toName'),
-        subtitle: canSettle
-            ? TextButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SettlementScreen(
-                      roomId: roomId,
-                      debt: debt,
-                      nameMap: nameMap,
-                    ),
-                  ),
-                ),
-                icon: const Icon(Icons.payment, size: 16),
-                label: const Text('Settle Up'),
-                style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              )
-            : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '₹${debt.amount.toStringAsFixed(2)}',
-              style: TextStyle(fontWeight: FontWeight.bold, color: color),
-            ),
-            if (canRemind)
-              IconButton(
-                icon: const Icon(Icons.notifications_active, size: 20),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: AppFinanceTile(
+        icon: Icons.swap_horiz_rounded,
+        color: color,
+        title: '$fromName → $toName',
+        subtitle: canSettle ? 'Tap to settle up' : 'Awaiting your confirmation',
+        value: '₹${debt.amount.toStringAsFixed(2)}',
+        action: canRemind
+            ? IconButton(
+                icon: Icon(Icons.notifications_active_rounded, size: 18, color: color),
                 tooltip: 'Send Reminder',
                 onPressed: () {
-                  final helper = NotificationHelper(
-                    ref.read(notificationServiceProvider),
-                  );
+                  final helper = NotificationHelper(ref.read(notificationServiceProvider));
                   helper.sendReminder(
                     roomId: roomId,
                     fromName: nameMap[currentUserId] ?? 'You',
@@ -304,9 +284,16 @@ class _DebtTile extends ConsumerWidget {
                     const SnackBar(content: Text('Reminder sent!')),
                   );
                 },
-              ),
-          ],
-        ),
+              )
+            : null,
+        onTap: canSettle
+            ? () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SettlementScreen(roomId: roomId, debt: debt, nameMap: nameMap),
+                ),
+              )
+            : null,
       ),
     );
   }

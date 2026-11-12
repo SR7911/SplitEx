@@ -1,14 +1,20 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:split_ex/modules/room/domain/entities/bill_model.dart';
 import 'package:split_ex/modules/room/domain/entities/room_bill_update.dart';
 import 'package:split_ex/modules/room/presentation/providers/bill_provider.dart';
+import 'package:split_ex/modules/room/dependencies.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/modules/room/presentation/screens/expense/add_expense_sheet.dart'
+    show RoomDateButton;
+import 'package:split_ex/modules/room/presentation/screens/expense/view_expense_sheet.dart'
+    show RoomViewRow;
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showViewBillSheet(
   BuildContext context, {
@@ -36,23 +42,22 @@ class _ViewBillSheet extends ConsumerStatefulWidget {
 class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
   bool _editing = false;
   bool _isLoading = false;
-  late TextEditingController _amountController;
+  late TextEditingController _amountCtrl;
   late BillType _billType;
   late DateTime _date;
 
   @override
   void initState() {
     super.initState();
-    _amountController = TextEditingController(
-      text: widget.bill.amount.toStringAsFixed(2),
-    );
+    _amountCtrl = TextEditingController(
+        text: widget.bill.amount.toStringAsFixed(2));
     _billType = widget.bill.type;
     _date = widget.bill.date;
   }
 
   @override
   void dispose() {
-    _amountController.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
@@ -63,27 +68,20 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
         (widget.bill.paidBy == userId || (room?.isAdmin(userId) ?? false));
   }
 
-  Future<void> _pickDate() async {
-    if (!_editing) return;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) setState(() => _date = picked);
-  }
+  void _cancelEdit() => setState(() {
+        _editing = false;
+        _amountCtrl.text = widget.bill.amount.toStringAsFixed(0);
+        _billType = widget.bill.type;
+        _date = widget.bill.date;
+      });
 
   Future<void> _save() async {
     if (!_canEdit) return;
-    final amount = double.tryParse(_amountController.text.trim());
+    final amount = double.tryParse(_amountCtrl.text.trim());
     if (amount == null || amount <= 0) return;
-
     setState(() => _isLoading = true);
     try {
-      await ref
-          .read(billServiceProvider)
-          .updateBill(
+      await ref.read(billServiceProvider).updateBill(
             widget.roomId,
             widget.bill.id,
             RoomBillUpdate(
@@ -97,21 +95,48 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _cancelEdit() {
-    setState(() {
-      _editing = false;
-      _amountController.text = widget.bill.amount.toStringAsFixed(0);
-      _billType = widget.bill.type;
-      _date = widget.bill.date;
-    });
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl)),
+        title: const Text('Delete Bill?'),
+        content: Text(
+            'Delete ${widget.bill.type.name} bill for ₹${widget.bill.amount.toStringAsFixed(0)}?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error(context)),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() => _isLoading = true);
+    final userId = ref.read(currentUserIdProvider);
+    try {
+      await ref.read(deleteRoomBillProvider)(
+          widget.roomId, widget.bill, userId);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _showReceipt(String path) {
@@ -119,7 +144,8 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -128,38 +154,27 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
               automaticallyImplyLeading: false,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx))
               ],
             ),
             ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
-              ),
+                  maxHeight: MediaQuery.of(context).size.height * 0.5),
               child: isLocal
-                  ? Image.file(
-                      File(path),
-                      fit: BoxFit.contain,
+                  ? Image.file(File(path), fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Failed to load'),
-                      ),
-                    )
-                  : Image.network(
-                      path,
-                      fit: BoxFit.contain,
+                          padding: EdgeInsets.all(32),
+                          child: Text('Failed to load')))
+                  : Image.network(path, fit: BoxFit.contain,
                       loadingBuilder: (_, child, p) => p == null
                           ? child
                           : const Padding(
                               padding: EdgeInsets.all(32),
-                              child: CircularProgressIndicator(),
-                            ),
+                              child: CircularProgressIndicator()),
                       errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Failed to load'),
-                      ),
-                    ),
+                          padding: EdgeInsets.all(32),
+                          child: Text('Failed to load'))),
             ),
           ],
         ),
@@ -169,18 +184,18 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final room = ref.watch(roomStreamProvider(widget.roomId)).valueOrNull;
     final members = {
-      ...?room?.historicalMemberIds,
+      ...?ref
+          .watch(roomStreamProvider(widget.roomId))
+          .valueOrNull
+          ?.historicalMemberIds,
       ...widget.bill.splitAmong,
       widget.bill.paidBy,
     }.toList();
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
-        nameMap[m.uid] = m.name;
-      }
+      for (final m in membersAsync.value!) nameMap[m.uid] = m.name;
     }
     final paidByName = nameMap[widget.bill.paidBy] ?? widget.bill.paidBy;
     final billIcon = switch (widget.bill.type) {
@@ -188,299 +203,155 @@ class _ViewBillSheetState extends ConsumerState<_ViewBillSheet> {
       BillType.electricity => Icons.bolt_rounded,
       BillType.water => Icons.water_drop_rounded,
     };
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+    if (_editing) return _buildEditMode(context);
+
+    // ── VIEW MODE ──
+    return PersonalFormSheet(
+      title: 'Bill Details',
+      icon: billIcon,
+      trailing: _canEdit
+          ? Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                onPressed: () => setState(() => _editing = true),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+                visualDensity: VisualDensity.compact,
               ),
-
-              // Header with icon and edit button
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      billIcon,
-                      size: 22,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Bill Details',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  if (_canEdit && !_editing)
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      tooltip: 'Edit',
-                      onPressed: () => setState(() => _editing = true),
-                    ),
-                  if (_editing)
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Cancel',
-                      onPressed: _cancelEdit,
-                    ),
-                ],
+              IconButton(
+                onPressed: _delete,
+                icon: Icon(Icons.delete_outline,
+                    color: AppColors.error(context)),
+                tooltip: 'Delete',
+                visualDensity: VisualDensity.compact,
               ),
-              const Divider(height: 24, thickness: 0.5),
-
-              // Bill type segmented button (full width)
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<BillType>(
-                  segments: const [
-                    ButtonSegment(
-                      value: BillType.rent,
-                      label: Text('Rent'),
-                      icon: Icon(Icons.home_rounded, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: BillType.electricity,
-                      label: Text('EB'),
-                      icon: Icon(Icons.bolt_rounded, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: BillType.water,
-                      label: Text('Water'),
-                      icon: Icon(Icons.water_drop_rounded, size: 18),
-                    ),
-                  ],
-                  selected: {_billType},
-                  onSelectionChanged: _editing
-                      ? (v) => setState(() => _billType = v.first)
-                      : null,
-                  style: ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    backgroundColor: MaterialStateProperty.resolveWith((
-                      states,
-                    ) {
-                      if (states.contains(MaterialState.selected))
-                        return Theme.of(context).colorScheme.primary;
-                      return Colors.transparent;
-                    }),
-                    foregroundColor: MaterialStateProperty.resolveWith((
-                      states,
-                    ) {
-                      if (states.contains(MaterialState.selected))
-                        return Colors.white;
-                      return Theme.of(context).colorScheme.onSurface;
-                    }),
-                  ),
-                ),
+            ])
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.base),
+            decoration: appCardDecoration(context),
+            child: Column(children: [
+              RoomViewRow(
+                icon: billIcon,
+                label: 'Type',
+                value: widget.bill.type.name[0].toUpperCase() +
+                    widget.bill.type.name.substring(1),
               ),
-              const SizedBox(height: 18),
-
-              // Amount field
-              TextFormField(
-                controller: _amountController,
-                enabled: _editing,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Amount (₹)',
-                  labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                  prefixIcon: Icon(
-                    Icons.currency_rupee,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+              RoomViewRow(
+                icon: Icons.currency_rupee_rounded,
+                label: 'Amount',
+                value: '₹${widget.bill.amount.toStringAsFixed(2)}',
+                valueColor: AppColors.error(context),
               ),
-              const SizedBox(height: 16),
-
-              // Date picker
-              InkWell(
-                onTap: _editing ? _pickDate : null,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.onSurface
-                            .withValues(alpha: _editing ? 0.6 : 0.4),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        DateFormat('dd MMM yyyy').format(_date),
-                        style: TextStyle(
-                          fontWeight: FontWeight.normal,
-                          fontSize: 14,
-                          color: _editing
-                              ? null
-                              : Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              RoomViewRow(
+                icon: Icons.calendar_today_rounded,
+                label: 'Date',
+                value: DateFormat('dd MMM yyyy').format(widget.bill.date),
               ),
-              const SizedBox(height: 20),
-
-              // Read-only info rows (styled as a card)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    _InfoRow(label: 'Paid by', value: paidByName),
-                    const SizedBox(height: 6),
-                    _InfoRow(label: 'Month', value: widget.bill.month),
-                  ],
-                ),
-              ),
-
-              // Receipt button (if available)
-              if (widget.bill.receiptUrl != null) ...[
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => _showReceipt(widget.bill.receiptUrl!),
-                  icon: const Icon(Icons.image, size: 18),
-                  label: const Text('View Receipt'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                ),
-              ],
-
-              // Save button (only in edit mode)
-              if (_editing) ...[
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isLoading ? null : _save,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Save Changes',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ],
+              RoomViewRow(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Paid by',
+                  value: paidByName),
+              RoomViewRow(
+                  icon: Icons.date_range_rounded,
+                  label: 'Month',
+                  value: widget.bill.month),
+            ]),
           ),
-        ),
+          if (widget.bill.receiptUrl != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            FilledButton.tonalIcon(
+              onPressed: () => _showReceipt(widget.bill.receiptUrl!),
+              icon: const Icon(Icons.image_outlined, size: 18),
+              label: const Text('View Receipt'),
+            ),
+          ],
+        ],
       ),
     );
   }
-}
 
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 70,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
+  Widget _buildEditMode(BuildContext context) {
+    return PersonalFormSheet(
+      title: 'Edit Bill',
+      icon: Icons.edit_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Bill Type',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: AppSpacing.sm),
+          SegmentedButton<BillType>(
+            segments: const [
+              ButtonSegment(
+                  value: BillType.rent,
+                  label: Text('Rent'),
+                  icon: Icon(Icons.home_rounded, size: 16)),
+              ButtonSegment(
+                  value: BillType.electricity,
+                  label: Text('EB'),
+                  icon: Icon(Icons.bolt_rounded, size: 16)),
+              ButtonSegment(
+                  value: BillType.water,
+                  label: Text('Water'),
+                  icon: Icon(Icons.water_drop_rounded, size: 16)),
+            ],
+            selected: {_billType},
+            onSelectionChanged: (v) =>
+                setState(() => _billType = v.first),
+          ),
+          const SizedBox(height: AppSpacing.base),
+          TextFormField(
+            controller: _amountCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Amount (₹)',
+              prefixIcon: Icon(Icons.currency_rupee_rounded),
             ),
           ),
-        ),
-        Expanded(
-          child: Text(value, style: Theme.of(context).textTheme.bodyMedium),
-        ),
-      ],
+          const SizedBox(height: AppSpacing.md),
+          RoomDateButton(
+            date: _date,
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _date,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) setState(() => _date = picked);
+            },
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                  onPressed: _cancelEdit, child: const Text('Cancel')),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: FilledButton(
+                onPressed: _isLoading ? null : _save,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Save'),
+              ),
+            ),
+          ]),
+        ],
+      ),
     );
   }
 }

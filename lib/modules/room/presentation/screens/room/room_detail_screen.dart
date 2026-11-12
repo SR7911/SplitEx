@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +21,7 @@ import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
 import 'package:split_ex/modules/room/presentation/providers/settlement_provider.dart';
+import 'package:split_ex/shared/ui/design_system/app_colors.dart';
 
 // -- Shared design tokens --
 const _kGreen = Color(0xFF22C55E);
@@ -34,22 +33,7 @@ const _kTeal = Color(0xFF14B8A6);
 const _kPurple = Color(0xFF8B5CF6);
 const _kPalette = [_kBlue, _kGreen, _kAmber, _kIndigo, _kTeal, _kPurple, _kRed];
 
-BoxDecoration _cardDeco(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return BoxDecoration(
-    color: isDark ? cs.surfaceContainerHigh : cs.surface,
-    borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-        blurRadius: 12,
-        offset: const Offset(0, 3),
-      ),
-    ],
-  );
-}
+// _cardDeco removed — use appCardDecoration(context) everywhere
 
 class RoomDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -215,19 +199,6 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen>
       appBar: _GradientTabAppBar(
         title: room.name,
         tabController: _tabController,
-        onAnalytics: () => _showAnalyticsSheet(context),
-        onReceipt: () async {
-          try {
-            await _generateReceipt(context, ref);
-          } catch (e) {
-            if (context.mounted)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Unable to export receipt: $e')),
-              );
-          }
-        },
-        onActivity: () => context.push('/room/${widget.roomId}/activity'),
-        onSettings: () => context.push('/room/${widget.roomId}/settings'),
       ),
       body: GradientBody(
         child: Column(
@@ -288,18 +259,10 @@ class _GradientTabAppBar extends StatelessWidget
     implements PreferredSizeWidget {
   final String title;
   final TabController tabController;
-  final VoidCallback onAnalytics;
-  final VoidCallback onReceipt;
-  final VoidCallback onActivity;
-  final VoidCallback onSettings;
 
   const _GradientTabAppBar({
     required this.title,
     required this.tabController,
-    required this.onAnalytics,
-    required this.onReceipt,
-    required this.onActivity,
-    required this.onSettings,
   });
 
   @override
@@ -326,28 +289,6 @@ class _GradientTabAppBar extends StatelessWidget
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: 'Analytics',
-            onPressed: onAnalytics,
-          ),
-          IconButton(
-            icon: const Icon(Icons.receipt_long),
-            tooltip: 'Generate Receipt',
-            onPressed: onReceipt,
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Activity Log',
-            onPressed: onActivity,
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Room Settings',
-            onPressed: onSettings,
-          ),
-        ],
         bottom: TabBar(
           controller: tabController,
           tabs: const [
@@ -400,22 +341,10 @@ class _AnalyticsSheet extends ConsumerWidget {
     final total = expTotal + billTotal;
 
     if (expenses.isEmpty && bills.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.analytics_outlined,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No data this month',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
-          ],
-        ),
+      return const AppEmptyState(
+        icon: Icons.analytics_outlined,
+        title: 'No data this month',
+        subtitle: 'Add expenses or bills to see analytics',
       );
     }
 
@@ -455,7 +384,6 @@ class _AnalyticsSheet extends ConsumerWidget {
     }
 
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return ListView(
       controller: scrollController,
@@ -506,7 +434,7 @@ class _AnalyticsSheet extends ConsumerWidget {
         const SizedBox(height: 14),
         // Stats banner
         Container(
-          decoration: _cardDeco(context),
+          decoration: appCardDecoration(context),
           padding: const EdgeInsets.symmetric(vertical: 14),
           child: Row(
             children: [
@@ -528,11 +456,11 @@ class _AnalyticsSheet extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         // Categories
-        _SectionHeader(label: 'Categories', color: _kBlue),
-        const SizedBox(height: 10),
+        AppSectionHeader(title: 'Categories'),
+        const SizedBox(height: AppSpacing.sm),
         Container(
-          decoration: _cardDeco(context),
-          padding: const EdgeInsets.all(16),
+          decoration: appCardDecoration(context),
+          padding: const EdgeInsets.all(AppSpacing.base),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -635,8 +563,8 @@ class _AnalyticsSheet extends ConsumerWidget {
           final color = _kPalette[idx % _kPalette.length];
           final pct = total > 0 ? entry.value / total : 0.0;
           return Container(
-            margin: const EdgeInsets.only(top: 6),
-            decoration: _cardDeco(context),
+            margin: const EdgeInsets.only(top: AppSpacing.xs),
+            decoration: appCardDecoration(context, accentColor: color),
             child: Row(
               children: [
                 Container(
@@ -644,15 +572,15 @@ class _AnalyticsSheet extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: color,
                     borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(20),
+                      left: Radius.circular(AppRadius.xl),
                     ),
                   ),
                 ),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,10 +590,7 @@ class _AnalyticsSheet extends ConsumerWidget {
                             Expanded(
                               child: Text(
                                 entry.key,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                style: AppTextStyles.sectionHeader(context),
                               ),
                             ),
                             Text(
@@ -678,15 +603,13 @@ class _AnalyticsSheet extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 5),
+                        const SizedBox(height: AppSpacing.xs),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: pct.toDouble(),
-                            minHeight: 4,
-                            backgroundColor: isDark
-                                ? Colors.white12
-                                : Colors.black.withValues(alpha: 0.06),
+                            minHeight: 5,
+                            backgroundColor: AppColors.border(context),
                             valueColor: AlwaysStoppedAnimation(color),
                           ),
                         ),
@@ -701,11 +624,11 @@ class _AnalyticsSheet extends ConsumerWidget {
         const SizedBox(height: 16),
         // Daily spending
         if (days.isNotEmpty) ...[
-          _SectionHeader(label: 'Daily Spending', color: _kTeal),
-          const SizedBox(height: 10),
+          AppSectionHeader(title: 'Daily Spending'),
+          const SizedBox(height: AppSpacing.sm),
           Container(
-            decoration: _cardDeco(context),
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+            decoration: appCardDecoration(context),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.base, AppSpacing.md, AppSpacing.sm),
             child: SizedBox(
               height: 140,
               child: BarChart(
@@ -762,23 +685,23 @@ class _AnalyticsSheet extends ConsumerWidget {
         ],
         // Who paid
         if (membersSorted.isNotEmpty) ...[
-          _SectionHeader(label: 'Who Paid', color: _kPurple),
-          const SizedBox(height: 10),
+          AppSectionHeader(title: 'Who Paid'),
+          const SizedBox(height: AppSpacing.sm),
           ...membersSorted.map((entry) {
             final name = nameMap[entry.key] ?? entry.key;
             final pct = total > 0 ? entry.value / total : 0.0;
             return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              decoration: _cardDeco(context),
+              margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+              decoration: appCardDecoration(context, accentColor: _kPurple),
               child: Row(
                 children: [
                   Container(
-                    width: 3,
+                    width: 4,
                     height: 60,
                     decoration: BoxDecoration(
                       color: _kPurple,
                       borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(20),
+                        left: Radius.circular(AppRadius.xl),
                       ),
                     ),
                   ),
@@ -812,10 +735,8 @@ class _AnalyticsSheet extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: pct,
-                            minHeight: 4,
-                            backgroundColor: isDark
-                                ? Colors.white12
-                                : Colors.black.withValues(alpha: 0.06),
+                            minHeight: 5,
+                            backgroundColor: AppColors.border(context),
                             valueColor: const AlwaysStoppedAnimation(_kPurple),
                           ),
                         ),
@@ -860,11 +781,7 @@ class _StatCell extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _StatCell({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  const _StatCell({required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -872,57 +789,11 @@ class _StatCell extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
+          Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ),
+          Text(label, style: AppTextStyles.caption(context)),
         ],
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _SectionHeader({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1170,84 +1041,89 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
         nameMap[m.uid] = m.name;
       }
     }
+    final cs = Theme.of(context).colorScheme;
 
     return Column(
       children: [
-        // Always-visible chip bar: sort chips + filter icon
         Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color:
-                  Theme.of(context).cardTheme.color ??
-                  Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _sortChip('Newest', _SortOption.timeDesc),
-                        const SizedBox(width: 6),
-                        _sortChip('Oldest', _SortOption.timeAsc),
-                        const SizedBox(width: 6),
-                        _sortChip('Amount \u2191', _SortOption.amountAsc),
-                        const SizedBox(width: 6),
-                        _sortChip('Amount \u2193', _SortOption.amountDesc),
-                        if (_hasActiveFilters) ...[
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: _clearFilters,
-                            child: Chip(
-                              label: const Text(
-                                'Clear',
-                                style: TextStyle(fontSize: 11),
-                              ),
-                              deleteIcon: const Icon(Icons.close, size: 14),
-                              onDeleted: _clearFilters,
-                              visualDensity: VisualDensity.compact,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: _RoomFilterChip(
+                  label: 'Newest',
+                  selected: _sortOption == _SortOption.timeDesc,
+                  onTap: () => setState(() => _sortOption = _SortOption.timeDesc),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _RoomFilterChip(
+                  label: 'Oldest',
+                  selected: _sortOption == _SortOption.timeAsc,
+                  onTap: () => setState(() => _sortOption = _SortOption.timeAsc),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _RoomFilterChip(
+                  label: 'Amt ↑',
+                  selected: _sortOption == _SortOption.amountAsc,
+                  onTap: () => setState(() => _sortOption = _SortOption.amountAsc),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _RoomFilterChip(
+                  label: 'Amt ↓',
+                  selected: _sortOption == _SortOption.amountDesc,
+                  onTap: () => setState(() => _sortOption = _SortOption.amountDesc),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _showFilterSheet(nameMap),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _hasActiveFilters
+                        ? cs.primary
+                        : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(
+                    Icons.tune_rounded,
+                    size: 18,
+                    color: _hasActiveFilters
+                        ? Colors.white
+                        : cs.onSurface.withValues(alpha: .6),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Filter icon
+              ),
+            ],
+          ),
+        ),
+        if (_hasActiveFilters)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: Row(
+              children: [
+                Text(
+                  'Filters active',
+                  style: TextStyle(fontSize: 11, color: cs.primary, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 6),
                 GestureDetector(
-                  onTap: () => _showFilterSheet(nameMap),
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: _hasActiveFilters
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.tune,
-                      size: 20,
-                      color: _hasActiveFilters
-                          ? Colors.white
-                          : Theme.of(context).iconTheme.color,
-                    ),
+                  onTap: _clearFilters,
+                  child: Text(
+                    '· Clear',
+                    style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: .45)),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-
-        // Expense list
         Expanded(
           child: expensesAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -1255,43 +1131,35 @@ class _ExpensesTabState extends ConsumerState<_ExpensesTab> {
             data: (expenses) {
               final filtered = _applyFiltersAndSort(expenses);
               if (filtered.isEmpty) {
-                return Center(
-                  child: Text(
-                    _hasActiveFilters
-                        ? 'No expenses match filters'
-                        : 'No expenses this month',
-                  ),
+                return AppEmptyState(
+                  icon: Icons.receipt_long_outlined,
+                  title: _hasActiveFilters ? 'No expenses match filters' : 'No expenses this month',
+                  subtitle: _hasActiveFilters ? 'Try adjusting your filters' : 'Tap + to add the first expense',
                 );
               }
               return ListView(
-                padding: const EdgeInsets.all(12),
-                children: filtered
-                    .map(
-                      (e) => _ExpenseTile(
-                        expense: e,
-                        isAdmin: isAdmin,
-                        userId: userId,
-                        roomId: widget.roomId,
-                        nameMap: nameMap,
-                      ),
-                    )
-                    .toList(),
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${filtered.length} expense${filtered.length == 1 ? '' : 's'}',
+                      style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: .45)),
+                    ),
+                  ),
+                  ...filtered.map((e) => _ExpenseTile(
+                    expense: e,
+                    isAdmin: isAdmin,
+                    userId: userId,
+                    roomId: widget.roomId,
+                    nameMap: nameMap,
+                  )),
+                ],
               );
             },
           ),
         ),
       ],
-    );
-  }
-
-  Widget _sortChip(String label, _SortOption option) {
-    final selected = _sortOption == option;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => setState(() => _sortOption = option),
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
   }
 }
@@ -1368,15 +1236,25 @@ class _FilterBottomSheetState extends State<_FilterBottomSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: AppSpacing.base,
+        right: AppSpacing.base,
+        top: AppSpacing.base,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.base,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .15),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1531,62 +1409,99 @@ class _ExpenseTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
-    final canDelete =
-        (room?.canWrite(userId) ?? false) &&
+    final canDelete = (room?.canWrite(userId) ?? false) &&
         (expense.createdBy == userId || isAdmin);
-    final icon =
-        RoomConstants.categoryIcons[expense.category] ?? Icons.receipt_long;
-    final paidByName = expense.paidBy == userId
-        ? 'You'
-        : (nameMap[expense.paidBy] ?? expense.paidBy);
-    final hasReceipt =
-        expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty;
-
+    final icon = RoomConstants.categoryIcons[expense.category] ?? Icons.receipt_long_outlined;
+    final paidByName = expense.paidBy == userId ? 'You' : (nameMap[expense.paidBy] ?? expense.paidBy);
+    final isPaidByMe = expense.paidBy == userId;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = isPaidByMe ? _kGreen : _kRed;
+
     final tile = Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: appCardDecoration(context, accentColor: cs.primary),
-      child: ListTile(
-        tileColor: Colors.transparent,
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
-            borderRadius: BorderRadius.circular(12),
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerHigh : cs.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: accent.withValues(alpha: isDark ? .15 : .12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? .10 : .03),
+            blurRadius: 8, offset: const Offset(0, 2),
           ),
-          child: Center(child: Icon(icon, size: 20, color: cs.primary)),
-        ),
-        title: Text(expense.title),
-        subtitle: Text(
-          '${expense.category} • ${DateFormat('dd MMM').format(expense.date)} • $paidByName',
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasReceipt)
-              IconButton(
-                icon: Icon(
-                  Icons.visibility,
-                  size: 20,
-                  color: const Color(0xFF10B981),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          onTap: () => showViewExpenseSheet(context, roomId: roomId, expense: expense),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Icon(icon, size: 18, color: accent),
                 ),
-                tooltip: 'View Receipt',
-                onPressed: () => _showReceipt(context, expense.receiptUrl!),
-              ),
-            Text(
-              '₹${expense.amount.toStringAsFixed(0)}',
-              style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              expense.title,
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text(
+                            '₹${expense.amount.toStringAsFixed(0)}',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: accent),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${expense.category}  ·  ${DateFormat('dd MMM').format(expense.date)}  ·  $paidByName',
+                        style: AppTextStyles.caption(context),
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                      ),
+                      if (expense.splitAmong.length > 1) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.primary.withValues(alpha: .08),
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: Text(
+                            'Split ${expense.splitAmong.length} ways  ·  ₹${(expense.amount / expense.splitAmong.length).toStringAsFixed(0)} each',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.primary),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-        onTap: () =>
-            showViewExpenseSheet(context, roomId: roomId, expense: expense),
       ),
     );
 
-    // Dismissible wrapper unchanged (only passes the tile)
     if (!canDelete) return tile;
     return Dismissible(
       key: Key(expense.id),
@@ -1595,10 +1510,10 @@ class _ExpenseTile extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: Colors.red.shade400,
-          borderRadius: BorderRadius.circular(16),
+          color: _kRed,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
-        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+        child: const Icon(Icons.delete_rounded, color: Colors.white, size: 26),
       ),
       confirmDismiss: (_) async {
         final confirmed = await showDialog<bool>(
@@ -1607,16 +1522,10 @@ class _ExpenseTile extends ConsumerWidget {
             title: const Text('Delete Expense'),
             content: Text('Delete "${expense.title}"?'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel'),
-              ),
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
-                ),
+                child: const Text('Delete', style: TextStyle(color: Colors.red)),
               ),
             ],
           ),
@@ -1626,67 +1535,12 @@ class _ExpenseTile extends ConsumerWidget {
             await ref.read(deleteRoomExpenseProvider)(roomId, expense, userId);
           } catch (e) {
             if (context.mounted)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Unable to delete expense: $e')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to delete: $e')));
           }
         }
         return false;
       },
       child: tile,
-    );
-  }
-
-  void _showReceipt(BuildContext context, String url) {
-    final isLocal = !url.startsWith('http');
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppBar(
-              title: const Text('Receipt'),
-              automaticallyImplyLeading: false,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
-              ),
-              child: isLocal
-                  ? Image.file(
-                      File(url),
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Failed to load image'),
-                      ),
-                    )
-                  : Image.network(
-                      url,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (_, child, progress) {
-                        if (progress == null) return child;
-                        return const Padding(
-                          padding: EdgeInsets.all(32),
-                          child: CircularProgressIndicator(),
-                        );
-                      },
-                      errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Failed to load image'),
-                      ),
-                    ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -1703,131 +1557,204 @@ class _BillsTab extends ConsumerWidget {
       billsStreamProvider(MonthBillKey(roomId: roomId, month: month)),
     );
     final members = ref.watch(
-      monthParticipantIdsProvider(
-        MonthBalanceKey(roomId: roomId, month: month),
-      ),
+      monthParticipantIdsProvider(MonthBalanceKey(roomId: roomId, month: month)),
     );
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final userId = ref.read(currentUserIdProvider);
     final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
-    final isAdmin =
-        (room?.isAdmin(userId) ?? false) && (room?.canWrite(userId) ?? false);
+    final isAdmin = (room?.isAdmin(userId) ?? false) && (room?.canWrite(userId) ?? false);
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
-        nameMap[m.uid] = m.name;
-      }
+      for (final m in membersAsync.value!) nameMap[m.uid] = m.name;
     }
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return billsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (bills) {
         if (bills.isEmpty)
-          return const Center(child: Text('No bills this month'));
+          return const AppEmptyState(
+            icon: Icons.receipt_outlined,
+            title: 'No bills this month',
+            subtitle: 'Tap + to add rent, electricity or water bills',
+          );
         return ListView(
-          padding: const EdgeInsets.all(12),
-          children: bills.map((bill) {
-            final paidBy = nameMap[bill.paidBy] ?? bill.paidBy;
-            final icon = switch (bill.type) {
-              BillType.rent => Icons.home,
-              BillType.electricity => Icons.bolt,
-              BillType.water => Icons.water_drop,
-            };
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            final billColor = switch (bill.type) {
-              BillType.rent => const Color(0xFF6366F1),
-              BillType.electricity => const Color(0xFFF59E0B),
-              BillType.water => const Color(0xFF3B82F6),
-            };
-            final card = Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: appCardDecoration(context, accentColor: billColor),
-              child: ListTile(
-                tileColor: Colors.transparent,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: billColor.withValues(alpha: isDark ? 0.18 : 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(child: Icon(icon, size: 20, color: billColor)),
-                ),
-                title: Text(bill.typeName),
-                subtitle: Text(
-                  'Paid by $paidBy • ${DateFormat('dd MMM').format(bill.date)}',
-                ),
-                trailing: Text(
-                  '₹${bill.amount.toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: billColor,
-                  ),
-                ),
-                onTap: () =>
-                    showViewBillSheet(context, roomId: roomId, bill: bill),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 80),
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${bills.length} bill${bills.length == 1 ? '' : 's'}',
+                style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: .45)),
               ),
-            );
-
-            if (!(room?.canWrite(userId) ?? false) ||
-                !(isAdmin || bill.paidBy == userId))
-              return card;
-
-            return Dismissible(
-              key: Key(bill.id),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
+            ),
+            ...bills.map((bill) {
+              final paidBy = bill.paidBy == userId ? 'You' : (nameMap[bill.paidBy] ?? bill.paidBy);
+              final icon = switch (bill.type) {
+                BillType.rent => Icons.home_rounded,
+                BillType.electricity => Icons.bolt_rounded,
+                BillType.water => Icons.water_drop_rounded,
+              };
+              final billColor = switch (bill.type) {
+                BillType.rent => _kIndigo,
+                BillType.electricity => _kAmber,
+                BillType.water => _kBlue,
+              };
+              final card = Container(
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade400,
-                  borderRadius: BorderRadius.circular(16),
+                  color: isDark ? cs.surfaceContainerHigh : cs.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  border: Border.all(color: billColor.withValues(alpha: isDark ? .15 : .12)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? .10 : .03),
+                      blurRadius: 8, offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.delete, color: Colors.white),
-              ),
-              confirmDismiss: (_) async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Delete Bill'),
-                    content: Text('Delete "${bill.typeName}"?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  child: InkWell(
+                    onTap: () => showViewBillSheet(context, roomId: roomId, bill: bill),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40, height: 40,
+                            decoration: BoxDecoration(
+                              color: billColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: Icon(icon, size: 18, color: billColor),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        bill.typeName,
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: AppSpacing.sm),
+                                    Text(
+                                      '₹${bill.amount.toStringAsFixed(0)}',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: billColor),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  'Paid by $paidBy  ·  ${DateFormat('dd MMM').format(bill.date)}',
+                                  style: AppTextStyles.caption(context),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text(
-                          'Delete',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                );
-                if (confirmed == true) {
-                  try {
-                    await ref.read(deleteRoomBillProvider)(
-                      roomId,
-                      bill,
-                      userId,
-                    );
-                  } catch (e) {
-                    if (context.mounted)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Unable to delete bill: $e')),
-                      );
+                ),
+              );
+
+              if (!(room?.canWrite(userId) ?? false) || !(isAdmin || bill.paidBy == userId))
+                return card;
+
+              return Dismissible(
+                key: Key(bill.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  decoration: BoxDecoration(
+                    color: _kRed,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                  child: const Icon(Icons.delete_rounded, color: Colors.white, size: 26),
+                ),
+                confirmDismiss: (_) async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete Bill'),
+                      content: Text('Delete "${bill.typeName}"?'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) {
+                    try {
+                      await ref.read(deleteRoomBillProvider)(roomId, bill, userId);
+                    } catch (e) {
+                      if (context.mounted)
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Unable to delete: $e')));
+                    }
                   }
-                }
-                return false;
-              },
-              child: card,
-            );
-          }).toList(),
+                  return false;
+                },
+                child: card,
+              );
+            }),
+          ],
         );
       },
+    );
+  }
+}
+
+// ========== ROOM FILTER CHIP ==========
+class _RoomFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _RoomFilterChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? cs.primary
+              : isDark ? cs.surfaceContainerHigh : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: selected ? cs.onPrimary : cs.onSurface.withValues(alpha: .65),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

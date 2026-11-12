@@ -162,10 +162,10 @@ service cloud.firestore {
         return !resource.data.get('isArchived', false) && !resource.data.get('isLocked', false)
           && !(request.auth.uid in resource.data.memberIds)
           && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['memberIds', 'participantIds', 'legacyBillMemberIds', 'ledgerVersion'])
+              .hasOnly(['memberIds', 'participantIds', 'ledgerVersion'])
           && request.resource.data.memberIds.toSet() == resource.data.memberIds.toSet().union([request.auth.uid].toSet())
           && request.resource.data.memberIds.size() == resource.data.memberIds.size() + 1
-          && request.resource.data.memberIds.size() <= 10 && stableHistory() && stableLegacyBills();
+          && request.resource.data.memberIds.size() <= 10 && stableHistory();
       }
       function leaving() {
         let removed = resource.data.memberIds.removeAll(request.resource.data.memberIds);

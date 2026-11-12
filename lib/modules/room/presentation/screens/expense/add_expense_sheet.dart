@@ -6,9 +6,10 @@ import 'package:split_ex/modules/room/presentation/config/room_constants.dart';
 import 'package:split_ex/modules/room/domain/entities/expense_model.dart';
 import 'package:split_ex/modules/room/domain/policies/split_calculator.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
-import 'package:split_ex/modules/room/presentation/widgets/receipt_picker.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showAddExpenseSheet(
   BuildContext context, {
@@ -35,14 +36,13 @@ class _AddExpenseSheet extends ConsumerStatefulWidget {
 
 class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _amountController = TextEditingController();
+  final _titleCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
   String _category = RoomConstants.expenseCategories.first;
   late DateTime _date;
   SplitType _splitType = SplitType.equal;
   List<String> _selectedMembers = [];
   bool _isLoading = false;
-  String? _receiptUrl;
 
   @override
   void initState() {
@@ -52,27 +52,15 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
+    _titleCtrl.dispose();
+    _amountCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) setState(() => _date = picked);
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-
     final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
     if (room == null) return;
-
     final userId = ref.read(currentUserIdProvider);
     if (!room.canWrite(userId)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,8 +68,8 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
       );
       return;
     }
-    List<String> splitAmong;
 
+    List<String> splitAmong;
     switch (_splitType) {
       case SplitType.equal:
         splitAmong = room.memberIds;
@@ -110,8 +98,8 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
     try {
       final expense = ExpenseModel(
         id: '',
-        title: _titleController.text.trim(),
-        amount: double.parse(_amountController.text.trim()),
+        title: _titleCtrl.text.trim(),
+        amount: double.parse(_amountCtrl.text.trim()),
         category: _category,
         date: _date,
         paidBy: userId,
@@ -120,17 +108,13 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
         createdBy: userId,
         createdAt: DateTime.now(),
         month: DateFormat('yyyy-MM').format(_date),
-        receiptUrl: _receiptUrl,
       );
-
       await ref.read(recordRoomExpenseProvider)(widget.roomId, expense);
       if (mounted) Navigator.pop(context);
     } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -139,439 +123,249 @@ class _AddExpenseSheetState extends ConsumerState<_AddExpenseSheet> {
   @override
   Widget build(BuildContext context) {
     final room = ref.watch(roomStreamProvider(widget.roomId)).valueOrNull;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return PersonalFormSheet(
+      title: 'Add Expense',
+      icon: Icons.add_circle_outline_rounded,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Amount
+            TextFormField(
+              controller: _amountCtrl,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹)',
+                prefixIcon: Icon(Icons.currency_rupee_rounded),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                if (double.tryParse(v) == null || double.parse(v) <= 0)
+                  return 'Enter a valid amount';
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
+            // Title
+            TextFormField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                hintText: 'e.g. Groceries, Electricity',
+                prefixIcon: Icon(Icons.receipt_long_outlined),
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'Required' : null,
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Category + Date
+            Row(
               children: [
-                // Drag handle
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _category,
+                    decoration: const InputDecoration(
+                      labelText: 'Category',
+                      prefixIcon: Icon(Icons.label_outline_rounded),
+                      contentPadding: EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
                     ),
+                    items: RoomConstants.expenseCategories
+                        .map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(c,
+                                style: const TextStyle(fontSize: 14))))
+                        .toList(),
+                    onChanged: (v) => setState(() => _category = v!),
+                    isExpanded: true,
                   ),
                 ),
-                // Header
-                Row(
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Add Expense',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Title field
-                TextFormField(
-                  controller: _titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Title',
-                    labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(
-                      Icons.receipt_long,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                    hintText: 'e.g. Groceries, Electricity',
-                    hintStyle: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'Enter title' : null,
-                  textInputAction: TextInputAction.next,
-                ),
-                const SizedBox(height: 16),
-
-                // Amount field
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Amount (₹)',
-                    labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(
-                      Icons.currency_rupee,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter amount';
-                    if (double.tryParse(v) == null || double.parse(v) <= 0) {
-                      return 'Enter valid amount';
-                    }
-                    return null;
+                const SizedBox(width: AppSpacing.md),
+                RoomDateButton(
+                  date: _date,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _date,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                    );
+                    if (picked != null) setState(() => _date = picked);
                   },
-                  textInputAction: TextInputAction.done,
-                ),
-                const SizedBox(height: 16),
-
-                // Category & Date row
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _category,
-                        decoration: InputDecoration(
-                          labelText: 'Category',
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.normal,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.category,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.5),
-                          ),
-                          filled: true,
-                          fillColor: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.5),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                        ),
-                        items: RoomConstants.expenseCategories
-                            .map(
-                              (c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(
-                                  c,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) => setState(() => _category = v!),
-                        isExpanded: true,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    InkWell(
-                      onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: 18,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.6),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              DateFormat('dd MMM yyyy').format(_date),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.normal,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Receipt picker
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: ReceiptPicker(
-                    roomId: widget.roomId,
-                    folder: 'expenses',
-                    onUploaded: (url) => _receiptUrl = url,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Split method section
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.splitscreen_rounded,
-                            size: 18,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Split method',
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: SegmentedButton<SplitType>(
-                          segments: const [
-                            ButtonSegment(
-                              value: SplitType.equal,
-                              label: Text('Equal'),
-                            ),
-                            ButtonSegment(
-                              value: SplitType.dynamic,
-                              label: Text('Custom'),
-                            ),
-                            ButtonSegment(
-                              value: SplitType.oneToOne,
-                              label: Text('1-to-1'),
-                            ),
-                          ],
-                          selected: {_splitType},
-                          onSelectionChanged: (v) => setState(() {
-                            _splitType = v.first;
-                            _selectedMembers = [];
-                          }),
-                          style: ButtonStyle(
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            backgroundColor: MaterialStateProperty.resolveWith((
-                              states,
-                            ) {
-                              if (states.contains(MaterialState.selected))
-                                return Theme.of(context).colorScheme.primary;
-                              return Colors.transparent;
-                            }),
-                            foregroundColor: MaterialStateProperty.resolveWith((
-                              states,
-                            ) {
-                              if (states.contains(MaterialState.selected))
-                                return Colors.white;
-                              return Theme.of(context).colorScheme.onSurface;
-                            }),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Member selection (if not equal)
-                if (_splitType != SplitType.equal && room != null) ...[
-                  const SizedBox(height: 20),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.people_alt_rounded,
-                              size: 18,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.6),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _splitType == SplitType.oneToOne
-                                  ? 'Who owes the full amount?'
-                                  : 'Share with:',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        ..._buildMemberChips(room.memberIds),
-                      ],
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-
-                // Save button
-                FilledButton(
-                  onPressed: _isLoading ? null : _save,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Add Expense',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: AppSpacing.base),
+
+            // Split method
+            Text(
+              'Split Method',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SegmentedButton<SplitType>(
+              segments: const [
+                ButtonSegment(value: SplitType.equal, label: Text('Equal')),
+                ButtonSegment(value: SplitType.dynamic, label: Text('Custom')),
+                ButtonSegment(
+                    value: SplitType.oneToOne, label: Text('1-to-1')),
+              ],
+              selected: {_splitType},
+              onSelectionChanged: (v) => setState(() {
+                _splitType = v.first;
+                _selectedMembers = [];
+              }),
+            ),
+
+            // Member picker
+            if (_splitType != SplitType.equal && room != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              RoomMemberPicker(
+                memberIds: room.memberIds,
+                payerId: ref.read(currentUserIdProvider),
+                splitType: _splitType,
+                selected: _selectedMembers,
+                onChanged: (v) => setState(() => _selectedMembers = v),
+              ),
+            ],
+            const SizedBox(height: AppSpacing.xl),
+
+            FilledButton(
+              onPressed: _isLoading ? null : _save,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Add Expense'),
+            ),
+          ],
         ),
       ),
     );
   }
+}
 
-  List<Widget> _buildMemberChips(List<String> memberIds) {
-    final userId = ref.read(currentUserIdProvider);
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+class RoomDateButton extends StatelessWidget {
+  final DateTime date;
+  final VoidCallback onTap;
+  const RoomDateButton({required this.date, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: cs.outline.withValues(alpha: .15)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_rounded,
+                size: 16, color: cs.onSurface.withValues(alpha: .55)),
+            const SizedBox(width: 6),
+            Text(DateFormat('dd MMM').format(date),
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RoomMemberPicker extends ConsumerWidget {
+  final List<String> memberIds;
+  final String payerId;
+  final SplitType splitType;
+  final List<String> selected;
+  final ValueChanged<List<String>> onChanged;
+  const RoomMemberPicker({
+    required this.memberIds,
+    required this.payerId,
+    required this.splitType,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
     final membersAsync = ref.watch(userProfilesByIdsProvider(memberIds));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
-        nameMap[m.uid] = m.name;
-      }
+      for (final m in membersAsync.value!) nameMap[m.uid] = m.name;
     }
+    final others = memberIds.where((id) => id != payerId).toList();
 
-    final others = memberIds.where((id) => id != userId).toList();
-
-    return [
-      Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        children: others.map((memberId) {
-          final selected = _selectedMembers.contains(memberId);
-          return FilterChip(
-            label: Text(
-              nameMap[memberId] ?? memberId,
-              style: const TextStyle(
-                fontWeight: FontWeight.normal,
-                fontFamily: 'Gilmer', // enforce Gilmer
-              ),
-            ),
-            selected: selected,
-            onSelected: (checked) {
-              setState(() {
-                if (_splitType == SplitType.oneToOne) {
-                  _selectedMembers = checked ? [memberId] : [];
-                } else {
-                  _selectedMembers = SplitCalculator.updateDynamicParticipants(
-                    selected: _selectedMembers,
-                    payerId: userId,
-                    memberId: memberId,
-                    included: checked,
-                  );
-                }
-              });
-            },
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            selectedColor: Theme.of(
-              context,
-            ).colorScheme.primary.withValues(alpha: 0.2),
-            checkmarkColor: Theme.of(context).colorScheme.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-          );
-        }).toList(),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: .5),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
-    ];
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.people_alt_rounded,
+                size: 16, color: cs.onSurface.withValues(alpha: .55)),
+            const SizedBox(width: 6),
+            Text(
+              splitType == SplitType.oneToOne
+                  ? 'Who owes the full amount?'
+                  : 'Share with:',
+              style: const TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: others.map((id) {
+              final isSelected = selected.contains(id);
+              return FilterChip(
+                label: Text(nameMap[id] ?? id),
+                selected: isSelected,
+                onSelected: (checked) {
+                  if (splitType == SplitType.oneToOne) {
+                    onChanged(checked ? [id] : []);
+                  } else {
+                    onChanged(SplitCalculator.updateDynamicParticipants(
+                      selected: selected,
+                      payerId: payerId,
+                      memberId: id,
+                      included: checked,
+                    ));
+                  }
+                },
+                selectedColor: cs.primary.withValues(alpha: .18),
+                checkmarkColor: cs.primary,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.xxl)),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
   }
 }

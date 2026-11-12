@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:split_ex/modules/room/dependencies.dart';
@@ -11,6 +10,10 @@ import 'package:split_ex/modules/room/domain/entities/room_expense_update.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/modules/room/presentation/screens/expense/add_expense_sheet.dart'
+    show RoomDateButton, RoomMemberPicker;
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showViewExpenseSheet(
   BuildContext context, {
@@ -38,8 +41,8 @@ class _ViewExpenseSheet extends ConsumerStatefulWidget {
 class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
   bool _editing = false;
   bool _isLoading = false;
-  late TextEditingController _titleController;
-  late TextEditingController _amountController;
+  late TextEditingController _titleCtrl;
+  late TextEditingController _amountCtrl;
   late String _category;
   late DateTime _date;
   late SplitType _splitType;
@@ -48,10 +51,9 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.expense.title);
-    _amountController = TextEditingController(
-      text: widget.expense.amount.toStringAsFixed(2),
-    );
+    _titleCtrl = TextEditingController(text: widget.expense.title);
+    _amountCtrl = TextEditingController(
+        text: widget.expense.amount.toStringAsFixed(2));
     _category = widget.expense.category;
     _date = widget.expense.date;
     _splitType = widget.expense.splitType;
@@ -60,8 +62,8 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
+    _titleCtrl.dispose();
+    _amountCtrl.dispose();
     super.dispose();
   }
 
@@ -73,23 +75,21 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
             (room?.isAdmin(userId) ?? false));
   }
 
-  Future<void> _pickDate() async {
-    if (!_editing) return;
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) setState(() => _date = picked);
-  }
+  void _cancelEdit() => setState(() {
+        _editing = false;
+        _titleCtrl.text = widget.expense.title;
+        _amountCtrl.text = widget.expense.amount.toStringAsFixed(0);
+        _category = widget.expense.category;
+        _date = widget.expense.date;
+        _splitType = widget.expense.splitType;
+        _selectedMembers = List<String>.from(widget.expense.splitAmong);
+      });
 
   Future<void> _save() async {
     if (!_canEdit) return;
-    if (_titleController.text.trim().isEmpty ||
-        _amountController.text.trim().isEmpty)
+    if (_titleCtrl.text.trim().isEmpty || _amountCtrl.text.trim().isEmpty)
       return;
-    final amount = double.tryParse(_amountController.text.trim());
+    final amount = double.tryParse(_amountCtrl.text.trim());
     if (amount == null || amount <= 0) return;
 
     final room = ref.read(roomStreamProvider(widget.roomId)).valueOrNull;
@@ -103,8 +103,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
       case SplitType.dynamic:
         if (_selectedMembers.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Select at least one member')),
-          );
+              const SnackBar(content: Text('Select at least one member')));
           return;
         }
         splitAmong = _selectedMembers;
@@ -112,8 +111,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
       case SplitType.oneToOne:
         if (_selectedMembers.length != 1) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Select exactly one person')),
-          );
+              const SnackBar(content: Text('Select exactly one person')));
           return;
         }
         splitAmong = [_selectedMembers.first];
@@ -127,7 +125,7 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
         widget.roomId,
         widget.expense,
         RoomExpenseUpdate(
-          title: _titleController.text.trim(),
+          title: _titleCtrl.text.trim(),
           amount: amount,
           category: _category,
           date: _date,
@@ -139,34 +137,58 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _cancelEdit() {
-    setState(() {
-      _editing = false;
-      _titleController.text = widget.expense.title;
-      _amountController.text = widget.expense.amount.toStringAsFixed(0);
-      _category = widget.expense.category;
-      _date = widget.expense.date;
-      _splitType = widget.expense.splitType;
-      _selectedMembers = List<String>.from(widget.expense.splitAmong);
-    });
+  Future<void> _delete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.xl)),
+        title: const Text('Delete Expense?'),
+        content: Text('Delete "${widget.expense.title}"?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error(context)),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() => _isLoading = true);
+    final userId = ref.read(currentUserIdProvider);
+    try {
+      await ref.read(deleteRoomExpenseProvider)(
+          widget.roomId, widget.expense, userId);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
+  // Dead code — receipt button removed from UI
   void _showReceipt(BuildContext context, String path) {
     final isLocal = !path.startsWith('http');
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -175,39 +197,27 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
               automaticallyImplyLeading: false,
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx))
               ],
             ),
             ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.5,
-              ),
+                  maxHeight: MediaQuery.of(context).size.height * 0.5),
               child: isLocal
-                  ? Image.file(
-                      File(path),
-                      fit: BoxFit.contain,
+                  ? Image.file(File(path), fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Failed to load image'),
-                      ),
-                    )
-                  : Image.network(
-                      path,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (_, child, progress) {
-                        if (progress == null) return child;
-                        return const Padding(
                           padding: EdgeInsets.all(32),
-                          child: CircularProgressIndicator(),
-                        );
-                      },
+                          child: Text('Failed to load image')))
+                  : Image.network(path, fit: BoxFit.contain,
+                      loadingBuilder: (_, child, p) => p == null
+                          ? child
+                          : const Padding(
+                              padding: EdgeInsets.all(32),
+                              child: CircularProgressIndicator()),
                       errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Text('Failed to load image'),
-                      ),
-                    ),
+                          padding: EdgeInsets.all(32),
+                          child: Text('Failed to load image'))),
             ),
           ],
         ),
@@ -226,523 +236,248 @@ class _ViewExpenseSheetState extends ConsumerState<_ViewExpenseSheet> {
     final membersAsync = ref.watch(userProfilesByIdsProvider(members));
     final nameMap = <String, String>{};
     if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
-        nameMap[m.uid] = m.name;
-      }
+      for (final m in membersAsync.value!) nameMap[m.uid] = m.name;
     }
-    final paidByName = nameMap[widget.expense.paidBy] ?? widget.expense.paidBy;
-    final splitNames = widget.expense.splitAmong
-        .map((id) => nameMap[id] ?? id)
-        .join(', ');
-    final icon =
-        RoomConstants.categoryIcons[widget.expense.category] ??
-        Icons.receipt_long;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final paidByName =
+        nameMap[widget.expense.paidBy] ?? widget.expense.paidBy;
+    final splitNames =
+        widget.expense.splitAmong.map((id) => nameMap[id] ?? id).join(', ');
+    final icon = RoomConstants.categoryIcons[widget.expense.category] ??
+        Icons.receipt_long_rounded;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+    if (_editing) return _buildEditMode(context, room, members);
+
+    // ── VIEW MODE ──
+    return PersonalFormSheet(
+      title: 'Expense Details',
+      icon: icon,
+      trailing: _canEdit
+          ? Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                onPressed: () => setState(() => _editing = true),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Edit',
+                visualDensity: VisualDensity.compact,
               ),
-
-              // Header with icon and edit button
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      icon,
-                      size: 22,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Expense Details',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  if (_canEdit && !_editing)
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      tooltip: 'Edit',
-                      onPressed: () => setState(() => _editing = true),
-                    ),
-                  if (_editing)
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Cancel',
-                      onPressed: _cancelEdit,
-                    ),
-                ],
+              IconButton(
+                onPressed: _delete,
+                icon: Icon(Icons.delete_outline,
+                    color: AppColors.error(context)),
+                tooltip: 'Delete',
+                visualDensity: VisualDensity.compact,
               ),
-              const Divider(height: 24, thickness: 0.5),
-
-              // Title field
-              TextFormField(
-                controller: _titleController,
-                enabled: _editing,
-                decoration: InputDecoration(
-                  labelText: 'Title',
-                  labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                  prefixIcon: Icon(
-                    Icons.receipt_long,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+            ])
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.base),
+            decoration: appCardDecoration(context),
+            child: Column(children: [
+              RoomViewRow(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Title',
+                  value: widget.expense.title),
+              RoomViewRow(
+                icon: Icons.currency_rupee_rounded,
+                label: 'Amount',
+                value: '₹${widget.expense.amount.toStringAsFixed(2)}',
+                valueColor: AppColors.error(context),
               ),
-              const SizedBox(height: 16),
-
-              // Amount field
-              TextFormField(
-                controller: _amountController,
-                enabled: _editing,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Amount (₹)',
-                  labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                  prefixIcon: Icon(
-                    Icons.currency_rupee,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                  filled: true,
-                  fillColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+              RoomViewRow(
+                  icon: Icons.label_outline_rounded,
+                  label: 'Category',
+                  value: widget.expense.category),
+              RoomViewRow(
+                icon: Icons.calendar_today_rounded,
+                label: 'Date',
+                value: DateFormat('dd MMM yyyy').format(widget.expense.date),
               ),
-              const SizedBox(height: 16),
-
-              // Category & Date row
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _category,
-                      decoration: InputDecoration(
-                        labelText: 'Category',
-                        labelStyle: const TextStyle(
-                          fontWeight: FontWeight.normal,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.category,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                      items: RoomConstants.expenseCategories
-                          .map(
-                            (c) => DropdownMenuItem(
-                              value: c,
-                              child: Text(
-                                c,
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _editing
-                          ? (v) => setState(() => _category = v!)
-                          : null,
-                      isExpanded: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  InkWell(
-                    onTap: _editing ? _pickDate : null,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 18,
-                            color: Theme.of(context).colorScheme.onSurface
-                                .withValues(alpha: _editing ? 0.6 : 0.4),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            DateFormat('dd MMM yyyy').format(_date),
-                            style: TextStyle(
-                              fontWeight: FontWeight.normal,
-                              fontSize: 14,
-                              color: _editing
-                                  ? null
-                                  : Theme.of(context).colorScheme.onSurface
-                                        .withValues(alpha: 0.5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+              RoomViewRow(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Paid by',
+                  value: paidByName),
+              RoomViewRow(
+                  icon: Icons.call_split_rounded,
+                  label: 'Split',
+                  value: widget.expense.splitType.name),
+              RoomViewRow(
+                  icon: Icons.people_outline_rounded,
+                  label: 'Among',
+                  value: splitNames),
+              RoomViewRow(
+                icon: Icons.calculate_outlined,
+                label: 'Per person',
+                value:
+                    '₹${widget.expense.splitAmount.toStringAsFixed(2)}',
+                valueColor: AppColors.info(context),
               ),
-              const SizedBox(height: 20),
-
-              // Read-only info rows (styled as small cards)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    _InfoRow(label: 'Paid by', value: paidByName),
-                    const SizedBox(height: 6),
-                    _InfoRow(
-                      label: 'Split',
-                      value: widget.expense.splitType.name,
-                    ),
-                    const SizedBox(height: 6),
-                    _InfoRow(label: 'Among', value: splitNames),
-                    const SizedBox(height: 6),
-                    _InfoRow(
-                      label: 'Per person',
-                      value:
-                          '₹${widget.expense.splitAmount.toStringAsFixed(2)}',
-                      valueStyle: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Receipt button (if available)
-              if (widget.expense.receiptUrl != null) ...[
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () =>
-                      _showReceipt(context, widget.expense.receiptUrl!),
-                  icon: const Icon(Icons.image, size: 18),
-                  label: const Text('View Receipt'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    side: BorderSide(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                ),
-              ],
-
-              // Split method (edit mode only)
-              if (_editing) ...[
-                const SizedBox(height: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.splitscreen_rounded,
-                          size: 18,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Split method',
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: SegmentedButton<SplitType>(
-                        segments: const [
-                          ButtonSegment(
-                            value: SplitType.equal,
-                            label: Text('Equal'),
-                          ),
-                          ButtonSegment(
-                            value: SplitType.dynamic,
-                            label: Text('Custom'),
-                          ),
-                          ButtonSegment(
-                            value: SplitType.oneToOne,
-                            label: Text('1-to-1'),
-                          ),
-                        ],
-                        selected: {_splitType},
-                        onSelectionChanged: (v) => setState(() {
-                          _splitType = v.first;
-                          _selectedMembers = [];
-                        }),
-                        style: ButtonStyle(
-                          visualDensity: VisualDensity.compact,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: MaterialStateProperty.resolveWith((
-                            states,
-                          ) {
-                            if (states.contains(MaterialState.selected))
-                              return Theme.of(context).colorScheme.primary;
-                            return Colors.transparent;
-                          }),
-                          foregroundColor: MaterialStateProperty.resolveWith((
-                            states,
-                          ) {
-                            if (states.contains(MaterialState.selected))
-                              return Colors.white;
-                            return Theme.of(context).colorScheme.onSurface;
-                          }),
-                        ),
-                      ),
-                    ),
-                    if (_splitType != SplitType.equal && room != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest
-                              .withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.people_alt_rounded,
-                                  size: 18,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.6),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _splitType == SplitType.oneToOne
-                                      ? 'Who owes the full amount?'
-                                      : 'Share with:',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            _buildMemberChips(members),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-
-              // Save button (only in edit mode)
-              if (_editing) ...[
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isLoading ? null : _save,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Save Changes',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                ),
-              ],
-            ],
+            ]),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildMemberChips(List<String> memberIds) {
-    final userId = widget.expense.paidBy;
-    final membersAsync = ref.watch(userProfilesByIdsProvider(memberIds));
-    final nameMap = <String, String>{};
-    if (membersAsync.hasValue) {
-      for (final m in membersAsync.value!) {
-        nameMap[m.uid] = m.name;
-      }
-    }
-    final others = memberIds.where((id) => id != userId).toList();
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: others.map((memberId) {
-        final selected = _selectedMembers.contains(memberId);
-        return FilterChip(
-          label: Text(
-            nameMap[memberId] ?? memberId,
-            style: const TextStyle(fontWeight: FontWeight.normal),
+  Widget _buildEditMode(BuildContext context, dynamic room, List<String> members) {
+    final userId = ref.read(currentUserIdProvider);
+    return PersonalFormSheet(
+      title: 'Edit Expense',
+      icon: Icons.edit_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextFormField(
+            controller: _amountCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Amount (₹)',
+              prefixIcon: Icon(Icons.currency_rupee_rounded),
+            ),
           ),
-          selected: selected,
-          onSelected: (checked) {
-            setState(() {
-              if (_splitType == SplitType.oneToOne) {
-                _selectedMembers = checked ? [memberId] : [];
-              } else {
-                _selectedMembers = SplitCalculator.updateDynamicParticipants(
-                  selected: _selectedMembers,
-                  payerId: userId,
-                  memberId: memberId,
-                  included: checked,
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            controller: _titleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Title',
+              prefixIcon: Icon(Icons.receipt_long_outlined),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _category,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  prefixIcon: Icon(Icons.label_outline_rounded),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                items: RoomConstants.expenseCategories
+                    .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c,
+                            style: const TextStyle(fontSize: 14))))
+                    .toList(),
+                onChanged: (v) => setState(() => _category = v!),
+                isExpanded: true,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            RoomDateButton(
+              date: _date,
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
                 );
-              }
-            });
-          },
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          selectedColor: Theme.of(
-            context,
-          ).colorScheme.primary.withValues(alpha: 0.2),
-          checkmarkColor: Theme.of(context).colorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
+                if (picked != null) setState(() => _date = picked);
+              },
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.base),
+          Text('Split Method',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: AppSpacing.sm),
+          SegmentedButton<SplitType>(
+            segments: const [
+              ButtonSegment(value: SplitType.equal, label: Text('Equal')),
+              ButtonSegment(
+                  value: SplitType.dynamic, label: Text('Custom')),
+              ButtonSegment(
+                  value: SplitType.oneToOne, label: Text('1-to-1')),
+            ],
+            selected: {_splitType},
+            onSelectionChanged: (v) => setState(() {
+              _splitType = v.first;
+              _selectedMembers = [];
+            }),
           ),
-        );
-      }).toList(),
+          if (_splitType != SplitType.equal && room != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            RoomMemberPicker(
+              memberIds: room.memberIds as List<String>,
+              payerId: userId,
+              splitType: _splitType,
+              selected: _selectedMembers,
+              onChanged: (v) => setState(() => _selectedMembers = v),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _cancelEdit,
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: FilledButton(
+                onPressed: _isLoading ? null : _save,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Save'),
+              ),
+            ),
+          ]),
+        ],
+      ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
+// ── _ViewRow ─────────────────────────────────────────────────────────────────
+
+class RoomViewRow extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
-  final TextStyle? valueStyle;
-  const _InfoRow({required this.label, required this.value, this.valueStyle});
+  final Color? valueColor;
+  const RoomViewRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 80,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w500,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(children: [
+        Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: .45)),
+        const SizedBox(width: AppSpacing.md),
+        Text(label,
+            style: AppTextStyles.label(context)
+                .copyWith(color: cs.onSurface.withValues(alpha: .6))),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
             value,
-            style: valueStyle ?? Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.right,
+            softWrap: true,
+            style: AppTextStyles.label(context).copyWith(
+              fontWeight: FontWeight.w600,
+              color: valueColor,
+            ),
           ),
         ),
-      ],
+      ]),
     );
   }
 }

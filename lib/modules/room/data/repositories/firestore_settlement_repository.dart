@@ -79,7 +79,8 @@ class FirestoreSettlementRepository implements SettlementRepository {
         'status': SettlementStatus.cancelled.name,
         'cancelledAt': FieldValue.serverTimestamp(),
       });
-      transaction.update(roomRef, {'ledgerVersion': FieldValue.increment(1)});
+      final nextVersion = (room['ledgerVersion'] as int? ?? 0) + 1;
+      transaction.update(roomRef, {'ledgerVersion': nextVersion});
       transaction.set(_source.activities(roomId).doc(), {
         'type': ActivityType.roomSettingsChanged.name,
         'performedBy': performedBy,

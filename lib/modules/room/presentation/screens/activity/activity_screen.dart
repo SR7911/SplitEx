@@ -8,26 +8,43 @@ import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
 
+const _kGreen  = Color(0xFF22C55E);
+const _kRed    = Color(0xFFEF4444);
+const _kAmber  = Color(0xFFF59E0B);
+const _kBlue   = Color(0xFF3B82F6);
+const _kTeal   = Color(0xFF14B8A6);
+const _kPurple = Color(0xFF8B5CF6);
+const _kSlate  = Color(0xFF64748B);
+
 class ActivityScreen extends ConsumerWidget {
   final String roomId;
-  const ActivityScreen({super.key, required this.roomId});
+  final DateTime? selectedMonth;
+  const ActivityScreen({super.key, required this.roomId, this.selectedMonth});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final activitiesAsync = ref.watch(activitiesStreamProvider(roomId));
     final roomAsync = ref.watch(roomStreamProvider(roomId));
+    final month = selectedMonth ?? DateTime.now();
 
     return Scaffold(
-      appBar: const AppHeader(
+      appBar: AppHeader(
         showBack: true,
-        title: 'Activity Log',
+        title: DateFormat('MMM yyyy').format(month) == DateFormat('MMM yyyy').format(DateTime.now())
+            ? 'Activity Log'
+            : 'Activity · ${DateFormat('MMM yyyy').format(month)}',
         showNotification: false,
       ),
       body: GradientBody(
         child: activitiesAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Error: $e')),
-          data: (activities) {
+          data: (allActivities) {
+            final activities = allActivities
+                .where((a) =>
+                    a.createdAt.year == month.year &&
+                    a.createdAt.month == month.month)
+                .toList();
             if (activities.isEmpty) {
               return const AppEmptyState(
                 icon: Icons.history_rounded,
@@ -97,19 +114,31 @@ class _DateSeparator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isToday = _label() == 'Today';
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Expanded(child: Divider(color: cs.outlineVariant, thickness: 0.5)),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              _label(),
-              style: TextStyle(
-                fontSize: 12,
-                color: cs.onSurface.withValues(alpha: 0.5),
-                fontWeight: FontWeight.w500,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: isToday
+                    ? cs.primary.withValues(alpha: .12)
+                    : cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Text(
+                _label(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isToday
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: .55),
+                ),
               ),
             ),
           ),
@@ -126,33 +155,33 @@ class _ActivityTile extends StatelessWidget {
   const _ActivityTile({required this.activity, required this.nameMap});
 
   IconData get _icon => switch (activity.type) {
-    ActivityType.expenseAdded => Icons.add_circle,
-    ActivityType.expenseEdited => Icons.edit,
-    ActivityType.expenseDeleted => Icons.delete,
-    ActivityType.settlementCreated => Icons.payment,
-    ActivityType.settlementConfirmed => Icons.check_circle,
-    ActivityType.memberJoined => Icons.person_add,
-    ActivityType.memberLeft => Icons.person_remove,
-    ActivityType.roomCreated => Icons.home,
-    ActivityType.roomSettingsChanged => Icons.settings,
-    ActivityType.billAdded => Icons.add_circle_outline,
-    ActivityType.billEdited => Icons.edit,
-    ActivityType.billDeleted => Icons.delete_outline,
+    ActivityType.expenseAdded      => Icons.add_circle_outline_rounded,
+    ActivityType.expenseEdited     => Icons.edit_rounded,
+    ActivityType.expenseDeleted    => Icons.delete_outline_rounded,
+    ActivityType.settlementCreated  => Icons.payment_rounded,
+    ActivityType.settlementConfirmed => Icons.check_circle_outline_rounded,
+    ActivityType.memberJoined      => Icons.person_add_alt_1_rounded,
+    ActivityType.memberLeft        => Icons.person_remove_alt_1_rounded,
+    ActivityType.roomCreated       => Icons.home_rounded,
+    ActivityType.roomSettingsChanged => Icons.settings_rounded,
+    ActivityType.billAdded         => Icons.receipt_long_rounded,
+    ActivityType.billEdited        => Icons.edit_note_rounded,
+    ActivityType.billDeleted       => Icons.delete_sweep_rounded,
   };
 
   Color get _color => switch (activity.type) {
-    ActivityType.expenseAdded => Colors.green,
-    ActivityType.expenseEdited => Colors.blue,
-    ActivityType.expenseDeleted => Colors.red,
-    ActivityType.settlementCreated => Colors.orange,
-    ActivityType.settlementConfirmed => Colors.green,
-    ActivityType.memberJoined => Colors.teal,
-    ActivityType.memberLeft => Colors.grey,
-    ActivityType.roomCreated => Colors.purple,
-    ActivityType.roomSettingsChanged => Colors.amber,
-    ActivityType.billAdded => Colors.green,
-    ActivityType.billEdited => Colors.blue,
-    ActivityType.billDeleted => Colors.red,
+    ActivityType.expenseAdded      => _kGreen,
+    ActivityType.expenseEdited     => _kBlue,
+    ActivityType.expenseDeleted    => _kRed,
+    ActivityType.settlementCreated  => _kAmber,
+    ActivityType.settlementConfirmed => _kGreen,
+    ActivityType.memberJoined      => _kTeal,
+    ActivityType.memberLeft        => _kSlate,
+    ActivityType.roomCreated       => _kPurple,
+    ActivityType.roomSettingsChanged => _kAmber,
+    ActivityType.billAdded         => _kGreen,
+    ActivityType.billEdited        => _kBlue,
+    ActivityType.billDeleted       => _kRed,
   };
 
   String _actionText() {
@@ -250,61 +279,73 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeStr = DateFormat('dd MMM, hh:mm a').format(activity.createdAt);
-    final hasDetails =
-        activity.metadata != null && activity.metadata!.isNotEmpty;
+    final timeStr = DateFormat('hh:mm a').format(activity.createdAt);
+    final hasDetails = activity.metadata != null && activity.metadata!.isNotEmpty;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = _color;
 
-    return InkWell(
+    return GestureDetector(
       onTap: hasDetails ? () => _showDetails(context) : null,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: isDark ? cs.surfaceContainerHigh : cs.surface,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(color: color.withValues(alpha: isDark ? .15 : .12)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? .08 : .03),
+              blurRadius: 6, offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: _color.withValues(alpha: 0.15),
-                child: Icon(_icon, size: 18, color: _color),
-              ),
               Container(
-                width: 2,
-                height: 40,
-                color: Theme.of(context).colorScheme.outlineVariant,
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(_icon, size: 18, color: color),
               ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _actionText(),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface),
+                      maxLines: 2, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      timeStr,
+                      style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: .45)),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasDetails)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Details',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.primary),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _actionText(),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    timeStr,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  if (hasDetails)
-                    Text(
-                      'Tap for details',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

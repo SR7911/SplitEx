@@ -6,6 +6,10 @@ import 'package:split_ex/modules/room/domain/entities/bill_model.dart';
 import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
 import 'package:split_ex/modules/room/presentation/widgets/receipt_picker.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
+import 'package:split_ex/modules/personal/presentation/shared/widgets/personal_form_sheet.dart';
+import 'package:split_ex/modules/room/presentation/screens/expense/add_expense_sheet.dart'
+    show RoomDateButton;
+import 'package:split_ex/shared/ui/design_system/design_system.dart';
 
 void showAddBillSheet(
   BuildContext context, {
@@ -32,7 +36,7 @@ class _AddBillSheet extends ConsumerStatefulWidget {
 
 class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
+  final _amountCtrl = TextEditingController();
   BillType _billType = BillType.rent;
   late DateTime _date;
   bool _isLoading = false;
@@ -46,18 +50,8 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
 
   @override
   void dispose() {
-    _amountController.dispose();
+    _amountCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null) setState(() => _date = picked);
   }
 
   Future<void> _save() async {
@@ -67,35 +61,29 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
     final userId = ref.read(currentUserIdProvider);
     if (!room.canWrite(userId)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This room is read-only for you.')),
-      );
+          const SnackBar(content: Text('This room is read-only for you.')));
       return;
     }
     setState(() => _isLoading = true);
-
-    final List<String> splitAmong = room.memberIds;
     final bill = BillModel(
       id: '',
       type: _billType,
-      amount: double.parse(_amountController.text.trim()),
+      amount: double.parse(_amountCtrl.text.trim()),
       paidBy: userId,
       splitType: 'equal',
-      splitAmong: splitAmong,
+      splitAmong: room.memberIds,
       month: DateFormat('yyyy-MM').format(_date),
       date: _date,
       receiptUrl: _receiptUrl,
       createdAt: DateTime.now(),
     );
-
     try {
       await ref.read(recordRoomBillProvider)(widget.roomId, bill);
       if (mounted) Navigator.pop(context);
     } on Exception catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.toString())));
-      }
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -103,243 +91,106 @@ class _AddBillSheetState extends ConsumerState<_AddBillSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Drag handle
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                // Header
-                Row(
-                  children: [
-                    Icon(
-                      Icons.receipt_long,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Add Bill',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Bill type (full‑width segmented)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.category,
-                          size: 18,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Bill type',
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: SegmentedButton<BillType>(
-                        segments: const [
-                          ButtonSegment(
-                            value: BillType.rent,
-                            label: Text('Rent'),
-                            icon: Icon(Icons.home, size: 18),
-                          ),
-                          ButtonSegment(
-                            value: BillType.electricity,
-                            label: Text('EB'),
-                            icon: Icon(Icons.bolt, size: 18),
-                          ),
-                          ButtonSegment(
-                            value: BillType.water,
-                            label: Text('Water'),
-                            icon: Icon(Icons.water_drop, size: 18),
-                          ),
-                        ],
-                        selected: {_billType},
-                        onSelectionChanged: (v) =>
-                            setState(() => _billType = v.first),
-                        style: ButtonStyle(
-                          visualDensity: VisualDensity.compact,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: MaterialStateProperty.resolveWith((
-                            states,
-                          ) {
-                            if (states.contains(MaterialState.selected))
-                              return Theme.of(context).colorScheme.primary;
-                            return Colors.transparent;
-                          }),
-                          foregroundColor: MaterialStateProperty.resolveWith((
-                            states,
-                          ) {
-                            if (states.contains(MaterialState.selected))
-                              return Colors.white;
-                            return Theme.of(context).colorScheme.onSurface;
-                          }),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Amount
-                TextFormField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Amount (₹)',
-                    labelStyle: const TextStyle(fontWeight: FontWeight.normal),
-                    prefixIcon: Icon(
-                      Icons.currency_rupee,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Enter amount';
-                    if (double.tryParse(v) == null || double.parse(v) <= 0)
-                      return 'Enter valid amount';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                // Date picker
-                InkWell(
-                  onTap: _pickDate,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 18,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          DateFormat('dd MMM yyyy').format(_date),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.normal,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Receipt picker
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: ReceiptPicker(
-                    roomId: widget.roomId,
-                    folder: 'bills',
-                    onUploaded: (url) => _receiptUrl = url,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Save button
-                FilledButton(
-                  onPressed: _isLoading ? null : _save,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Add Bill',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                ),
-              ],
+    return PersonalFormSheet(
+      title: 'Add Bill',
+      icon: Icons.receipt_long_rounded,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Bill type
+            Text(
+              'Bill Type',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
-          ),
+            const SizedBox(height: AppSpacing.sm),
+            SegmentedButton<BillType>(
+              segments: const [
+                ButtonSegment(
+                    value: BillType.rent,
+                    label: Text('Rent'),
+                    icon: Icon(Icons.home_rounded, size: 16)),
+                ButtonSegment(
+                    value: BillType.electricity,
+                    label: Text('EB'),
+                    icon: Icon(Icons.bolt_rounded, size: 16)),
+                ButtonSegment(
+                    value: BillType.water,
+                    label: Text('Water'),
+                    icon: Icon(Icons.water_drop_rounded, size: 16)),
+              ],
+              selected: {_billType},
+              onSelectionChanged: (v) =>
+                  setState(() => _billType = v.first),
+            ),
+            const SizedBox(height: AppSpacing.base),
+
+            // Amount
+            TextFormField(
+              controller: _amountCtrl,
+              autofocus: true,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹)',
+                prefixIcon: Icon(Icons.currency_rupee_rounded),
+              ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Required';
+                if (double.tryParse(v) == null || double.parse(v) <= 0)
+                  return 'Enter a valid amount';
+                return null;
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Date
+            RoomDateButton(
+              date: _date,
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _date = picked);
+              },
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            // Receipt
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withValues(alpha: .5),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              child: ReceiptPicker(
+                roomId: widget.roomId,
+                folder: 'bills',
+                onUploaded: (url) => _receiptUrl = url,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+
+            FilledButton(
+              onPressed: _isLoading ? null : _save,
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Add Bill'),
+            ),
+          ],
         ),
       ),
     );

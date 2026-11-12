@@ -15,14 +15,22 @@ import 'package:split_ex/modules/room/presentation/screens/settlement/upi_id_dia
 import 'package:split_ex/app/auth/services/user_service.dart';
 import 'package:split_ex/shared/ui/design_system/design_system.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
+import 'package:split_ex/app/auth/providers/user_profiles_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/bill_provider.dart';
+import 'package:split_ex/modules/room/presentation/providers/settlement_provider.dart';
+import 'package:split_ex/modules/room/dependencies.dart';
 
-const _kGreen = Color(0xFF22C55E);
-const _kRed = Color(0xFFEF4444);
-const _kBlue = Color(0xFF3B82F6);
-const _kAmber = Color(0xFFF59E0B);
+const _kGreen  = Color(0xFF22C55E);
+const _kRed    = Color(0xFFEF4444);
+const _kBlue   = Color(0xFF3B82F6);
+const _kAmber  = Color(0xFFF59E0B);
 const _kIndigo = Color(0xFF6366F1);
-const _kTeal = Color(0xFF14B8A6);
+const _kTeal   = Color(0xFF14B8A6);
 const _kPurple = Color(0xFF8B5CF6);
+const _kPink   = Color(0xFFEC4899);
+
+// Full palette — cycles for members, tips, activity tiles, etc.
+const _kPalette = [_kBlue, _kTeal, _kGreen, _kPurple, _kAmber, _kIndigo, _kPink, _kRed];
 
 // ---------------------------------------------------------------------------
 // Room entry point — owns Room month state, widgets, and UPI entry checks.
@@ -37,7 +45,6 @@ class RoomTab extends ConsumerStatefulWidget {
 
 class _RoomTabState extends ConsumerState<RoomTab> {
   late DateTime _selectedMonth;
-  String? _selectedRoomId;
 
   @override
   void initState() {
@@ -112,6 +119,66 @@ class _RoomTabState extends ConsumerState<RoomTab> {
     return true;
   }
 
+  Future<void> _generateReceipt(String roomId) async {
+    final month = _monthKey;
+    final room = await ref.read(roomStreamProvider(roomId).future);
+    if (room == null || !mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Generating receipt...')));
+    try {
+      final expenses = await ref.read(
+        monthExpensesProvider(MonthRoomKey(roomId: roomId, month: month)).future,
+      );
+      final bills = await ref.read(
+        billsStreamProvider(MonthBillKey(roomId: roomId, month: month)).future,
+      );
+      final settlements =
+          await ref.read(settlementsStreamProvider(roomId).future);
+      final participantIds = ref.read(
+        monthParticipantIdsProvider(
+            MonthBalanceKey(roomId: roomId, month: month)),
+      );
+      final debts = ref.read(
+        monthPairDebtsProvider(
+            MonthBalanceKey(roomId: roomId, month: month)),
+      );
+      final detailedMap = ref.read(
+        detailedDebtsMapProvider(
+            MonthBalanceKey(roomId: roomId, month: month)),
+      );
+      final members =
+          await ref.read(userProfilesByIdsProvider(participantIds).future);
+      final nameMap = {for (final m in members) m.uid: m.name};
+      final generator = ref.read(roomReceiptExporterProvider);
+      final filePath = await generator.generateMonthlyReceiptPath(
+        roomName: room.name,
+        month: month,
+        expenses: expenses,
+        bills: bills,
+        nameMap: nameMap,
+        debts: debts,
+        memberCount: participantIds.length,
+        detailedDebtsMap: detailedMap,
+        memberIds: participantIds,
+        settlements:
+            settlements.where((s) => s.effectiveMonth == month).toList(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      await generator.sharePdfPath(
+        filePath,
+        text: 'SplitEx Monthly Receipt - ${room.name} ($month)',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to export receipt: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final roomsAsync = ref.watch(userRoomsProvider);
@@ -124,9 +191,7 @@ class _RoomTabState extends ConsumerState<RoomTab> {
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (rooms) {
         if (rooms.isEmpty) return _EmptyState();
-        final room =
-            rooms.where((r) => r.id == _selectedRoomId).firstOrNull ??
-            rooms.first;
+        final room = rooms.first;
         final expensesAsync = ref.watch(
           monthExpensesProvider(
             MonthRoomKey(roomId: room.id, month: _monthKey),
@@ -141,43 +206,6 @@ class _RoomTabState extends ConsumerState<RoomTab> {
               children: [
                 _Header(userName: userName, selectedMonth: _selectedMonth),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: ValueKey(room.id),
-                  initialValue: room.id,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Your rooms'),
-                  items: rooms
-                      .map(
-                        (r) => DropdownMenuItem(
-                          value: r.id,
-                          child: Text(
-                            '${r.name}${r.isArchived
-                                ? ' · Archived'
-                                : !r.isMember(userId)
-                                ? ' · Former member'
-                                : ''}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (id) => setState(() => _selectedRoomId = id),
-                ),
-                Row(
-                  children: [
-                    TextButton.icon(
-                      onPressed: () => context.push('/create-room'),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create room'),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => context.push('/join-room'),
-                      icon: const Icon(Icons.login),
-                      label: const Text('Join room'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
                 _HeroCard(
                   monthKey: _monthKey,
                   selectedMonth: _selectedMonth,
@@ -199,6 +227,7 @@ class _RoomTabState extends ConsumerState<RoomTab> {
                     if (context.mounted)
                       context.push('/room/${room.id}', extra: _selectedMonth);
                   },
+                  onGenerateReceipt: () => _generateReceipt(room.id),
                 ),
                 const SizedBox(height: 20),
                 _RoomCard(
@@ -210,6 +239,8 @@ class _RoomTabState extends ConsumerState<RoomTab> {
                       context.push('/room/${room.id}', extra: _selectedMonth);
                   },
                 ),
+                const SizedBox(height: 16),
+                _MembersStrip(roomId: room.id),
                 if (expenses.isNotEmpty) ...[
                   const SizedBox(height: 20),
                   _CategoryBreakdown(expenses: expenses),
@@ -222,7 +253,7 @@ class _RoomTabState extends ConsumerState<RoomTab> {
                 ),
                 if (_isCurrentMonth) ...[
                   const SizedBox(height: 20),
-                  _RecentActivity(roomId: room.id),
+                  _RecentActivity(roomId: room.id, selectedMonth: _selectedMonth),
                 ],
                 const SizedBox(height: 16),
                 _OnboardingTips(roomId: room.id, userId: userId),
@@ -673,7 +704,7 @@ class _MiniStats extends StatelessWidget {
             label: 'Total Spent',
             value: '₹${total.toStringAsFixed(0)}',
             icon: Icons.receipt_long_rounded,
-            color: _kBlue,
+            color: _kIndigo,
           ),
         ),
         const SizedBox(width: 10),
@@ -682,7 +713,7 @@ class _MiniStats extends StatelessWidget {
             label: 'You Paid',
             value: '₹${mine.toStringAsFixed(0)}',
             icon: Icons.person_rounded,
-            color: _kGreen,
+            color: _kTeal,
           ),
         ),
         const SizedBox(width: 10),
@@ -691,7 +722,7 @@ class _MiniStats extends StatelessWidget {
             label: 'Others Paid',
             value: '₹${others.toStringAsFixed(0)}',
             icon: Icons.people_rounded,
-            color: _kIndigo,
+            color: _kAmber,
           ),
         ),
       ],
@@ -708,11 +739,13 @@ class _QuickActions extends ConsumerWidget {
   final DateTime selectedMonth;
   final Future<bool> Function() checkUpiExist;
   final VoidCallback onOpenRoom;
+  final VoidCallback onGenerateReceipt;
   const _QuickActions({
     required this.roomId,
     required this.selectedMonth,
     required this.checkUpiExist,
     required this.onOpenRoom,
+    required this.onGenerateReceipt,
   });
 
   @override
@@ -740,7 +773,7 @@ class _QuickActions extends ConsumerWidget {
           },
         ),
       _QA(
-        icon: Icons.handshake_outlined,
+        icon: Icons.handshake_rounded,
         label: 'Settle',
         color: _kTeal,
         onTap: () async {
@@ -751,15 +784,34 @@ class _QuickActions extends ConsumerWidget {
       _QA(
         icon: Icons.home_rounded,
         label: 'Room',
-        color: _kBlue,
+        color: _kIndigo,
         onTap: onOpenRoom,
+      ),
+      _QA(
+        icon: Icons.bar_chart_rounded,
+        label: 'Analytics',
+        color: _kPurple,
+        onTap: () => context.push('/room/$roomId/analytics', extra: selectedMonth),
       ),
       _QA(
         icon: Icons.history_rounded,
         label: 'Activity',
-        color: _kIndigo,
-        onTap: () => context.push('/room/$roomId/activity'),
+        color: _kAmber,
+        onTap: () => context.push('/room/$roomId/activity', extra: selectedMonth),
       ),
+      _QA(
+        icon: Icons.picture_as_pdf_rounded,
+        label: 'Receipt',
+        color: _kRed,
+        onTap: () => onGenerateReceipt(),
+      ),
+      if (selectedRoom?.isAdmin(ref.watch(currentUserIdProvider)) ?? false)
+        _QA(
+          icon: Icons.settings_rounded,
+          label: 'Settings',
+          color: _kPink,
+          onTap: () => context.push('/room/$roomId/settings'),
+        ),
     ];
 
     return SizedBox(
@@ -841,17 +893,25 @@ class _RoomCard extends StatelessWidget {
     required this.onTap,
   });
 
+  // Pick a stable accent from the palette based on room name
+  Color _accent() {
+    final name = room.name as String;
+    final idx = name.isEmpty ? 0 : name.codeUnitAt(0) % _kPalette.length;
+    return _kPalette[idx];
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isAdmin = room.isAdmin(userId) as bool;
+    final accent = _accent();
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadius.xl),
       child: Container(
-        decoration: appCardDecoration(context, accentColor: _kBlue),
+        decoration: appCardDecoration(context, accentColor: accent),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Row(
@@ -860,16 +920,16 @@ class _RoomCard extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.1),
+                  color: accent.withValues(alpha: isDark ? 0.15 : 0.1),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
                   child: Text(
                     (room.name as String)[0].toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: _kBlue,
+                      color: accent,
                     ),
                   ),
                 ),
@@ -964,16 +1024,16 @@ class _RoomCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: _kBlue.withValues(alpha: isDark ? 0.15 : 0.1),
+                    color: accent.withValues(alpha: isDark ? 0.15 : 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _kBlue.withValues(alpha: 0.25)),
+                    border: Border.all(color: accent.withValues(alpha: 0.25)),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Admin',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: _kBlue,
+                      color: accent,
                     ),
                   ),
                 )
@@ -1026,18 +1086,7 @@ class _CategoryBreakdown extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : cs.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      decoration: appCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1150,18 +1199,7 @@ class _SpendingSummary extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : cs.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      decoration: appCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1178,7 +1216,7 @@ class _SpendingSummary extends StatelessWidget {
                   label: 'Total ($monthLabel)',
                   value: '₹${totalSpent.toStringAsFixed(0)}',
                   icon: Icons.group_rounded,
-                  color: _kBlue,
+                  color: _kTeal,
                   isDark: isDark,
                   cs: cs,
                 ),
@@ -1189,7 +1227,7 @@ class _SpendingSummary extends StatelessWidget {
                   label: 'You ($monthLabel)',
                   value: '₹${mySpent.toStringAsFixed(0)}',
                   icon: Icons.person_rounded,
-                  color: _kPurple,
+                  color: _kPink,
                   isDark: isDark,
                   cs: cs,
                 ),
@@ -1224,7 +1262,7 @@ class _SpendingSummary extends StatelessWidget {
               minHeight: 7,
               backgroundColor: cs.outline.withValues(alpha: 0.1),
               valueColor: AlwaysStoppedAnimation<Color>(
-                myPercentage > 0.5 ? _kBlue : _kPurple,
+                myPercentage > 0.5 ? _kTeal : _kPink,
               ),
             ),
           ),
@@ -1316,7 +1354,8 @@ class _StatTile extends StatelessWidget {
 
 class _RecentActivity extends ConsumerWidget {
   final String roomId;
-  const _RecentActivity({required this.roomId});
+  final DateTime selectedMonth;
+  const _RecentActivity({required this.roomId, required this.selectedMonth});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1328,18 +1367,7 @@ class _RecentActivity extends ConsumerWidget {
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? cs.surfaceContainerHigh : cs.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      decoration: appCardDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1353,7 +1381,7 @@ class _RecentActivity extends ConsumerWidget {
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               GestureDetector(
-                onTap: () => context.push('/room/$roomId/activity'),
+                onTap: () => context.push('/room/$roomId/activity', extra: selectedMonth),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.md,
@@ -1528,20 +1556,23 @@ class _OnboardingTips extends ConsumerWidget {
     }
     if (tips.isEmpty) return const SizedBox.shrink();
 
-    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         AppSectionHeader(title: 'Tips', actionLabel: null, onAction: null),
         const SizedBox(height: 10),
-        ...tips.map(
-          (t) => Container(
+        ...tips.asMap().entries.map(
+          (entry) {
+            final t = entry.value;
+            final color = _kPalette[entry.key % _kPalette.length];
+            return Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              color: cs.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: cs.outline.withValues(alpha: 0.08)),
+              color: color.withValues(alpha: isDark ? 0.07 : 0.04),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(color: color.withValues(alpha: 0.14)),
             ),
             child: Row(
               children: [
@@ -1549,10 +1580,10 @@ class _OnboardingTips extends ConsumerWidget {
                   width: 34,
                   height: 34,
                   decoration: BoxDecoration(
-                    color: cs.primary.withValues(alpha: 0.1),
+                    color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(t.icon, size: 16, color: cs.primary),
+                  child: Icon(t.icon, size: 16, color: color),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1560,13 +1591,14 @@ class _OnboardingTips extends ConsumerWidget {
                 ),
                 if (t.action != null)
                   IconButton(
-                    icon: const Icon(Icons.chevron_right, size: 18),
+                    icon: Icon(Icons.chevron_right, size: 18, color: color),
                     onPressed: t.action,
                     padding: EdgeInsets.zero,
                   ),
               ],
             ),
-          ),
+          );
+          },
         ),
       ],
     );
@@ -1578,6 +1610,94 @@ class _Tip {
   final String text;
   final VoidCallback? action;
   const _Tip({required this.icon, required this.text, this.action});
+}
+
+// ---------------------------------------------------------------------------
+// _MembersStrip — avatar pills for current room members
+// ---------------------------------------------------------------------------
+
+class _MembersStrip extends ConsumerWidget {
+  final String roomId;
+  const _MembersStrip({required this.roomId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final room = ref.watch(roomStreamProvider(roomId)).valueOrNull;
+    if (room == null || room.memberIds.isEmpty) return const SizedBox.shrink();
+
+    final profilesAsync = ref.watch(userProfilesByIdsProvider(room.memberIds));
+    final nameMap = <String, String>{};
+    if (profilesAsync.valueOrNull != null) {
+      for (final p in profilesAsync.value!) nameMap[p.uid] = p.name;
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: appCardDecoration(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(
+            title: 'Members (${room.memberIds.length})',
+            actionLabel: null,
+            onAction: null,
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: room.memberIds.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final id = entry.value;
+              final isAdmin = room.isAdmin(id);
+              final color = _kPalette[idx % _kPalette.length];
+              final name = nameMap[id] ?? id;
+              final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: AppSpacing.xs,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: isDark ? 0.10 : 0.06),
+                  borderRadius: BorderRadius.circular(AppRadius.xxl),
+                  border: Border.all(color: color.withValues(alpha: 0.15)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: 11,
+                      backgroundColor: color.withValues(alpha: 0.12),
+                      child: Text(
+                        initial,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      isAdmin ? '$name · Admin' : name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

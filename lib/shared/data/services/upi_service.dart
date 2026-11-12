@@ -10,14 +10,12 @@ class UpiService implements UpiPaymentLauncher {
     required double amount,
     String? note,
   }) async {
-    // Build URI string manually — Flutter's Uri() class adds extra encoding
-    // that causes GPay/PhonePe/Paytm to reject or show errors
     final params = <String, String>{
       'pa': upiId,
       'pn': payeeName,
       'am': amount.toStringAsFixed(2),
       'cu': 'INR',
-      'mode': '00', // default mode
+      'mode': '00',
       if (note != null && note.isNotEmpty) 'tn': note,
     };
 
@@ -25,13 +23,19 @@ class UpiService implements UpiPaymentLauncher {
         .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
         .join('&');
 
-    final uriString = 'upi://pay?$query';
-    final uri = Uri.parse(uriString);
+    final uri = Uri.parse('upi://pay?$query');
 
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return true;
+    try {
+      // Skip canLaunchUrl — it returns false for upi:// on Android even when
+      // GPay/PhonePe are installed unless the intent query is declared in
+      // AndroidManifest. Attempt launch directly and catch failures.
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalNonBrowserApplication,
+      );
+      return launched;
+    } catch (_) {
+      return false;
     }
-    return false;
   }
 }

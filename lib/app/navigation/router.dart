@@ -166,8 +166,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/room/:roomId/activity',
-        builder: (context, state) =>
-            ActivityScreen(roomId: state.pathParameters['roomId']!),
+        builder: (context, state) => ActivityScreen(
+          roomId: state.pathParameters['roomId']!,
+          selectedMonth: state.extra as DateTime?,
+        ),
       ),
       GoRoute(
         path: '/room/:roomId/storage',
@@ -176,8 +178,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/room/:roomId/analytics',
-        builder: (context, state) =>
-            AnalyticsScreen(roomId: state.pathParameters['roomId']!),
+        builder: (context, state) => AnalyticsScreen(
+          roomId: state.pathParameters['roomId']!,
+          selectedMonth: state.extra as DateTime?,
+        ),
       ),
       GoRoute(
         path: '/room/:roomId/settings',

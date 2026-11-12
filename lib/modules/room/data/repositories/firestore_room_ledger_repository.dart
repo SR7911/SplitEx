@@ -73,7 +73,8 @@ class FirestoreRoomLedgerRepository implements RoomLedgerRepository {
         throw Exception('The room changed. Refresh and try again.');
       }
       await write(transaction, room);
-      transaction.update(roomRef, {'ledgerVersion': FieldValue.increment(1)});
+      final nextVersion = (data['ledgerVersion'] as int? ?? 0) + 1;
+      transaction.update(roomRef, {'ledgerVersion': nextVersion});
       transaction.set(_source.activities(roomId).doc(), {
         'type': activity.type.name,
         'performedBy': activity.performedBy,

@@ -31,7 +31,8 @@ class RoomFirestoreDataSource {
         throw Exception('This room is read-only.');
       }
       await write(transaction);
-      transaction.update(ref, {'ledgerVersion': FieldValue.increment(1)});
+      final nextVersion = (room['ledgerVersion'] as int? ?? 0) + 1;
+      transaction.update(ref, {'ledgerVersion': nextVersion});
     });
   }
 
@@ -59,7 +60,13 @@ class RoomFirestoreDataSource {
         .get();
     if (query.docs.isEmpty) return null;
     final ref = query.docs.first.reference;
-    return db.runTransaction((transaction) async {
+
+    // Phase 1: atomically update only the room document.
+    // users write and activity write are intentionally outside the transaction
+    // because Firestore rules reject cross-collection writes from a user who
+    // is not yet a participant (getAfter reads inside rules are unreliable
+    // for the joining user's first write).
+    final result = await db.runTransaction((transaction) async {
       final latest = await transaction.get(ref);
       final data = latest.data();
       if (data == null) return null;
@@ -71,35 +78,46 @@ class RoomFirestoreDataSource {
       if (memberIds.length >= maxMembers) {
         throw Exception('Room is full (max $maxMembers members)');
       }
-      final updated = {
-        ...data,
-        'memberIds': [...memberIds, userId],
-        'participantIds': {
-          ...List<String>.from(data['participantIds'] ?? []),
-          ...memberIds,
-          userId,
-        }.toList(),
-        'legacyBillMemberIds': data['legacyBillMemberIds'] ?? memberIds,
-      };
-      transaction.update(ref, {
-        'memberIds': updated['memberIds'],
-        'participantIds': updated['participantIds'],
-        'legacyBillMemberIds': updated['legacyBillMemberIds'],
-        'ledgerVersion': FieldValue.increment(1),
-      });
-      transaction.set(users.doc(userId), {
-        'rooms': FieldValue.arrayUnion([latest.id]),
-      }, SetOptions(merge: true));
-      _activity(
-        transaction,
-        latest.id,
+      final updatedMemberIds = [...memberIds, userId];
+      final updatedParticipantIds = {
+        ...List<String>.from(data['participantIds'] ?? []),
+        ...memberIds,
         userId,
-        'memberJoined',
-        'A member joined the room',
-        {'memberId': userId},
-      );
-      return (latest.id, updated);
+      }.toList();
+      final nextVersion = (data['ledgerVersion'] as int? ?? 0) + 1;
+      transaction.update(ref, {
+        'memberIds': updatedMemberIds,
+        'participantIds': updatedParticipantIds,
+        'ledgerVersion': nextVersion,
+      });
+      return (latest.id, {
+        ...data,
+        'memberIds': updatedMemberIds,
+        'participantIds': updatedParticipantIds,
+        'ledgerVersion': nextVersion,
+      });
     });
+
+    if (result == null) return null;
+    final roomId = result.$1;
+
+    // Phase 2: user profile + activity — both allowed independently.
+    final batch = db.batch();
+    batch.set(
+      users.doc(userId),
+      {'rooms': FieldValue.arrayUnion([roomId])},
+      SetOptions(merge: true),
+    );
+    batch.set(activities(roomId).doc(), {
+      'type': 'memberJoined',
+      'performedBy': userId,
+      'description': 'A member joined the room',
+      'createdAt': FieldValue.serverTimestamp(),
+      'metadata': {'memberId': userId},
+    });
+    await batch.commit();
+
+    return result;
   }
 
   Future<void> removeMember(
@@ -123,6 +141,7 @@ class RoomFirestoreDataSource {
       final userRef = users.doc(userId);
       final user = await transaction.get(userRef);
       final remaining = members.where((id) => id != userId).toList();
+      final nextVersion = (data['ledgerVersion'] as int? ?? 0) + 1;
       transaction.update(roomRef, {
         'memberIds': remaining,
         'participantIds': {
@@ -130,7 +149,7 @@ class RoomFirestoreDataSource {
           ...members,
         }.toList(),
         'legacyBillMemberIds': data['legacyBillMemberIds'] ?? members,
-        'ledgerVersion': FieldValue.increment(1),
+        'ledgerVersion': nextVersion,
         if (remaining.isEmpty) ...{
           'isArchived': true,
           'archivedAt': FieldValue.serverTimestamp(),
@@ -173,9 +192,10 @@ class RoomFirestoreDataSource {
       if (newAdminId == adminId || !members.contains(newAdminId)) {
         throw Exception('Choose another active member as admin.');
       }
+      final nextVersion = (data['ledgerVersion'] as int? ?? 0) + 1;
       transaction.update(ref, {
         'adminId': newAdminId,
-        'ledgerVersion': FieldValue.increment(1),
+        'ledgerVersion': nextVersion,
       });
       _activity(
         transaction,
@@ -199,6 +219,7 @@ class RoomFirestoreDataSource {
       if (archived && !members.contains(userId))
         throw Exception('You are no longer an active member.');
       final rejoin = !archived && members.isEmpty;
+      final nextVersion = (data['ledgerVersion'] as int? ?? 0) + 1;
       transaction.update(ref, {
         'isArchived': archived,
         'archivedAt': archived ? FieldValue.serverTimestamp() : null,
@@ -209,7 +230,7 @@ class RoomFirestoreDataSource {
           userId,
         }.toList(),
         if (rejoin) 'memberIds': [userId],
-        'ledgerVersion': FieldValue.increment(1),
+        'ledgerVersion': nextVersion,
       });
       if (rejoin) {
         transaction.set(users.doc(userId), {
@@ -264,13 +285,14 @@ class RoomFirestoreDataSource {
       final data = (await transaction.get(ref)).data();
       if (data == null || data['adminId'] != userId)
         throw Exception('Only the admin can restore historical access.');
+      final nextVersion = (data['ledgerVersion'] as int? ?? 0) + 1;
       transaction.update(ref, {
         'participantIds': {
           ...List<String>.from(data['participantIds'] ?? []),
           ...List<String>.from(data['memberIds'] ?? []),
           ...recovered,
         }.toList(),
-        'ledgerVersion': FieldValue.increment(1),
+        'ledgerVersion': nextVersion,
       });
       _activity(
         transaction,

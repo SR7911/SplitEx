@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:split_ex/modules/room/dependencies.dart';
 import 'package:split_ex/app/auth/services/user_service.dart';
 import 'package:split_ex/modules/room/presentation/screens/settlement/upi_id_dialog.dart';
+import 'package:split_ex/modules/room/presentation/providers/room_provider.dart';
 import 'package:split_ex/shared/ui/widgets/app_header.dart';
 import 'package:split_ex/app/auth/providers/session_provider.dart';
 
@@ -31,10 +32,19 @@ class _JoinRoomScreenState extends ConsumerState<JoinRoomScreen> {
     try {
       final userId = ref.read(currentUserIdProvider);
 
-      // Ensure user has a primary UPI ID before joining a room. If missing,
-      // prompt the user explaining that UPI is only used to receive money
-      // (not for fraud). This prompt is skippable earlier in onboarding but
-      // mandatory when joining a room.
+      // Enforce 1-room-per-user: check if already an active member of any room
+      final rooms = ref.read(userRoomsProvider).valueOrNull ?? [];
+      if (rooms.any((r) => r.isMember(userId))) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('You are already a member of a room. Leave your current room before joining another.'),
+            ),
+          );
+        }
+        return;
+      }
+
       final profile = await UserService().getUserProfile(userId);
       if (profile == null || profile.upiId == null || profile.upiId!.isEmpty) {
         final proceed = await showDialog<bool>(

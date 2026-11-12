@@ -198,6 +198,8 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
                   Container(
@@ -290,6 +292,8 @@ class _PairSettlementTimelineState extends State<PairSettlementTimeline> {
                                 ? _kGreen
                                 : (net > 0 ? _kGreen : _kRed),
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
                         ),
                       ],
                     ),
